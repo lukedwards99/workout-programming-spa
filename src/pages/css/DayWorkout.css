@@ -1,0 +1,42 @@
+.day-workout-page {
+  max-width: 1200px;
+}
+
+.workout-group-checkbox {
+  padding: 0.5rem 1rem;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 0.25rem;
+  transition: background-color 0.15s ease-in-out;
+}
+
+.workout-group-checkbox:hover {
+  background-color: #e9ecef;
+}
+
+.workout-group-checkbox .form-check-input:checked ~ .form-check-label {
+  font-weight: 600;
+}
+
+.exercises-list {
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.exercises-list .card {
+  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.exercises-list table input {
+  min-width: 60px;
+}
+
+@media (max-width: 768px) {
+  .day-workout-page h1 {
+    font-size: 1.75rem;
+  }
+  
+  .exercises-list table {
+    font-size: 0.875rem;
+  }
+}
