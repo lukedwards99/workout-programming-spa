@@ -1,18 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Form, Button, ListGroup, Alert, Badge } from 'react-bootstrap';
-import {
-  getAllWorkoutGroups,
-  createWorkoutGroup,
-  updateWorkoutGroup,
-  deleteWorkoutGroup,
-  getAllExercises,
-  createExercise,
-  updateExercise,
-  deleteExercise,
-  downloadSetupDataCSV,
-  importSetupDataFromCSV,
-  clearAllData
-} from '../../db/dataService';
+import { 
+  workoutGroupsApi, 
+  exercisesApi, 
+  dataApi 
+} from '../../api/workoutApi';
 import '../css/Setup.css';
 
 function Setup() {
@@ -38,18 +30,23 @@ function Setup() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    try {
-      const groups = getAllWorkoutGroups();
-      const allExercises = getAllExercises();
-      setWorkoutGroups(groups);
-      setExercises(allExercises);
-      
-      if (groups.length > 0 && !exerciseGroupId) {
-        setExerciseGroupId(groups[0].id);
+  const loadData = async () => {
+    const groupsResponse = await workoutGroupsApi.getAll();
+    const exercisesResponse = await exercisesApi.getAll();
+    
+    if (groupsResponse.success) {
+      setWorkoutGroups(groupsResponse.data);
+      if (groupsResponse.data.length > 0 && !exerciseGroupId) {
+        setExerciseGroupId(groupsResponse.data[0].id);
       }
-    } catch (error) {
-      showAlert('Error loading data: ' + error.message, 'danger');
+    } else {
+      showAlert(groupsResponse.error, 'danger');
+    }
+    
+    if (exercisesResponse.success) {
+      setExercises(exercisesResponse.data);
+    } else {
+      showAlert(exercisesResponse.error, 'danger');
     }
   };
 
@@ -62,23 +59,19 @@ function Setup() {
   const handleGroupSubmit = async (e) => {
     e.preventDefault();
     
-    try {
-      if (editingGroup) {
-        await updateWorkoutGroup(editingGroup.id, groupName, groupNotes);
-        showAlert('Workout group updated successfully');
-      } else {
-        await createWorkoutGroup(groupName, groupNotes);
-        showAlert('Workout group created successfully');
-      }
-      
+    let response;
+    if (editingGroup) {
+      response = await workoutGroupsApi.update(editingGroup.id, { name: groupName, notes: groupNotes });
+    } else {
+      response = await workoutGroupsApi.create({ name: groupName, notes: groupNotes });
+    }
+    
+    if (response.success) {
+      showAlert(response.message);
       resetGroupForm();
-      // Force a fresh reload of all data
-      const groups = getAllWorkoutGroups();
-      const allExercises = getAllExercises();
-      setWorkoutGroups(groups);
-      setExercises(allExercises);
-    } catch (error) {
-      showAlert('Error saving workout group: ' + error.message, 'danger');
+      loadData();
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
@@ -90,16 +83,13 @@ function Setup() {
 
   const handleDeleteGroup = async (id) => {
     if (window.confirm('Are you sure? This will delete all associated exercises and sets.')) {
-      try {
-        await deleteWorkoutGroup(id);
+      const response = await workoutGroupsApi.delete(id);
+      
+      if (response.success) {
         showAlert('Workout group deleted successfully');
-        // Force a fresh reload
-        const groups = getAllWorkoutGroups();
-        const allExercises = getAllExercises();
-        setWorkoutGroups(groups);
-        setExercises(allExercises);
-      } catch (error) {
-        showAlert('Error deleting workout group: ' + error.message, 'danger');
+        loadData();
+      } else {
+        showAlert(response.error, 'danger');
       }
     }
   };
@@ -114,21 +104,27 @@ function Setup() {
   const handleExerciseSubmit = async (e) => {
     e.preventDefault();
     
-    try {
-      if (editingExercise) {
-        await updateExercise(editingExercise.id, parseInt(exerciseGroupId), exerciseName, exerciseNotes);
-        showAlert('Exercise updated successfully');
-      } else {
-        await createExercise(parseInt(exerciseGroupId), exerciseName, exerciseNotes);
-        showAlert('Exercise created successfully');
-      }
-      
+    let response;
+    if (editingExercise) {
+      response = await exercisesApi.update(editingExercise.id, { 
+        workoutGroupId: parseInt(exerciseGroupId), 
+        name: exerciseName, 
+        notes: exerciseNotes 
+      });
+    } else {
+      response = await exercisesApi.create({ 
+        workoutGroupId: parseInt(exerciseGroupId), 
+        name: exerciseName, 
+        notes: exerciseNotes 
+      });
+    }
+    
+    if (response.success) {
+      showAlert(response.message);
       resetExerciseForm();
-      // Force a fresh reload
-      const allExercises = getAllExercises();
-      setExercises(allExercises);
-    } catch (error) {
-      showAlert('Error saving exercise: ' + error.message, 'danger');
+      loadData();
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
@@ -141,14 +137,13 @@ function Setup() {
 
   const handleDeleteExercise = async (id) => {
     if (window.confirm('Are you sure? This will delete all associated sets.')) {
-      try {
-        await deleteExercise(id);
+      const response = await exercisesApi.delete(id);
+      
+      if (response.success) {
         showAlert('Exercise deleted successfully');
-        // Force a fresh reload
-        const allExercises = getAllExercises();
-        setExercises(allExercises);
-      } catch (error) {
-        showAlert('Error deleting exercise: ' + error.message, 'danger');
+        loadData();
+      } else {
+        showAlert(response.error, 'danger');
       }
     }
   };
@@ -164,12 +159,13 @@ function Setup() {
     : exercises;
 
   // Setup Data Export/Import Handlers
-  const handleExportSetupData = () => {
-    try {
-      downloadSetupDataCSV();
-      showAlert('Setup data exported successfully!');
-    } catch (error) {
-      showAlert('Error exporting setup data: ' + error.message, 'danger');
+  const handleExportSetupData = async () => {
+    const response = await dataApi.downloadSetup();
+    
+    if (response.success) {
+      showAlert(response.message);
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
@@ -191,18 +187,19 @@ function Setup() {
 
     try {
       const text = await file.text();
-      const result = await importSetupDataFromCSV(text);
+      const response = await dataApi.importSetup(text);
       
-      showAlert(`Successfully imported ${result.rowCount} records. Reloading...`, 'success');
-      
-      // Reload data
-      setTimeout(() => {
-        loadData();
+      if (response.success) {
+        showAlert(response.message, 'success');
+        e.target.value = '';
+        setTimeout(() => {
+          loadData();
+          setImporting(false);
+        }, 1000);
+      } else {
+        showAlert(response.error, 'danger');
         setImporting(false);
-      }, 1000);
-      
-      // Clear the file input
-      e.target.value = '';
+      }
     } catch (error) {
       showAlert('Error importing setup data: ' + error.message, 'danger');
       setImporting(false);
@@ -217,15 +214,15 @@ const handleClearAllData = async () => {
       return;
     }
 
-    try {
-      await clearAllData();
+    const response = await dataApi.clearAllData();
+    
+    if (response.success) {
       showAlert('All data cleared successfully. The database has been reset.', 'success');
-      // Reload to show empty state
       setTimeout(() => {
         loadData();
       }, 1000);
-    } catch (error) {
-      showAlert('Error clearing all data: ' + error.message, 'danger');
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 

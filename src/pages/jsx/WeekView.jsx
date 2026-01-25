@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Badge, Alert, Modal, Form } from 'react-bootstrap';
-import { 
-  getAllDays, 
-  getDayWorkoutGroups, 
-  generateWorkoutProgram, 
-  addDay, 
-  removeLastDay
-} from '../../db/dataService';
+import {
+  daysApi,
+  dayWorkoutGroupsApi,
+  programApi
+} from '../../api/workoutApi';
 import '../css/WeekView.css';
 
 function WeekView() {
@@ -21,19 +19,23 @@ function WeekView() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    try {
-      const allDays = getAllDays();
-      setDays(allDays);
+  const loadData = async () => {
+    const daysResponse = await daysApi.getAll();
+    
+    if (daysResponse.success) {
+      setDays(daysResponse.data);
       
       // Load workout groups for each day
       const workouts = {};
-      allDays.forEach(day => {
-        workouts[day.id] = getDayWorkoutGroups(day.id);
-      });
+      for (const day of daysResponse.data) {
+        const dayGroupsResponse = await dayWorkoutGroupsApi.getByDay(day.id);
+        if (dayGroupsResponse.success) {
+          workouts[day.id] = dayGroupsResponse.data;
+        }
+      }
       setDayWorkouts(workouts);
-    } catch (error) {
-      showAlert('Error loading data: ' + error.message, 'danger');
+    } else {
+      showAlert(daysResponse.error, 'danger');
     }
   };
 
@@ -42,9 +44,13 @@ function WeekView() {
     // setTimeout(() => setAlert(null), 4000);
   };
 
-  const handleAutoProgramming = () => {
-    const result = generateWorkoutProgram();
-    showAlert(result.message, result.success ? 'success' : 'info');
+  const handleAutoProgramming = async () => {
+    const response = await programApi.generate();
+    if (response.success) {
+      showAlert(response.message, 'success');
+    } else {
+      showAlert(response.error, 'info');
+    }
   };
 
   const handleOpenAddDay = () => {
@@ -64,13 +70,14 @@ function WeekView() {
       return;
     }
 
-    try {
-      await addDay(newDayName.trim());
+    const response = await daysApi.add(newDayName.trim());
+    
+    if (response.success) {
       showAlert(`Day "${newDayName}" added successfully`);
       setShowAddDayModal(false);
       loadData();
-    } catch (error) {
-      showAlert('Error adding day: ' + error.message, 'danger');
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
@@ -86,12 +93,13 @@ function WeekView() {
       return;
     }
 
-    try {
-      await removeLastDay();
+    const response = await daysApi.removeLast();
+    
+    if (response.success) {
       showAlert('Day removed successfully');
       loadData();
-    } catch (error) {
-      showAlert('Error removing day: ' + error.message, 'danger');
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 

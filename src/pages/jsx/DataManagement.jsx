@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Card, Button, Form, Alert } from 'react-bootstrap';
-import { downloadCSV, importFromCSV, exportToCSV, clearWorkoutData } from '../../db/dataService';
+import { dataApi } from '../../api/workoutApi';
 import '../css/DataManagement.css';
 
 function DataManagement() {
@@ -13,24 +13,26 @@ function DataManagement() {
     setTimeout(() => setAlert(null), 5000);
   };
 
-  const handleExport = () => {
-    try {
-      downloadCSV();
-      showAlert('CSV file downloaded successfully!');
-    } catch (error) {
-      showAlert('Error exporting data: ' + error.message, 'danger');
+  const handleExport = async () => {
+    const response = await dataApi.download();
+    
+    if (response.success) {
+      showAlert(response.message);
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
-  const handlePreview = () => {
-    try {
-      const csv = exportToCSV();
-      const lines = csv.split('\n');
+  const handlePreview = async () => {
+    const response = await dataApi.export();
+    
+    if (response.success) {
+      const lines = response.data.csv.split('\n');
       const preview = lines.slice(0, 11).join('\n'); // Header + first 10 rows
       setCsvPreview(preview);
       showAlert('Preview loaded (showing first 10 rows)', 'info');
-    } catch (error) {
-      showAlert('Error generating preview: ' + error.message, 'danger');
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
@@ -47,15 +49,14 @@ function DataManagement() {
 
     try {
       const text = await file.text();
-      const result = await importFromCSV(text);
+      const response = await dataApi.import(text);
       
-      showAlert(
-        `Successfully imported ${result.rowCount} rows. Please refresh the page or navigate to see updated data.`,
-        'success'
-      );
-      
-      // Clear the file input
-      e.target.value = '';
+      if (response.success) {
+        showAlert(response.message, 'success');
+        e.target.value = '';
+      } else {
+        showAlert(response.error, 'danger');
+      }
     } catch (error) {
       showAlert('Error importing CSV: ' + error.message, 'danger');
     } finally {
@@ -68,11 +69,12 @@ function DataManagement() {
       return;
     }
 
-    try {
-      await clearWorkoutData();
+    const response = await dataApi.clearWorkoutData();
+    
+    if (response.success) {
       showAlert('All workout data cleared successfully. Your workout groups and exercises are preserved.', 'success');
-    } catch (error) {
-      showAlert('Error clearing workout data: ' + error.message, 'danger');
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 

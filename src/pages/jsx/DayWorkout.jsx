@@ -4,16 +4,12 @@ import {
   Container, Row, Col, Card, Form, Button, Table, Badge, Alert, ListGroup 
 } from 'react-bootstrap';
 import {
-  getDayById,
-  getAllWorkoutGroups,
-  getDayWorkoutGroups,
-  setDayWorkoutGroups,
-  getExercisesByWorkoutGroups,
-  getSetsByDay,
-  createSet,
-  updateSet,
-  deleteSet
-} from '../../db/dataService';
+  daysApi,
+  workoutGroupsApi,
+  dayWorkoutGroupsApi,
+  exercisesApi,
+  setsApi
+} from '../../api/workoutApi';
 import '../css/DayWorkout.css';
 
 function DayWorkout() {
@@ -39,52 +35,54 @@ function DayWorkout() {
 
   useEffect(() => {
     if (selectedWorkoutGroups.length > 0) {
-      const exercises = getExercisesByWorkoutGroups(selectedWorkoutGroups);
-      setAvailableExercises(exercises);
+      loadExercises();
     } else {
       setAvailableExercises([]);
     }
   }, [selectedWorkoutGroups]);
 
-  const loadData = () => {
-    try {
-      const dayData = getDayById(parseInt(dayId));
-      setDay(dayData);
-      
-      const groups = getAllWorkoutGroups();
-      setAllWorkoutGroups(groups);
-      
-      const dayGroups = getDayWorkoutGroups(parseInt(dayId));
-      const groupIds = dayGroups.map(g => g.workout_group_id);
+  const loadData = async () => {
+    const dayResponse = await daysApi.getById(parseInt(dayId));
+    const groupsResponse = await workoutGroupsApi.getAll();
+    const dayGroupsResponse = await dayWorkoutGroupsApi.getByDay(parseInt(dayId));
+    
+    if (dayResponse.success) {
+      setDay(dayResponse.data);
+    } else {
+      showAlert(dayResponse.error, 'danger');
+    }
+    
+    if (groupsResponse.success) {
+      setAllWorkoutGroups(groupsResponse.data);
+    } else {
+      showAlert(groupsResponse.error, 'danger');
+    }
+    
+    if (dayGroupsResponse.success) {
+      const groupIds = dayGroupsResponse.data.map(g => g.workout_group_id);
       setSelectedWorkoutGroups(groupIds);
-      
-      loadSets();
-    } catch (error) {
-      showAlert('Error loading data: ' + error.message, 'danger');
+    } else {
+      showAlert(dayGroupsResponse.error, 'danger');
+    }
+    
+    await loadSets();
+  };
+
+  const loadExercises = async () => {
+    const response = await exercisesApi.getByWorkoutGroups(selectedWorkoutGroups);
+    if (response.success) {
+      setAvailableExercises(response.data);
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
-  const loadSets = () => {
-    try {
-      const sets = getSetsByDay(parseInt(dayId));
-      
-      // Group sets by exercise
-      const groupedSets = {};
-      sets.forEach(set => {
-        if (!groupedSets[set.exercise_id]) {
-          groupedSets[set.exercise_id] = {
-            exerciseName: set.exercise_name,
-            exerciseNotes: set.exercise_notes,
-            workoutGroupName: set.workout_group_name,
-            sets: []
-          };
-        }
-        groupedSets[set.exercise_id].sets.push(set);
-      });
-      
-      setWorkoutSets(groupedSets);
-    } catch (error) {
-      showAlert('Error loading sets: ' + error.message, 'danger');
+  const loadSets = async () => {
+    const response = await setsApi.getByDayGrouped(parseInt(dayId));
+    if (response.success) {
+      setWorkoutSets(response.data);
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
@@ -98,12 +96,13 @@ function DayWorkout() {
       ? selectedWorkoutGroups.filter(id => id !== groupId)
       : [...selectedWorkoutGroups, groupId];
     
-    try {
-      await setDayWorkoutGroups(parseInt(dayId), newSelection);
+    const response = await dayWorkoutGroupsApi.setForDay(parseInt(dayId), newSelection);
+    
+    if (response.success) {
       setSelectedWorkoutGroups(newSelection);
       showAlert('Workout groups updated');
-    } catch (error) {
-      showAlert('Error updating workout groups: ' + error.message, 'danger');
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
@@ -115,58 +114,58 @@ function DayWorkout() {
       return;
     }
     
-    try {
-      await createSet(
-        parseInt(dayId),
-        parseInt(selectedExercise),
-        newSetReps ? parseInt(newSetReps) : null,
-        newSetRir ? parseInt(newSetRir) : null,
-        newSetNotes
-      );
-      
-      // Reset form
+    const response = await setsApi.create({
+      dayId: parseInt(dayId),
+      exerciseId: parseInt(selectedExercise),
+      reps: newSetReps ? parseInt(newSetReps) : null,
+      rir: newSetRir ? parseInt(newSetRir) : null,
+      notes: newSetNotes
+    });
+    
+    if (response.success) {
       setNewSetReps('');
       setNewSetRir('');
       setNewSetNotes('');
-      
       loadSets();
-      showAlert('Set added successfully');
-    } catch (error) {
-      showAlert('Error adding set: ' + error.message, 'danger');
+      showAlert(response.message);
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
   const handleUpdateSet = async (setId, field, value) => {
-    try {
-      const set = Object.values(workoutSets)
-        .flatMap(ex => ex.sets)
-        .find(s => s.id === setId);
-      
-      if (!set) return;
-      
-      const updates = {
-        set_order: set.set_order,
-        reps: set.reps,
-        rir: set.rir,
-        notes: set.notes || '',
-        [field]: value
-      };
-      
-      await updateSet(setId, updates.set_order, updates.reps, updates.rir, updates.notes);
+    const set = Object.values(workoutSets)
+      .flatMap(ex => ex.sets)
+      .find(s => s.id === setId);
+    
+    if (!set) return;
+    
+    const updates = {
+      setOrder: set.set_order,
+      reps: set.reps,
+      rir: set.rir,
+      notes: set.notes || '',
+      [field]: value
+    };
+    
+    const response = await setsApi.update(setId, updates);
+    
+    if (response.success) {
       loadSets();
-    } catch (error) {
-      showAlert('Error updating set: ' + error.message, 'danger');
+    } else {
+      showAlert(response.error, 'danger');
     }
   };
 
   const handleDeleteSet = async (setId) => {
     if (window.confirm('Delete this set?')) {
-      try {
-        await deleteSet(setId);
+      const response = await setsApi.delete(setId);
+      
+      if (response.success) {
         loadSets();
         showAlert('Set deleted');
-      } catch (error) {
-        showAlert('Error deleting set: ' + error.message, 'danger');
+      } else {
+        showAlert(response.error, 'danger');
       }
     }
   };
