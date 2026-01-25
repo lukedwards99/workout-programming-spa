@@ -32,9 +32,6 @@ export async function initDatabase() {
       // Create tables
       await createTables();
       
-      // Seed initial data
-      await seedInitialData();
-      
       // Save to IndexedDB
       await saveDatabaseToIndexedDB();
     }
@@ -55,24 +52,30 @@ async function createTables() {
 
 /**
  * Seed initial data (7 days + sample workout groups and exercises)
+ * Uses INSERT OR IGNORE to skip existing data and prevent conflicts
  */
-async function seedInitialData() {
-  // Insert 7 days
-  const daysData = [
-    [1, 'Monday', 1],
-    [2, 'Tuesday', 2],
-    [3, 'Wednesday', 3],
-    [4, 'Thursday', 4],
-    [5, 'Friday', 5],
-    [6, 'Saturday', 6],
-    [7, 'Sunday', 7]
-  ];
+export async function seedInitialData() {
+  // Check if days already exist
+  const dayCount = db.exec('SELECT COUNT(*) as count FROM days')[0]?.values[0][0] || 0;
+  
+  // Only insert days if none exist
+  if (dayCount === 0) {
+    const daysData = [
+      [1, 'Monday', 1],
+      [2, 'Tuesday', 2],
+      [3, 'Wednesday', 3],
+      [4, 'Thursday', 4],
+      [5, 'Friday', 5],
+      [6, 'Saturday', 6],
+      [7, 'Sunday', 7]
+    ];
 
-  const insertDay = db.prepare('INSERT INTO days (id, day_name, day_order) VALUES (?, ?, ?)');
-  daysData.forEach(day => insertDay.run(day));
-  insertDay.free();
+    const insertDay = db.prepare('INSERT INTO days (id, day_name, day_order) VALUES (?, ?, ?)');
+    daysData.forEach(day => insertDay.run(day));
+    insertDay.free();
+  }
 
-  // Insert sample workout groups
+  // Insert sample workout groups (use OR IGNORE to skip duplicates)
   const workoutGroups = [
     ['Chest', 'Chest exercises'],
     ['Back', 'Back exercises'],
@@ -83,35 +86,48 @@ async function seedInitialData() {
     ['Rest', 'Rest and recovery']
   ];
 
-  const insertGroup = db.prepare('INSERT INTO workout_groups (name, notes) VALUES (?, ?)');
+  const insertGroup = db.prepare('INSERT OR IGNORE INTO workout_groups (name, notes) VALUES (?, ?)');
   workoutGroups.forEach(group => insertGroup.run(group));
   insertGroup.free();
 
-  // Insert sample exercises
+  // Get workout group IDs dynamically
+  const groupIds = {};
+  const groups = db.exec('SELECT id, name FROM workout_groups');
+  if (groups.length > 0) {
+    groups[0].values.forEach(row => {
+      groupIds[row[1]] = row[0];
+    });
+  }
+
+  // Insert sample exercises using dynamic IDs (OR IGNORE to skip duplicates)
   const exercises = [
-    [1, 'Barbell Bench Press', 'Compound chest movement'],
-    [1, 'Incline Dumbbell Press', 'Upper chest focus'],
-    [1, 'Cable Flyes', 'Chest isolation'],
-    [2, 'Deadlift', 'Compound back and posterior chain'],
-    [2, 'Pull-ups', 'Vertical pulling movement'],
-    [2, 'Barbell Rows', 'Horizontal pulling movement'],
-    [3, 'Back Squat', 'Compound leg movement'],
-    [3, 'Romanian Deadlift', 'Hamstring focus'],
-    [3, 'Leg Press', 'Quad focus'],
-    [4, 'Overhead Press', 'Compound shoulder movement'],
-    [4, 'Lateral Raises', 'Lateral delt isolation'],
-    [4, 'Face Pulls', 'Rear delt and upper back'],
-    [5, 'Barbell Curls', 'Bicep compound'],
-    [5, 'Tricep Dips', 'Tricep compound'],
-    [5, 'Hammer Curls', 'Bicep and forearm'],
-    [6, 'Treadmill', 'Running or walking'],
-    [6, 'Cycling', 'Low impact cardio'],
-    [6, 'Rowing Machine', 'Full body cardio'],
-    [7, 'Rest Day', 'Active recovery']
+    [groupIds['Chest'], 'Barbell Bench Press', 'Compound chest movement'],
+    [groupIds['Chest'], 'Incline Dumbbell Press', 'Upper chest focus'],
+    [groupIds['Chest'], 'Cable Flyes', 'Chest isolation'],
+    [groupIds['Back'], 'Deadlift', 'Compound back and posterior chain'],
+    [groupIds['Back'], 'Pull-ups', 'Vertical pulling movement'],
+    [groupIds['Back'], 'Barbell Rows', 'Horizontal pulling movement'],
+    [groupIds['Legs'], 'Back Squat', 'Compound leg movement'],
+    [groupIds['Legs'], 'Romanian Deadlift', 'Hamstring focus'],
+    [groupIds['Legs'], 'Leg Press', 'Quad focus'],
+    [groupIds['Shoulders'], 'Overhead Press', 'Compound shoulder movement'],
+    [groupIds['Shoulders'], 'Lateral Raises', 'Lateral delt isolation'],
+    [groupIds['Shoulders'], 'Face Pulls', 'Rear delt and upper back'],
+    [groupIds['Arms'], 'Barbell Curls', 'Bicep compound'],
+    [groupIds['Arms'], 'Tricep Dips', 'Tricep compound'],
+    [groupIds['Arms'], 'Hammer Curls', 'Bicep and forearm'],
+    [groupIds['Cardio'], 'Treadmill', 'Running or walking'],
+    [groupIds['Cardio'], 'Cycling', 'Low impact cardio'],
+    [groupIds['Cardio'], 'Rowing Machine', 'Full body cardio'],
+    [groupIds['Rest'], 'Rest Day', 'Active recovery']
   ];
 
-  const insertExercise = db.prepare('INSERT INTO exercises (workout_group_id, name, notes) VALUES (?, ?, ?)');
-  exercises.forEach(exercise => insertExercise.run(exercise));
+  const insertExercise = db.prepare('INSERT OR IGNORE INTO exercises (workout_group_id, name, notes) VALUES (?, ?, ?)');
+  exercises.forEach(exercise => {
+    if (exercise[0]) { // Only insert if workout group ID exists
+      insertExercise.run(exercise);
+    }
+  });
   insertExercise.free();
 }
 

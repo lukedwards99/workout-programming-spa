@@ -1,4 +1,4 @@
-import { getDatabase, saveDatabaseToIndexedDB, resetDatabase, initDatabase } from './database.js';
+import { getDatabase, saveDatabaseToIndexedDB, resetDatabase, initDatabase, seedInitialData } from './database.js';
 import { queries } from './queries.js';
 import Papa from 'papaparse';
 
@@ -598,6 +598,14 @@ export async function clearAllData() {
   
   // Reinitialize with fresh schema
   await initDatabase();
+}
+
+/**
+ * Seed sample data (workout groups, exercises, and days)
+ */
+export async function seedSampleData() {
+  await seedInitialData();
+  await saveDatabaseToIndexedDB();
 }
 
 // ===== AUTO-PROGRAMMING (STUB) =====

@@ -5,6 +5,8 @@ import {
 } from 'react-bootstrap';
 import {
   daysApi,
+  workoutGroupsApi,
+  dayWorkoutGroupsApi,
   exercisesApi,
   dayExercisesApi,
   setsApi
@@ -16,6 +18,8 @@ function DayWorkout() {
   const navigate = useNavigate();
   
   const [day, setDay] = useState(null);
+  const [allWorkoutGroups, setAllWorkoutGroups] = useState([]);
+  const [selectedWorkoutGroups, setSelectedWorkoutGroups] = useState([]);
   const [allExercises, setAllExercises] = useState([]);
   const [dayExercises, setDayExercises] = useState([]);
   const [alert, setAlert] = useState(null);
@@ -30,6 +34,8 @@ function DayWorkout() {
 
   const loadData = async () => {
     const dayResponse = await daysApi.getById(parseInt(dayId));
+    const groupsResponse = await workoutGroupsApi.getAll();
+    const dayGroupsResponse = await dayWorkoutGroupsApi.getByDay(parseInt(dayId));
     const exercisesResponse = await exercisesApi.getAll();
     const dayExercisesResponse = await dayExercisesApi.getByDay(parseInt(dayId));
     
@@ -37,6 +43,19 @@ function DayWorkout() {
       setDay(dayResponse.data);
     } else {
       showAlert(dayResponse.error, 'danger');
+    }
+    
+    if (groupsResponse.success) {
+      setAllWorkoutGroups(groupsResponse.data);
+    } else {
+      showAlert(groupsResponse.error, 'danger');
+    }
+    
+    if (dayGroupsResponse.success) {
+      const groupIds = dayGroupsResponse.data.map(g => g.workout_group_id);
+      setSelectedWorkoutGroups(groupIds);
+    } else {
+      showAlert(dayGroupsResponse.error, 'danger');
     }
     
     if (exercisesResponse.success) {
@@ -84,9 +103,35 @@ function DayWorkout() {
     setAlert({ message, variant });
   };
 
+  const handleWorkoutGroupToggle = async (groupId) => {
+    const newSelection = selectedWorkoutGroups.includes(groupId)
+      ? selectedWorkoutGroups.filter(id => id !== groupId)
+      : [...selectedWorkoutGroups, groupId];
+    
+    const response = await dayWorkoutGroupsApi.setForDay(parseInt(dayId), newSelection);
+    
+    if (response.success) {
+      setSelectedWorkoutGroups(newSelection);
+      showAlert('Workout groups updated');
+    } else {
+      showAlert(response.error, 'danger');
+    }
+  };
+
   const handleAddExerciseClick = () => {
     setShowExerciseAdd(true);
     setSelectedExercise('');
+  };
+
+  // Organize exercises: selected workout groups first, then others
+  const organizedExercises = () => {
+    const priorityExercises = allExercises.filter(ex => 
+      selectedWorkoutGroups.includes(ex.workout_group_id)
+    );
+    const otherExercises = allExercises.filter(ex => 
+      !selectedWorkoutGroups.includes(ex.workout_group_id)
+    );
+    return [...priorityExercises, ...otherExercises];
   };
 
   const handleAddExercise = async (e) => {
@@ -203,6 +248,35 @@ function DayWorkout() {
         </Alert>
       )}
 
+      {/* Workout Groups Selection */}
+      <Row className="mb-4">
+        <Col>
+          <Card>
+            <Card.Header className="bg-info text-white">
+              <h5 className="mb-0">Muscle Groups for This Day</h5>
+            </Card.Header>
+            <Card.Body>
+              <p className="text-muted mb-3">
+                Select which muscle groups you'll work today. This helps prioritize exercises in the dropdown.
+              </p>
+              <div className="d-flex flex-wrap gap-2">
+                {allWorkoutGroups.map(group => (
+                  <Form.Check
+                    key={group.id}
+                    type="checkbox"
+                    id={`group-${group.id}`}
+                    label={group.name}
+                    checked={selectedWorkoutGroups.includes(group.id)}
+                    onChange={() => handleWorkoutGroupToggle(group.id)}
+                    className="workout-group-checkbox"
+                  />
+                ))}
+              </div>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
       {/* Exercise List */}
       <Row>
         <Col>
@@ -235,11 +309,26 @@ function DayWorkout() {
                               required
                             >
                               <option value="">Choose an exercise...</option>
-                              {allExercises.map(ex => (
-                                <option key={ex.id} value={ex.id}>
-                                  {ex.name} ({ex.workout_group_name})
-                                </option>
-                              ))}
+                              {selectedWorkoutGroups.length > 0 && (
+                                <optgroup label="─── Priority (Selected Muscle Groups) ───">
+                                  {organizedExercises()
+                                    .filter(ex => selectedWorkoutGroups.includes(ex.workout_group_id))
+                                    .map(ex => (
+                                      <option key={ex.id} value={ex.id}>
+                                        {ex.name} ({ex.workout_group_name})
+                                      </option>
+                                    ))}
+                                </optgroup>
+                              )}
+                              <optgroup label={selectedWorkoutGroups.length > 0 ? "─── Other Exercises ───" : "─── All Exercises ───"}>
+                                {organizedExercises()
+                                  .filter(ex => !selectedWorkoutGroups.includes(ex.workout_group_id))
+                                  .map(ex => (
+                                    <option key={ex.id} value={ex.id}>
+                                      {ex.name} ({ex.workout_group_name})
+                                    </option>
+                                  ))}
+                              </optgroup>
                             </Form.Select>
                           </Form.Group>
                         </Col>

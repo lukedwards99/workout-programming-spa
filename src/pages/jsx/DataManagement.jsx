@@ -160,6 +160,20 @@ function DataManagement() {
     }
   };
 
+  const handleSeedSampleData = async () => {
+    if (!window.confirm('This will add sample workout groups, exercises, and 7 days to your database. If data already exists, this may create duplicates. Continue?')) {
+      return;
+    }
+
+    const response = await dataApi.seedSampleData();
+    
+    if (response.success) {
+      showAlert('Sample data added successfully. Check your setup page to see the new workout groups and exercises.', 'success');
+    } else {
+      showAlert(response.error, 'danger');
+    }
+  };
+
   return (
     <Container className="data-management-page py-4">
       <h1 className="mb-4">Data Management</h1>
@@ -452,6 +466,32 @@ function DataManagement() {
                   </Button>
                 </Col>
               </Row>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
+
+      {/* Seed Sample Data Section */}
+      <Row className="mt-4">
+        <Col>
+          <Card className="border-primary">
+            <Card.Header className="bg-primary text-white">
+              <h5 className="mb-0">Sample Data</h5>
+            </Card.Header>
+            <Card.Body>
+              <h6>Add Sample Workout Data</h6>
+              <p className="text-muted mb-3 small">
+                This will add sample workout groups (Chest, Back, Legs, Shoulders, Arms, Cardio, Rest), 
+                corresponding exercises, and create 7 days (Monday-Sunday). Use this to quickly 
+                populate your database with example data to get started.
+              </p>
+              <Alert variant="warning" className="mb-3 small">
+                <strong>Note:</strong> If you already have data, this may create duplicates. 
+                Consider clearing all data first if you want a clean sample setup.
+              </Alert>
+              <Button variant="primary" onClick={handleSeedSampleData}>
+                Add Sample Data
+              </Button>
             </Card.Body>
           </Card>
         </Col>

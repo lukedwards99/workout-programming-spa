@@ -67,6 +67,7 @@ import {
   importSetupDataFromCSV,
   clearWorkoutData,
   clearAllData,
+  seedSampleData,
   
   // Program Generation
   generateWorkoutProgram
@@ -822,6 +823,20 @@ export const dataApi = {
         return null;
       },
       'Failed to clear all data'
+    );
+  },
+
+  /**
+   * Seed sample workout data
+   * Adds sample workout groups, exercises, and 7 days
+   */
+  seedSampleData: async () => {
+    return handleApiCall(
+      async () => {
+        await seedSampleData();
+        return null;
+      },
+      'Failed to seed sample data'
     );
   },
 
