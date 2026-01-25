@@ -301,9 +301,11 @@ export async function importFromCSV(csvString) {
         try {
           const db = getDatabase();
           
-          // Track workout groups and exercises to create/find
+          // Track workout groups, exercises, and days to create/find
           const workoutGroupMap = new Map();
           const exerciseMap = new Map();
+          const dayMap = new Map();
+          const dayWorkoutGroupsSet = new Set(); // Track day-workout_group associations
           
           // Get existing workout groups
           const existingGroups = getAllWorkoutGroups();
@@ -315,6 +317,12 @@ export async function importFromCSV(csvString) {
           const existingExercises = getAllExercises();
           existingExercises.forEach(exercise => {
             exerciseMap.set(`${exercise.workout_group_id}-${exercise.name}`, exercise.id);
+          });
+          
+          // Get existing days
+          const existingDays = getAllDays();
+          existingDays.forEach(day => {
+            dayMap.set(day.day_name, day.id);
           });
           
           // Process each row
@@ -346,22 +354,41 @@ export async function importFromCSV(csvString) {
               exerciseMap.set(exerciseKey, exerciseId);
             }
             
-            // Find day ID
-            const day = executeQueryOne('SELECT id FROM days WHERE day_name = ?', [day_name]);
-            if (!day) {
-              console.warn(`Day not found: ${day_name}`);
-              continue;
+            // Find or create day
+            let dayId = dayMap.get(day_name);
+            if (!dayId) {
+              // Create day with the order from CSV
+              const order = parseInt(day_order) || 1;
+              db.run(queries.insertDay, [day_name, order]);
+              const result = executeQueryOne('SELECT last_insert_rowid() as id');
+              dayId = result ? result.id : null;
+              if (dayId) {
+                dayMap.set(day_name, dayId);
+              } else {
+                console.warn(`Failed to create day: ${day_name}`);
+                continue;
+              }
             }
+            
+            // Track the day-workout_group association
+            const associationKey = `${dayId}-${workoutGroupId}`;
+            dayWorkoutGroupsSet.add(associationKey);
             
             // Insert set
             db.run(queries.insertSet, [
-              day.id,
+              dayId,
               exerciseId,
               parseInt(set_order) || 1,
               parseInt(reps) || null,
               parseInt(rir) || null,
               set_notes || ''
             ]);
+          }
+          
+          // Create day_workout_groups associations
+          for (const key of dayWorkoutGroupsSet) {
+            const [dayId, workoutGroupId] = key.split('-').map(id => parseInt(id));
+            db.run(queries.insertDayWorkoutGroup, [dayId, workoutGroupId]);
           }
           
           await saveDatabaseToIndexedDB();
