@@ -301,9 +301,6 @@ export async function importFromCSV(csvString) {
         try {
           const db = getDatabase();
           
-          // Clear existing sets
-          db.run('DELETE FROM sets');
-          
           // Track workout groups and exercises to create/find
           const workoutGroupMap = new Map();
           const exerciseMap = new Map();
@@ -455,12 +452,6 @@ export async function importSetupDataFromCSV(csvString) {
         try {
           const db = getDatabase();
           
-          // Clear existing data
-          db.run('DELETE FROM sets');
-          db.run('DELETE FROM day_workout_groups');
-          db.run('DELETE FROM exercises');
-          db.run('DELETE FROM workout_groups');
-          
           // Track ID mappings (old ID -> new ID)
           const groupIdMap = new Map();
           
@@ -525,16 +516,17 @@ export async function clearWorkoutData() {
 }
 
 /**
- * Clear entire database (everything except the 7 days)
- * Clears workout groups, exercises, sets, and day workout groups
+ * Clear entire database (everything including days)
+ * Clears days, workout groups, exercises, sets, and day workout groups
+ * Used when doing a complete import of all data
  */
 export async function clearAllData() {
   const db = getDatabase();
   db.run('DELETE FROM sets');
   db.run('DELETE FROM day_workout_groups');
   db.run('DELETE FROM exercises');
-  db.run('DELETE FROM days');
   db.run('DELETE FROM workout_groups');
+  db.run('DELETE FROM days');
   await saveDatabaseToIndexedDB();
 }
 

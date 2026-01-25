@@ -716,6 +716,69 @@ export const dataApi = {
       },
       'Failed to clear all data'
     );
+  },
+
+  /**
+   * Download both setup and program data files
+   * Downloads two CSV files with matching timestamps
+   */
+  downloadAll: async () => {
+    try {
+      const date = new Date().toISOString().split('T')[0];
+      
+      // Download setup file
+      downloadSetupDataCSV();
+      
+      // Small delay to prevent browser blocking multiple downloads
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Download program file
+      downloadCSV();
+      
+      return successResponse(
+        { 
+          setupFilename: `workout-setup-${date}.csv`,
+          programFilename: `workout-program-${date}.csv`
+        },
+        'Both CSV files downloaded successfully'
+      );
+    } catch (error) {
+      console.error('Failed to download files', error);
+      return errorResponse(error, 'EXPORT_ERROR');
+    }
+  },
+
+  /**
+   * Import both setup and program data from CSV strings
+   * Clears all existing data and rebuilds from both CSV files
+   * Both files must be provided and are tightly coupled
+   */
+  importAll: async (setupCsv, programCsv) => {
+    try {
+      // Validate both files are provided
+      validateRequired(setupCsv, 'Setup CSV data');
+      validateRequired(programCsv, 'Program CSV data');
+      
+      // Clear all existing data
+      await clearAllData();
+      
+      // Import setup data first (workout groups and exercises)
+      const setupResult = await importSetupDataFromCSV(setupCsv);
+      
+      // Then import program data (days, sets, associations)
+      const programResult = await importFromCSV(programCsv);
+      
+      return successResponse(
+        { 
+          setupRows: setupResult.rowCount,
+          programRows: programResult.rowCount
+        },
+        `Successfully imported ${setupResult.rowCount} setup items and ${programResult.rowCount} program rows`
+      );
+    } catch (error) {
+      console.error('Failed to import data', error);
+      return errorResponse(error, 'IMPORT_ERROR');
+    }
   }
 };
 
