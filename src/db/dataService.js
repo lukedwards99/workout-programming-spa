@@ -1,4 +1,4 @@
-import { getDatabase, saveDatabaseToIndexedDB } from './database.js';
+import { getDatabase, saveDatabaseToIndexedDB, resetDatabase, initDatabase } from './database.js';
 import { queries } from './queries.js';
 import Papa from 'papaparse';
 
@@ -198,6 +198,36 @@ export async function removeDayWorkoutGroup(dayId, workoutGroupId) {
   await executeUpdate(queries.deleteDayWorkoutGroup, [dayId, workoutGroupId]);
 }
 
+// ===== DAY EXERCISES =====
+
+export function getAllDayExercises() {
+  return executeQuery(queries.getAllDayExercises);
+}
+
+export function getDayExercisesByDay(dayId) {
+  return executeQuery(queries.getDayExercisesByDay, [dayId]);
+}
+
+export function getDayExerciseById(id) {
+  return executeQueryOne(queries.getDayExerciseById, [id]);
+}
+
+export async function createDayExercise(dayId, exerciseId) {
+  // Get next exercise order for this day
+  const result = executeQueryOne(queries.getMaxExerciseOrder, [dayId]);
+  const exerciseOrder = (result && result.max_order ? result.max_order : 0) + 1;
+  
+  return await executeInsert(queries.insertDayExercise, [dayId, exerciseId, exerciseOrder]);
+}
+
+export async function updateDayExercise(id, exerciseId, exerciseOrder) {
+  await executeUpdate(queries.updateDayExercise, [exerciseId, exerciseOrder, id]);
+}
+
+export async function deleteDayExercise(id) {
+  await executeUpdate(queries.deleteDayExercise, [id]);
+}
+
 // ===== SETS =====
 
 export function getAllSets() {
@@ -208,20 +238,20 @@ export function getSetsByDay(dayId) {
   return executeQuery(queries.getSetsByDay, [dayId]);
 }
 
-export function getSetsByDayAndExercise(dayId, exerciseId) {
-  return executeQuery(queries.getSetsByDayAndExercise, [dayId, exerciseId]);
+export function getSetsByDayExercise(dayExerciseId) {
+  return executeQuery(queries.getSetsByDayExercise, [dayExerciseId]);
 }
 
 export function getSetById(id) {
   return executeQueryOne(queries.getSetById, [id]);
 }
 
-export async function createSet(dayId, exerciseId, reps = null, rir = null, notes = '') {
-  // Get next set order
-  const result = executeQueryOne(queries.getMaxSetOrder, [dayId, exerciseId]);
+export async function createSet(dayExerciseId, reps = null, rir = null, notes = '') {
+  // Get next set order for this day exercise
+  const result = executeQueryOne(queries.getMaxSetOrder, [dayExerciseId]);
   const setOrder = (result && result.max_order ? result.max_order : 0) + 1;
   
-  return await executeInsert(queries.insertSet, [dayId, exerciseId, setOrder, reps, rir, notes]);
+  return await executeInsert(queries.insertSet, [dayExerciseId, setOrder, reps, rir, notes]);
 }
 
 export async function updateSet(id, setOrder, reps, rir, notes = '') {
@@ -232,12 +262,8 @@ export async function deleteSet(id) {
   await executeUpdate(queries.deleteSet, [id]);
 }
 
-export async function deleteSetsByDay(dayId) {
-  await executeUpdate(queries.deleteSetsByDay, [dayId]);
-}
-
-export async function deleteSetsByDayAndExercise(dayId, exerciseId) {
-  await executeUpdate(queries.deleteSetsByDayAndExercise, [dayId, exerciseId]);
+export async function deleteSetsByDayExercise(dayExerciseId) {
+  await executeUpdate(queries.deleteSetsByDayExercise, [dayExerciseId]);
 }
 
 // ===== CSV EXPORT/IMPORT =====
@@ -257,6 +283,7 @@ export function exportToCSV() {
       'workout_group_name',
       'exercise_name',
       'exercise_notes',
+      'exercise_order',
       'set_order',
       'reps',
       'rir',
@@ -301,10 +328,11 @@ export async function importFromCSV(csvString) {
         try {
           const db = getDatabase();
           
-          // Track workout groups, exercises, and days to create/find
+          // Track workout groups, exercises, days, and day_exercises to create/find
           const workoutGroupMap = new Map();
           const exerciseMap = new Map();
           const dayMap = new Map();
+          const dayExerciseMap = new Map(); // key: "dayId-exerciseId-exerciseOrder", value: dayExerciseId
           const dayWorkoutGroupsSet = new Set(); // Track day-workout_group associations
           
           // Get existing workout groups
@@ -333,6 +361,7 @@ export async function importFromCSV(csvString) {
               workout_group_name,
               exercise_name,
               exercise_notes,
+              exercise_order,
               set_order,
               reps,
               rir,
@@ -374,10 +403,26 @@ export async function importFromCSV(csvString) {
             const associationKey = `${dayId}-${workoutGroupId}`;
             dayWorkoutGroupsSet.add(associationKey);
             
+            // Find or create day_exercise
+            const exOrder = parseInt(exercise_order) || 1;
+            const dayExerciseKey = `${dayId}-${exerciseId}-${exOrder}`;
+            let dayExerciseId = dayExerciseMap.get(dayExerciseKey);
+            if (!dayExerciseId) {
+              // Create day_exercise
+              db.run(queries.insertDayExercise, [dayId, exerciseId, exOrder]);
+              const result = executeQueryOne('SELECT last_insert_rowid() as id');
+              dayExerciseId = result ? result.id : null;
+              if (dayExerciseId) {
+                dayExerciseMap.set(dayExerciseKey, dayExerciseId);
+              } else {
+                console.warn(`Failed to create day_exercise for day ${day_name}, exercise ${exercise_name}`);
+                continue;
+              }
+            }
+            
             // Insert set
             db.run(queries.insertSet, [
-              dayId,
-              exerciseId,
+              dayExerciseId,
               parseInt(set_order) || 1,
               parseInt(reps) || null,
               parseInt(rir) || null,
@@ -544,17 +589,15 @@ export async function clearWorkoutData() {
 
 /**
  * Clear entire database (everything including days)
- * Clears days, workout groups, exercises, sets, and day workout groups
- * Used when doing a complete import of all data
+ * Forces complete deletion of IndexedDB and reinitializes with fresh schema
+ * Used when doing a complete reset or when schema has changed
  */
 export async function clearAllData() {
-  const db = getDatabase();
-  db.run('DELETE FROM sets');
-  db.run('DELETE FROM day_workout_groups');
-  db.run('DELETE FROM exercises');
-  db.run('DELETE FROM workout_groups');
-  db.run('DELETE FROM days');
-  await saveDatabaseToIndexedDB();
+  // Force delete the entire IndexedDB database
+  await resetDatabase();
+  
+  // Reinitialize with fresh schema
+  await initDatabase();
 }
 
 // ===== AUTO-PROGRAMMING (STUB) =====

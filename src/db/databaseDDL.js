@@ -33,15 +33,22 @@ export const schema = `
     UNIQUE(day_id, workout_group_id)
   );
 
-  CREATE TABLE IF NOT EXISTS sets (
+  CREATE TABLE IF NOT EXISTS day_exercises (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     day_id INTEGER NOT NULL,
     exercise_id INTEGER NOT NULL,
+    exercise_order INTEGER NOT NULL,
+    FOREIGN KEY (day_id) REFERENCES days(id) ON DELETE CASCADE,
+    FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+  );
+
+  CREATE TABLE IF NOT EXISTS sets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    day_exercise_id INTEGER NOT NULL,
     set_order INTEGER NOT NULL,
     reps INTEGER,
     rir INTEGER,
     notes TEXT,
-    FOREIGN KEY (day_id) REFERENCES days(id) ON DELETE CASCADE,
-    FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+    FOREIGN KEY (day_exercise_id) REFERENCES day_exercises(id) ON DELETE CASCADE
   );
 `;
