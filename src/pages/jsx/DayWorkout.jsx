@@ -31,7 +31,7 @@ function DayWorkout() {
   const loadData = async () => {
     const dayResponse = await daysApi.getById(parseInt(dayId));
     const exercisesResponse = await exercisesApi.getAll();
-    const setsGroupedResponse = await setsApi.getByDayGrouped(parseInt(dayId));
+    const dayExercisesResponse = await dayExercisesApi.getByDay(parseInt(dayId));
     
     if (dayResponse.success) {
       setDay(dayResponse.data);
@@ -45,10 +45,38 @@ function DayWorkout() {
       showAlert(exercisesResponse.error, 'danger');
     }
     
-    if (setsGroupedResponse.success) {
-      setDayExercises(setsGroupedResponse.data);
+    if (dayExercisesResponse.success) {
+      // Get sets for this day to merge with day exercises
+      const setsResponse = await setsApi.getByDay(parseInt(dayId));
+      const sets = setsResponse.success ? setsResponse.data : [];
+      
+      // Build the day exercises array with sets grouped by day_exercise_id
+      const exercisesWithSets = dayExercisesResponse.data.map(dayEx => {
+        const exerciseSets = sets
+          .filter(set => set.day_exercise_id === dayEx.id)
+          .sort((a, b) => a.set_order - b.set_order)
+          .map(set => ({
+            id: set.id,
+            set_order: set.set_order,
+            reps: set.reps,
+            rir: set.rir,
+            notes: set.notes || ''
+          }));
+        
+        return {
+          dayExerciseId: dayEx.id,
+          exerciseId: dayEx.exercise_id,
+          exerciseName: dayEx.exercise_name,
+          workoutGroupName: dayEx.workout_group_name,
+          exerciseNotes: dayEx.exercise_notes || '',
+          exerciseOrder: dayEx.exercise_order,
+          sets: exerciseSets
+        };
+      });
+      
+      setDayExercises(exercisesWithSets);
     } else {
-      showAlert(setsGroupedResponse.error, 'danger');
+      showAlert(dayExercisesResponse.error, 'danger');
     }
   };
 
@@ -68,7 +96,7 @@ function DayWorkout() {
       showAlert('Please select an exercise', 'warning');
       return;
     }
-
+    
     const response = await dayExercisesApi.create({
       dayId: parseInt(dayId),
       exerciseId: parseInt(selectedExercise)
