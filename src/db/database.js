@@ -50,8 +50,8 @@ export async function initDatabase() {
 async function createTables() {
   const schema = `
     CREATE TABLE IF NOT EXISTS days (
-      id INTEGER PRIMARY KEY,
-      day_name TEXT NOT NULL UNIQUE,
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      day_name TEXT NOT NULL,
       day_order INTEGER NOT NULL UNIQUE
     );
 

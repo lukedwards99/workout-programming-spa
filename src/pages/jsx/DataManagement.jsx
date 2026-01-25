@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Card, Button, Form, Alert } from 'react-bootstrap';
-import { downloadCSV, importFromCSV, exportToCSV } from '../../db/dataService';
+import { downloadCSV, importFromCSV, exportToCSV, clearWorkoutData } from '../../db/dataService';
 import '../css/DataManagement.css';
 
 function DataManagement() {
@@ -60,6 +60,19 @@ function DataManagement() {
       showAlert('Error importing CSV: ' + error.message, 'danger');
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleClearWorkoutData = async () => {
+    if (!window.confirm('Are you sure you want to clear all workout data? This will delete all sets for the week but keep your workout groups and exercises. This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await clearWorkoutData();
+      showAlert('All workout data cleared successfully. Your workout groups and exercises are preserved.', 'success');
+    } catch (error) {
+      showAlert('Error clearing workout data: ' + error.message, 'danger');
     }
   };
 
@@ -205,6 +218,27 @@ function DataManagement() {
                   <p className="small">
                     Upload the edited CSV file. Your program will be updated with the new data. 
                     This is perfect for planning ahead or tracking progress week-to-week.
+
+      {/* Clear Data Section */}
+      <Row className="mt-4">
+        <Col>
+          <Card className="border-danger">
+            <Card.Header className="bg-danger text-white">
+              <h5 className="mb-0">Danger Zone</h5>
+            </Card.Header>
+            <Card.Body>
+              <h6>Clear Workout Data</h6>
+              <p className="text-muted mb-3">
+                Remove all workout data (sets) for the week. This will clear all your programmed workouts 
+                but preserve your workout groups and exercises library.
+              </p>
+              <Button variant="danger" onClick={handleClearWorkoutData}>
+                Clear All Workout Data
+              </Button>
+            </Card.Body>
+          </Card>
+        </Col>
+      </Row>
                   </p>
                 </Col>
               </Row>

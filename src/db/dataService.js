@@ -63,6 +63,40 @@ export function getDayById(id) {
   return executeQueryOne(queries.getDayById, [id]);
 }
 
+export function getDaysCount() {
+  const result = executeQueryOne(queries.getDaysCount);
+  return result ? result.count : 0;
+}
+
+export async function addDay(dayName) {
+  // Get next day order
+  const result = executeQueryOne(queries.getMaxDayOrder);
+  const nextOrder = (result && result.max_order ? result.max_order : 0) + 1;
+  
+  await executeUpdate(queries.insertDay, [dayName, nextOrder]);
+  return getLastInsertId();
+}
+
+export async function removeLastDay() {
+  const count = getDaysCount();
+  if (count === 0) {
+    throw new Error('No days to remove');
+  }
+  
+  await executeUpdate(queries.deleteLastDay);
+}
+
+export function getNextDayOfWeek(currentDayName) {
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const currentIndex = daysOfWeek.indexOf(currentDayName);
+  
+  if (currentIndex === -1) {
+    return 'Monday'; // Default if not found
+  }
+  
+  return daysOfWeek[(currentIndex + 1) % 7];
+}
+
 // ===== WORKOUT GROUPS =====
 
 export function getAllWorkoutGroups() {
@@ -337,6 +371,152 @@ export async function importFromCSV(csvString) {
       }
     });
   });
+}
+
+/**
+ * Export setup data (workout groups and exercises) to CSV
+ * Returns CSV string with workout groups and exercises
+ */
+export function exportSetupDataToCSV() {
+  const workoutGroups = getAllWorkoutGroups();
+  const exercises = getAllExercises();
+  
+  // Create rows with type identifier
+  const rows = [];
+  
+  // Add workout groups
+  workoutGroups.forEach(group => {
+    rows.push({
+      type: 'group',
+      id: group.id,
+      workout_group_id: '',
+      name: group.name,
+      notes: group.notes || ''
+    });
+  });
+  
+  // Add exercises
+  exercises.forEach(exercise => {
+    rows.push({
+      type: 'exercise',
+      id: exercise.id,
+      workout_group_id: exercise.workout_group_id,
+      name: exercise.name,
+      notes: exercise.notes || ''
+    });
+  });
+  
+  const csv = Papa.unparse(rows, {
+    columns: ['type', 'id', 'workout_group_id', 'name', 'notes'],
+    header: true
+  });
+  
+  return csv;
+}
+
+/**
+ * Download setup data CSV file
+ */
+export function downloadSetupDataCSV() {
+  const csv = exportSetupDataToCSV();
+  const date = new Date().toISOString().split('T')[0];
+  const filename = `workout-setup-${date}.csv`;
+  
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+/**
+ * Import setup data from CSV
+ * Clears existing workout groups and exercises, then rebuilds from CSV
+ */
+export async function importSetupDataFromCSV(csvString) {
+  return new Promise((resolve, reject) => {
+    Papa.parse(csvString, {
+      header: true,
+      skipEmptyLines: true,
+      complete: async (results) => {
+        try {
+          const db = getDatabase();
+          
+          // Clear existing data
+          db.run('DELETE FROM sets');
+          db.run('DELETE FROM day_workout_groups');
+          db.run('DELETE FROM exercises');
+          db.run('DELETE FROM workout_groups');
+          
+          // Track ID mappings (old ID -> new ID)
+          const groupIdMap = new Map();
+          
+          // First pass: Create all workout groups
+          for (const row of results.data) {
+            if (row.type === 'group') {
+              const oldId = parseInt(row.id);
+              const newId = await createWorkoutGroup(row.name, row.notes || '');
+              groupIdMap.set(oldId, newId);
+            }
+          }
+          
+          // Second pass: Create all exercises with mapped workout group IDs
+          for (const row of results.data) {
+            if (row.type === 'exercise') {
+              const oldGroupId = parseInt(row.workout_group_id);
+              const newGroupId = groupIdMap.get(oldGroupId);
+              
+              if (newGroupId) {
+                await createExercise(newGroupId, row.name, row.notes || '');
+              } else {
+                console.warn(`Workout group not found for exercise: ${row.name}`);
+              }
+            }
+          }
+          
+          await saveDatabaseToIndexedDB();
+          resolve({ success: true, rowCount: results.data.length });
+        } catch (error) {
+          console.error('Error importing setup data:', error);
+          reject(error);
+        }
+      },
+      error: (error) => {
+        reject(error);
+      }
+    });
+  });
+}
+
+/**
+ * Clear all workout data (sets and day workout groups)
+ * Keeps workout groups and exercises intact
+ */
+export async function clearWorkoutData() {
+  const db = getDatabase();
+  db.run('DELETE FROM sets');
+  db.run('DELETE FROM day_workout_groups');
+  db.run('DELETE FROM days');
+  await saveDatabaseToIndexedDB();
+}
+
+/**
+ * Clear entire database (everything except the 7 days)
+ * Clears workout groups, exercises, sets, and day workout groups
+ */
+export async function clearAllData() {
+  const db = getDatabase();
+  db.run('DELETE FROM sets');
+  db.run('DELETE FROM day_workout_groups');
+  db.run('DELETE FROM exercises');
+  db.run('DELETE FROM days');
+  db.run('DELETE FROM workout_groups');
+  await saveDatabaseToIndexedDB();
 }
 
 // ===== AUTO-PROGRAMMING (STUB) =====

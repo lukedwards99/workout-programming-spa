@@ -7,6 +7,10 @@ export const queries = {
   // ===== DAYS =====
   getAllDays: 'SELECT * FROM days ORDER BY day_order',
   getDayById: 'SELECT * FROM days WHERE id = ?',
+  getMaxDayOrder: 'SELECT MAX(day_order) as max_order FROM days',
+  insertDay: 'INSERT INTO days (day_name, day_order) VALUES (?, ?)',
+  deleteLastDay: 'DELETE FROM days WHERE day_order = (SELECT MAX(day_order) FROM days)',
+  getDaysCount: 'SELECT COUNT(*) as count FROM days',
 
   // ===== WORKOUT GROUPS =====
   getAllWorkoutGroups: 'SELECT * FROM workout_groups ORDER BY name',
