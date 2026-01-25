@@ -6,7 +6,7 @@ import {
 } from '../../api/workoutApi';
 import '../css/Setup.css';
 
-function Setup() {
+function ExerciseSetup() {
   const [workoutGroups, setWorkoutGroups] = useState([]);
   const [exercises, setExercises] = useState([]);
   
@@ -356,4 +356,4 @@ function Setup() {
   );
 }
 
-export default Setup;
+export default ExerciseSetup;

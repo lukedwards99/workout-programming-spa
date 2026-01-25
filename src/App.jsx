@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import Navigation from './components/jsx/Navigation';
 import Footer from './components/jsx/Footer';
 import WeekView from './pages/jsx/WeekView';
-import Setup from './pages/jsx/Setup';
+import ExerciseSetup from './pages/jsx/ExerciseSetup';
 import DayWorkout from './pages/jsx/DayWorkout';
 import DataManagement from './pages/jsx/DataManagement';
 import { initDatabase } from './db/database';
@@ -62,7 +62,7 @@ function App() {
       <main className="main-content">
         <Routes>
           <Route path="/" element={<WeekView />} />
-          <Route path="/setup" element={<Setup />} />
+          <Route path="/setup" element={<ExerciseSetup />} />
           <Route path="/day/:dayId" element={<DayWorkout />} />
           <Route path="/data" element={<DataManagement />} />
         </Routes>

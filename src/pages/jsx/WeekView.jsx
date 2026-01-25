@@ -106,7 +106,7 @@ function WeekView() {
   return (
     <Container className="week-view-page py-4">
       <div className="hero-section text-center mb-4">
-        <h1 className="display-4 mb-3">Workout Program</h1>
+        <h1 className="display-4 mb-3">Build Your Program</h1>
         <p className="lead text-muted mb-4">
           Plan your training days, build workouts, and track your progress
         </p>
@@ -198,24 +198,6 @@ function WeekView() {
           <Button variant="primary" size="lg" onClick={handleOpenAddDay}>
             + Add Your First Day
           </Button>
-        </div>
-      )}
-
-      {days.length > 0 && (
-        <div className="mt-5 text-center">
-          <Card className="bg-light">
-            <Card.Body>
-              <h5>Quick Actions</h5>
-              <div className="d-flex justify-content-center gap-3 flex-wrap mt-3">
-                <Button as={Link} to="/setup" variant="outline-secondary">
-                  Manage Exercises
-                </Button>
-                <Button as={Link} to="/data" variant="outline-secondary">
-                  Export to CSV
-                </Button>
-              </div>
-            </Card.Body>
-          </Card>
         </div>
       )}
 

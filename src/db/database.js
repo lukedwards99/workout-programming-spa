@@ -36,6 +36,14 @@ export async function initDatabase() {
       await saveDatabaseToIndexedDB();
     }
 
+    // Optimize SQLite memory settings
+    // Note: These settings improve performance and reduce memory errors
+    // db.run('PRAGMA cache_size = 10000');        // 10000 pages (~40MB cache)
+    // db.run('PRAGMA page_size = 4096');          // 4KB pages
+    // db.run('PRAGMA temp_store = MEMORY');       // Use memory for temp storage
+    // db.run('PRAGMA journal_mode = MEMORY');     // Keep journal in memory
+    // db.run('PRAGMA synchronous = OFF');         // Disable sync for better performance
+
     return db;
   } catch (error) {
     console.error('Error initializing database:', error);

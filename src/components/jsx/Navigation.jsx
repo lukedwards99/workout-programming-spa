@@ -23,7 +23,7 @@ function Navigation() {
     <Navbar expand="md" bg="dark" variant="dark" fixed="top" expanded={isMenuOpen}>
       <Container>
         <Navbar.Brand as={Link} to="/" onClick={closeMenu}>
-          <strong>Workout Programming</strong>
+          <strong>Complete Workout Programming</strong>
         </Navbar.Brand>
 
         <Navbar.Toggle 
@@ -47,7 +47,7 @@ function Navigation() {
               className={isActive('/setup') ? 'active' : ''}
               onClick={closeMenu}
             >
-              Setup
+              Exercise Setup
             </Nav.Link>
             <Nav.Link 
               as={Link}
@@ -55,7 +55,7 @@ function Navigation() {
               className={isActive('/data') ? 'active' : ''}
               onClick={closeMenu}
             >
-              Data
+              Data Management
             </Nav.Link>
           </Nav>
         </Navbar.Collapse>
