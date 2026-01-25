@@ -15,7 +15,6 @@ import '../css/Setup.css';
 function Setup() {
   const [workoutGroups, setWorkoutGroups] = useState([]);
   const [exercises, setExercises] = useState([]);
-  const [selectedGroup, setSelectedGroup] = useState(null);
   
   // Workout Group Form State
   const [groupName, setGroupName] = useState('');
@@ -42,8 +41,7 @@ function Setup() {
       setWorkoutGroups(groups);
       setExercises(allExercises);
       
-      if (groups.length > 0 && !selectedGroup) {
-        setSelectedGroup(groups[0].id);
+      if (groups.length > 0 && !exerciseGroupId) {
         setExerciseGroupId(groups[0].id);
       }
     } catch (error) {
@@ -70,7 +68,11 @@ function Setup() {
       }
       
       resetGroupForm();
-      loadData();
+      // Force a fresh reload of all data
+      const groups = getAllWorkoutGroups();
+      const allExercises = getAllExercises();
+      setWorkoutGroups(groups);
+      setExercises(allExercises);
     } catch (error) {
       showAlert('Error saving workout group: ' + error.message, 'danger');
     }
@@ -87,7 +89,11 @@ function Setup() {
       try {
         await deleteWorkoutGroup(id);
         showAlert('Workout group deleted successfully');
-        loadData();
+        // Force a fresh reload
+        const groups = getAllWorkoutGroups();
+        const allExercises = getAllExercises();
+        setWorkoutGroups(groups);
+        setExercises(allExercises);
       } catch (error) {
         showAlert('Error deleting workout group: ' + error.message, 'danger');
       }
@@ -114,7 +120,9 @@ function Setup() {
       }
       
       resetExerciseForm();
-      loadData();
+      // Force a fresh reload
+      const allExercises = getAllExercises();
+      setExercises(allExercises);
     } catch (error) {
       showAlert('Error saving exercise: ' + error.message, 'danger');
     }
@@ -132,7 +140,9 @@ function Setup() {
       try {
         await deleteExercise(id);
         showAlert('Exercise deleted successfully');
-        loadData();
+        // Force a fresh reload
+        const allExercises = getAllExercises();
+        setExercises(allExercises);
       } catch (error) {
         showAlert('Error deleting exercise: ' + error.message, 'danger');
       }
@@ -143,11 +153,10 @@ function Setup() {
     setEditingExercise(null);
     setExerciseName('');
     setExerciseNotes('');
-    setExerciseGroupId(selectedGroup || '');
   };
 
-  const filteredExercises = selectedGroup
-    ? exercises.filter(ex => ex.workout_group_id === selectedGroup)
+  const filteredExercises = exerciseGroupId
+    ? exercises.filter(ex => ex.workout_group_id === parseInt(exerciseGroupId))
     : exercises;
 
   return (
@@ -207,11 +216,7 @@ function Setup() {
                 {workoutGroups.map(group => (
                   <ListGroup.Item
                     key={group.id}
-                    className={`d-flex justify-content-between align-items-start ${
-                      selectedGroup === group.id ? 'active' : ''
-                    }`}
-                    style={{ cursor: 'pointer' }}
-                    onClick={() => setSelectedGroup(group.id)}
+                    className="d-flex justify-content-between align-items-start"
                   >
                     <div className="flex-grow-1">
                       <strong>{group.name}</strong>
@@ -304,10 +309,10 @@ function Setup() {
                 </div>
               </Form>
               
-              {selectedGroup && (
+              {exerciseGroupId && (
                 <div className="mb-2">
                   <Badge bg="info">
-                    Showing exercises for: {workoutGroups.find(g => g.id === selectedGroup)?.name}
+                    Showing exercises for: {workoutGroups.find(g => g.id === parseInt(exerciseGroupId))?.name}
                   </Badge>
                 </div>
               )}
