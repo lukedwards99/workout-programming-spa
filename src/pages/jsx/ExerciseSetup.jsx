@@ -323,9 +323,6 @@ function ExerciseSetup() {
                     <div className="flex-grow-1">
                       <strong>{exercise.name}</strong>
                       <div className="small text-muted">
-                        <Badge bg="secondary" className="me-2">
-                          {exercise.workout_group_name}
-                        </Badge>
                         {exercise.notes}
                       </div>
                     </div>
