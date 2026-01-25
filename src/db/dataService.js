@@ -45,6 +45,18 @@ async function executeUpdate(query, params = []) {
 }
 
 /**
+ * Execute an insert query and return the last insert ID
+ */
+async function executeInsert(query, params = []) {
+  const db = getDatabase();
+  db.run(query, params);
+  const result = executeQueryOne('SELECT last_insert_rowid() as id');
+  const id = result ? result.id : null;
+  await saveDatabaseToIndexedDB();
+  return id;
+}
+
+/**
  * Get last insert ID
  */
 function getLastInsertId() {
@@ -73,8 +85,7 @@ export async function addDay(dayName) {
   const result = executeQueryOne(queries.getMaxDayOrder);
   const nextOrder = (result && result.max_order ? result.max_order : 0) + 1;
   
-  await executeUpdate(queries.insertDay, [dayName, nextOrder]);
-  return getLastInsertId();
+  return await executeInsert(queries.insertDay, [dayName, nextOrder]);
 }
 
 export async function removeLastDay() {
@@ -108,8 +119,7 @@ export function getWorkoutGroupById(id) {
 }
 
 export async function createWorkoutGroup(name, notes = '') {
-  await executeUpdate(queries.insertWorkoutGroup, [name, notes]);
-  return getLastInsertId();
+  return await executeInsert(queries.insertWorkoutGroup, [name, notes]);
 }
 
 export async function updateWorkoutGroup(id, name, notes = '') {
@@ -145,8 +155,7 @@ export function getExercisesByWorkoutGroups(workoutGroupIds) {
 }
 
 export async function createExercise(workoutGroupId, name, notes = '') {
-  await executeUpdate(queries.insertExercise, [workoutGroupId, name, notes]);
-  return getLastInsertId();
+  return await executeInsert(queries.insertExercise, [workoutGroupId, name, notes]);
 }
 
 export async function updateExercise(id, workoutGroupId, name, notes = '') {
@@ -212,8 +221,7 @@ export async function createSet(dayId, exerciseId, reps = null, rir = null, note
   const result = executeQueryOne(queries.getMaxSetOrder, [dayId, exerciseId]);
   const setOrder = (result && result.max_order ? result.max_order : 0) + 1;
   
-  await executeUpdate(queries.insertSet, [dayId, exerciseId, setOrder, reps, rir, notes]);
-  return getLastInsertId();
+  return await executeInsert(queries.insertSet, [dayId, exerciseId, setOrder, reps, rir, notes]);
 }
 
 export async function updateSet(id, setOrder, reps, rir, notes = '') {
@@ -460,21 +468,32 @@ export async function importSetupDataFromCSV(csvString) {
           for (const row of results.data) {
             if (row.type === 'group') {
               const oldId = parseInt(row.id);
+              console.log(`Creating group: ${row.name}, oldId: ${oldId}, raw id: ${row.id}`);
               const newId = await createWorkoutGroup(row.name, row.notes || '');
+              console.log(`Created group with newId: ${newId}`);
               groupIdMap.set(oldId, newId);
             }
           }
+          
+          console.log('Group ID Map:', Array.from(groupIdMap.entries()));
           
           // Second pass: Create all exercises with mapped workout group IDs
           for (const row of results.data) {
             if (row.type === 'exercise') {
               const oldGroupId = parseInt(row.workout_group_id);
+              console.log(`Processing exercise: ${row.name}, oldGroupId: ${oldGroupId}, raw workout_group_id: ${row.workout_group_id}`);
               const newGroupId = groupIdMap.get(oldGroupId);
+              console.log(`Mapped to newGroupId: ${newGroupId}, type: ${typeof newGroupId}`);
+              console.log(`Map has key ${oldGroupId}:`, groupIdMap.has(oldGroupId));
               
-              if (newGroupId) {
+              // Check if newGroupId exists and is a valid number
+              if (newGroupId && typeof newGroupId === 'number') {
                 await createExercise(newGroupId, row.name, row.notes || '');
+                console.log(`Created exercise: ${row.name}`);
               } else {
-                console.warn(`Workout group not found for exercise: ${row.name}`);
+                console.warn(`Workout group not found for exercise: ${row.name}, looking for oldGroupId: ${oldGroupId}`);
+                console.warn('Available group IDs:', Array.from(groupIdMap.keys()));
+                console.warn('Full map:', Array.from(groupIdMap.entries()));
               }
             }
           }
