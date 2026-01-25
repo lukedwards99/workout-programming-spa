@@ -12,7 +12,6 @@ function DataManagement() {
 
   const showAlert = (message, variant = 'success') => {
     setAlert({ message, variant });
-    setTimeout(() => setAlert(null), 5000);
   };
 
   const handleExportSetup = async () => {

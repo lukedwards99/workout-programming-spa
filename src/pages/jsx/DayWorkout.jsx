@@ -54,7 +54,6 @@ function DayWorkout() {
 
   const showAlert = (message, variant = 'success') => {
     setAlert({ message, variant });
-    setTimeout(() => setAlert(null), 3000);
   };
 
   const handleAddExerciseClick = () => {
@@ -69,7 +68,7 @@ function DayWorkout() {
       showAlert('Please select an exercise', 'warning');
       return;
     }
-    
+
     const response = await dayExercisesApi.create({
       dayId: parseInt(dayId),
       exerciseId: parseInt(selectedExercise)
