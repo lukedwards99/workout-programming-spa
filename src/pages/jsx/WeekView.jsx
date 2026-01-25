@@ -39,7 +39,7 @@ function WeekView() {
 
   const showAlert = (message, variant = 'info') => {
     setAlert({ message, variant });
-    setTimeout(() => setAlert(null), 4000);
+    // setTimeout(() => setAlert(null), 4000);
   };
 
   const handleAutoProgramming = () => {

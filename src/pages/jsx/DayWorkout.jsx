@@ -90,7 +90,7 @@ function DayWorkout() {
 
   const showAlert = (message, variant = 'success') => {
     setAlert({ message, variant });
-    setTimeout(() => setAlert(null), 3000);
+    // setTimeout(() => setAlert(null), 3000);
   };
 
   const handleWorkoutGroupToggle = async (groupId) => {

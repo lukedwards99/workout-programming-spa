@@ -55,7 +55,7 @@ function Setup() {
 
   const showAlert = (message, variant = 'success') => {
     setAlert({ message, variant });
-    setTimeout(() => setAlert(null), 5000);
+    // setTimeout(() => setAlert(null), 5000);
   };
 
   // Workout Group Handlers
