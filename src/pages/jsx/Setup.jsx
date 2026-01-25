@@ -2,8 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Form, Button, ListGroup, Alert, Badge } from 'react-bootstrap';
 import { 
   workoutGroupsApi, 
-  exercisesApi, 
-  dataApi 
+  exercisesApi
 } from '../../api/workoutApi';
 import '../css/Setup.css';
 
@@ -24,7 +23,6 @@ function Setup() {
   
   // UI State
   const [alert, setAlert] = useState(null);
-  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -158,75 +156,6 @@ function Setup() {
     ? exercises.filter(ex => ex.workout_group_id === parseInt(exerciseGroupId))
     : exercises;
 
-  // Setup Data Export/Import Handlers
-  const handleExportSetupData = async () => {
-    const response = await dataApi.downloadSetup();
-    
-    if (response.success) {
-      showAlert(response.message);
-    } else {
-      showAlert(response.error, 'danger');
-    }
-  };
-
-  const handleImportSetupData = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!file.name.endsWith('.csv')) {
-      showAlert('Please upload a CSV file', 'warning');
-      return;
-    }
-
-    if (!window.confirm('Warning: This will replace all workout groups and exercises. All workout data will be cleared. Continue?')) {
-      e.target.value = '';
-      return;
-    }
-
-    setImporting(true);
-
-    try {
-      const text = await file.text();
-      const response = await dataApi.importSetup(text);
-      
-      if (response.success) {
-        showAlert(response.message, 'success');
-        e.target.value = '';
-        setTimeout(() => {
-          loadData();
-          setImporting(false);
-        }, 1000);
-      } else {
-        showAlert(response.error, 'danger');
-        setImporting(false);
-      }
-    } catch (error) {
-      showAlert('Error importing setup data: ' + error.message, 'danger');
-      setImporting(false);
-    }
-  };
-const handleClearAllData = async () => {
-    if (!window.confirm('⚠️ WARNING: This will permanently delete ALL data including workout groups, exercises, and all workout data. This action CANNOT be undone. Are you absolutely sure?')) {
-      return;
-    }
-
-    if (!window.confirm('This is your last chance. Click OK to permanently delete everything.')) {
-      return;
-    }
-
-    const response = await dataApi.clearAllData();
-    
-    if (response.success) {
-      showAlert('All data cleared successfully. The database has been reset.', 'success');
-      setTimeout(() => {
-        loadData();
-      }, 1000);
-    } else {
-      showAlert(response.error, 'danger');
-    }
-  };
-
-  
   return (
     <Container className="setup-page py-4">
       {alert && (
@@ -235,30 +164,7 @@ const handleClearAllData = async () => {
         </Alert>
       )}
       
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <h1 className="mb-0">Setup Workout Groups & Exercises</h1>
-        <div className="d-flex gap-2">
-          <Button variant="outline-primary" onClick={handleExportSetupData}>
-            Export Setup
-          </Button>
-          <Button 
-            variant="outline-secondary" 
-            as="label" 
-            htmlFor="setup-import-file"
-            disabled={importing}
-          >
-            {importing ? 'Importing...' : 'Import Setup'}
-          </Button>
-          <input
-            id="setup-import-file"
-            type="file"
-            accept=".csv"
-            onChange={handleImportSetupData}
-            style={{ display: 'none' }}
-            disabled={importing}
-          />
-        </div>
-      </div>
+      <h1 className="mb-4">Setup Workout Groups & Exercises</h1>
       
       <Row>
         {/* Workout Groups Section */}
@@ -442,28 +348,6 @@ const handleClearAllData = async () => {
                   </ListGroup.Item>
                 ))}
               </ListGroup>
-            </Card.Body>
-          </Card>
-        </Col>
-      </Row>
-
-      {/* Danger Zone */}
-      <Row className="mt-4">
-        <Col>
-          <Card className="border-danger">
-            <Card.Header className="bg-danger text-white">
-              <h5 className="mb-0">Danger Zone</h5>
-            </Card.Header>
-            <Card.Body>
-              <h6>Reset Entire Database</h6>
-              <p className="text-muted mb-3">
-                <strong>⚠️ WARNING:</strong> This will permanently delete ALL data including all workout groups, 
-                exercises, and all workout data. This action cannot be undone. Only use this if you want to 
-                start completely fresh.
-              </p>
-              <Button variant="danger" onClick={handleClearAllData}>
-                Clear All Data (Reset Database)
-              </Button>
             </Card.Body>
           </Card>
         </Col>
