@@ -38,11 +38,11 @@ export async function initDatabase() {
 
     // Optimize SQLite memory settings
     // Note: These settings improve performance and reduce memory errors
-    db.run('PRAGMA cache_size = 10000');        // 10000 pages (~40MB cache)
-    db.run('PRAGMA page_size = 4096');          // 4KB pages
-    db.run('PRAGMA temp_store = MEMORY');       // Use memory for temp storage
-    db.run('PRAGMA journal_mode = MEMORY');     // Keep journal in memory
-    db.run('PRAGMA synchronous = OFF');         // Disable sync for better performance
+    // db.run('PRAGMA cache_size = 10000');        // 10000 pages (~40MB cache)
+    // db.run('PRAGMA page_size = 4096');          // 4KB pages
+    // db.run('PRAGMA temp_store = MEMORY');       // Use memory for temp storage
+    // db.run('PRAGMA journal_mode = MEMORY');     // Keep journal in memory
+    // db.run('PRAGMA synchronous = OFF');         // Disable sync for better performance
 
     return db;
   } catch (error) {
@@ -63,11 +63,6 @@ async function createTables() {
  * Uses INSERT OR IGNORE to skip existing data and prevent conflicts
  */
 export async function seedInitialData() {
-  // Ensure database is initialized
-  if (!db) {
-    throw new Error('Database not initialized. Cannot seed data.');
-  }
-  
   // Check if days already exist
   const dayCount = db.exec('SELECT COUNT(*) as count FROM days')[0]?.values[0][0] || 0;
   
@@ -235,37 +230,19 @@ async function loadDatabaseFromIndexedDB() {
 
 /**
  * Clear all data and reset database
- * Properly handles cleanup and prevents race conditions
  */
 export async function resetDatabase() {
-  // Close and clear the database reference
   if (db) {
     db.close();
-    db = null;
   }
   
-  // Clear IndexedDB with proper blocking handling
+  // Clear IndexedDB
   return new Promise((resolve, reject) => {
     const request = indexedDB.deleteDatabase('WorkoutProgrammingDB');
-    
     request.onsuccess = () => {
-      console.log('Database deleted successfully');
-      // Longer delay to ensure IndexedDB cleanup is fully complete
-      setTimeout(() => {
-        db = null; // Ensure reference is cleared
-        resolve();
-      }, 250);
+      console.log('Database reset');
+      resolve();
     };
-    
-    request.onerror = () => {
-      console.error('Error deleting database:', request.error);
-      reject(request.error);
-    };
-    
-    request.onblocked = () => {
-      console.warn('Database deletion blocked - waiting for connections to close');
-      // The deletion will complete once all connections are closed
-      // onsuccess will be called after unblocking
-    };
+    request.onerror = () => reject(request.error);
   });
 }

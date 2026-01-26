@@ -596,14 +596,8 @@ export async function clearAllData() {
   // Force delete the entire IndexedDB database
   await resetDatabase();
   
-  // Additional delay to ensure cleanup is complete
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
   // Reinitialize with fresh schema
   await initDatabase();
-  
-  // Final delay to ensure database is fully ready
-  await new Promise(resolve => setTimeout(resolve, 100));
 }
 
 /**
