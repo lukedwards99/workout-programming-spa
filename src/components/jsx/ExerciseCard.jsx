@@ -16,54 +16,62 @@ function ExerciseCard({
 }) {
   return (
     <Card className="mb-3">
-      <Card.Header className="d-flex justify-content-between align-items-center">
-        <div>
-          <Badge bg="secondary" className="me-2">
-            #{index + 1}
-          </Badge>
-          <strong>{dayExercise.exerciseName}</strong>
-          <Badge bg="info" className="ms-2">
-            {dayExercise.workoutGroupName}
-          </Badge>
-          {dayExercise.exerciseNotes && (
-            <small className="text-muted ms-2">({dayExercise.exerciseNotes})</small>
-          )}
-        </div>
-        <div className="d-flex gap-2">
-          <div className="d-flex gap-1">
+      <Card.Header>
+        <div className="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+          <div className="w-100 w-md-auto">
+            <Badge bg="secondary" className="me-2">
+              #{index + 1}
+            </Badge>
+            <strong>{dayExercise.exerciseName}</strong>
+            <Badge bg="info" className="ms-2">
+              {dayExercise.workoutGroupName}
+            </Badge>
+            {dayExercise.exerciseNotes && (
+              <small className="text-muted ms-2 d-block d-sm-inline mt-1 mt-sm-0">
+                ({dayExercise.exerciseNotes})
+              </small>
+            )}
+          </div>
+          <div className="d-flex flex-column flex-sm-row gap-2 w-100 w-md-auto">
+            <div className="d-flex gap-1">
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => onMoveUp(index)}
+                disabled={isFirst}
+                title="Move up"
+                className="flex-fill flex-sm-grow-0"
+              >
+                ↑
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => onMoveDown(index)}
+                disabled={isLast}
+                title="Move down"
+                className="flex-fill flex-sm-grow-0"
+              >
+                ↓
+              </Button>
+            </div>
             <Button
               size="sm"
-              variant="outline-secondary"
-              onClick={() => onMoveUp(index)}
-              disabled={isFirst}
-              title="Move up"
+              variant="success"
+              onClick={() => onAddSet(dayExercise.dayExerciseId)}
+              className="flex-fill flex-sm-grow-0"
             >
-              ↑
+              + Add Set
             </Button>
             <Button
               size="sm"
-              variant="outline-secondary"
-              onClick={() => onMoveDown(index)}
-              disabled={isLast}
-              title="Move down"
+              variant="outline-danger"
+              onClick={() => onDeleteExercise(dayExercise.dayExerciseId, dayExercise.exerciseName)}
+              className="flex-fill flex-sm-grow-0"
             >
-              ↓
+              Remove Exercise
             </Button>
           </div>
-          <Button
-            size="sm"
-            variant="success"
-            onClick={() => onAddSet(dayExercise.dayExerciseId)}
-          >
-            + Add Set
-          </Button>
-          <Button
-            size="sm"
-            variant="outline-danger"
-            onClick={() => onDeleteExercise(dayExercise.dayExerciseId, dayExercise.exerciseName)}
-          >
-            Remove Exercise
-          </Button>
         </div>
       </Card.Header>
       <Card.Body className="p-0">
