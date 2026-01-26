@@ -47,6 +47,7 @@ export const schema = `
     day_exercise_id INTEGER NOT NULL,
     set_order INTEGER NOT NULL,
     reps INTEGER,
+    weight REAL,
     rir INTEGER,
     notes TEXT,
     FOREIGN KEY (day_exercise_id) REFERENCES day_exercises(id) ON DELETE CASCADE

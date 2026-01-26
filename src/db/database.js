@@ -1,5 +1,8 @@
 import { schema } from './databaseDDL.js';
 
+// Schema version - increment this when making schema changes to force rebuild
+const SCHEMA_VERSION = 2; // Added weight column to sets table
+
 let db = null;
 let SQL = null;
 
@@ -23,7 +26,16 @@ export async function initDatabase() {
     
     if (savedDb) {
       db = new SQL.Database(savedDb);
-      console.log('Database loaded from IndexedDB');
+      
+      // Check schema version
+      const currentVersion = getSchemaVersion();
+      
+      if (currentVersion !== SCHEMA_VERSION) {
+        console.log(`Schema version mismatch (current: ${currentVersion}, expected: ${SCHEMA_VERSION}). Rebuilding database...`);
+        await rebuildDatabase();
+      } else {
+        console.log('Database loaded from IndexedDB');
+      }
     } else {
       // Create new database
       db = new SQL.Database();
@@ -31,6 +43,9 @@ export async function initDatabase() {
       
       // Create tables
       await createTables();
+      
+      // Set schema version
+      setSchemaVersion(SCHEMA_VERSION);
       
       // Save to IndexedDB
       await saveDatabaseToIndexedDB();
@@ -56,6 +71,58 @@ export async function initDatabase() {
  */
 async function createTables() {
   db.run(schema);
+}
+
+/**
+ * Get the current schema version from the database
+ */
+function getSchemaVersion() {
+  try {
+    const result = db.exec('PRAGMA user_version');
+    if (result.length > 0 && result[0].values.length > 0) {
+      return result[0].values[0][0];
+    }
+    return 0;
+  } catch (error) {
+    return 0;
+  }
+}
+
+/**
+ * Set the schema version in the database
+ */
+function setSchemaVersion(version) {
+  db.run(`PRAGMA user_version = ${version}`);
+}
+
+/**
+ * Rebuild the database with the current schema
+ * Drops all tables and recreates them
+ */
+async function rebuildDatabase() {
+  try {
+    // Drop all existing tables
+    db.run('DROP TABLE IF EXISTS sets');
+    db.run('DROP TABLE IF EXISTS day_exercises');
+    db.run('DROP TABLE IF EXISTS day_workout_groups');
+    db.run('DROP TABLE IF EXISTS exercises');
+    db.run('DROP TABLE IF EXISTS workout_groups');
+    db.run('DROP TABLE IF EXISTS days');
+    
+    // Recreate tables with new schema
+    await createTables();
+    
+    // Set new schema version
+    setSchemaVersion(SCHEMA_VERSION);
+    
+    console.log('Database rebuilt with new schema');
+    
+    // Save to IndexedDB
+    await saveDatabaseToIndexedDB();
+  } catch (error) {
+    console.error('Error rebuilding database:', error);
+    throw error;
+  }
 }
 
 /**

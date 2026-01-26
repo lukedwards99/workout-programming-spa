@@ -246,16 +246,16 @@ export function getSetById(id) {
   return executeQueryOne(queries.getSetById, [id]);
 }
 
-export async function createSet(dayExerciseId, reps = null, rir = null, notes = '') {
+export async function createSet(dayExerciseId, reps = null, weight = null, rir = null, notes = '') {
   // Get next set order for this day exercise
   const result = executeQueryOne(queries.getMaxSetOrder, [dayExerciseId]);
   const setOrder = (result && result.max_order ? result.max_order : 0) + 1;
   
-  return await executeInsert(queries.insertSet, [dayExerciseId, setOrder, reps, rir, notes]);
+  return await executeInsert(queries.insertSet, [dayExerciseId, setOrder, reps, weight, rir, notes]);
 }
 
-export async function updateSet(id, setOrder, reps, rir, notes = '') {
-  await executeUpdate(queries.updateSet, [setOrder, reps, rir, notes, id]);
+export async function updateSet(id, setOrder, reps, weight, rir, notes = '') {
+  await executeUpdate(queries.updateSet, [setOrder, reps, weight, rir, notes, id]);
 }
 
 export async function deleteSet(id) {

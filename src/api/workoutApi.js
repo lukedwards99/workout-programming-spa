@@ -626,6 +626,10 @@ export const setsApi = {
         validatePositiveNumber(data.reps, 'Reps');
       }
       
+      if (data.weight !== null && data.weight !== undefined) {
+        validatePositiveNumber(data.weight, 'Weight');
+      }
+      
       if (data.rir !== null && data.rir !== undefined) {
         validateNonNegativeNumber(data.rir, 'RIR');
       }
@@ -639,6 +643,7 @@ export const setsApi = {
       const id = await createSet(
         data.dayExerciseId,
         data.reps,
+        data.weight,
         data.rir,
         data.notes || ''
       );
@@ -665,6 +670,10 @@ export const setsApi = {
         validatePositiveNumber(data.reps, 'Reps');
       }
       
+      if (data.weight !== null && data.weight !== undefined) {
+        validatePositiveNumber(data.weight, 'Weight');
+      }
+      
       if (data.rir !== null && data.rir !== undefined) {
         validateNonNegativeNumber(data.rir, 'RIR');
       }
@@ -672,10 +681,11 @@ export const setsApi = {
       // Use current values if not provided
       const setOrder = data.setOrder !== undefined ? data.setOrder : currentSet.set_order;
       const reps = data.reps !== undefined ? data.reps : currentSet.reps;
+      const weight = data.weight !== undefined ? data.weight : currentSet.weight;
       const rir = data.rir !== undefined ? data.rir : currentSet.rir;
       const notes = data.notes !== undefined ? data.notes : currentSet.notes;
       
-      await updateSet(id, setOrder, reps, rir, notes || '');
+      await updateSet(id, setOrder, reps, weight, rir, notes || '');
       return successResponse({ id }, 'Set updated successfully');
     } catch (error) {
       console.error('Failed to update set', error);

@@ -78,6 +78,7 @@ function DayWorkout() {
             id: set.id,
             set_order: set.set_order,
             reps: set.reps,
+            weight: set.weight,
             rir: set.rir,
             notes: set.notes || ''
           }));
@@ -174,6 +175,7 @@ function DayWorkout() {
     const response = await setsApi.create({
       dayExerciseId: dayExerciseId,
       reps: null,
+      weight: null,
       rir: null,
       notes: ''
     });
@@ -196,6 +198,7 @@ function DayWorkout() {
     const updates = {
       setOrder: set.set_order,
       reps: set.reps,
+      weight: set.weight,
       rir: set.rir,
       notes: set.notes || '',
       [field]: value
@@ -398,10 +401,11 @@ function DayWorkout() {
                         <Table striped bordered hover responsive className="mb-0">
                           <thead>
                             <tr>
-                              <th width="10%">Set</th>
-                              <th width="20%">Reps</th>
-                              <th width="20%">RIR</th>
-                              <th width="35%">Notes</th>
+                              <th width="8%">Set</th>
+                              <th width="15%">Reps</th>
+                              <th width="15%">Weight</th>
+                              <th width="15%">RIR</th>
+                              <th width="32%">Notes</th>
                               <th width="15%">Actions</th>
                             </tr>
                           </thead>
@@ -419,6 +423,17 @@ function DayWorkout() {
                                     size="sm"
                                     min="1"
                                     placeholder="8"
+                                  />
+                                </td>
+                                <td>
+                                  <Form.Control
+                                    type="number"
+                                    value={set.weight || ''}
+                                    onChange={(e) => handleUpdateSet(set.id, 'weight', e.target.value ? parseFloat(e.target.value) : null)}
+                                    size="sm"
+                                    min="0"
+                                    step="0.5"
+                                    placeholder="135"
                                   />
                                 </td>
                                 <td>

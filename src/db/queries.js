@@ -126,8 +126,8 @@ export const queries = {
     ORDER BY s.set_order
   `,
   getSetById: 'SELECT * FROM sets WHERE id = ?',
-  insertSet: 'INSERT INTO sets (day_exercise_id, set_order, reps, rir, notes) VALUES (?, ?, ?, ?, ?)',
-  updateSet: 'UPDATE sets SET set_order = ?, reps = ?, rir = ?, notes = ? WHERE id = ?',
+  insertSet: 'INSERT INTO sets (day_exercise_id, set_order, reps, weight, rir, notes) VALUES (?, ?, ?, ?, ?, ?)',
+  updateSet: 'UPDATE sets SET set_order = ?, reps = ?, weight = ?, rir = ?, notes = ? WHERE id = ?',
   deleteSet: 'DELETE FROM sets WHERE id = ?',
   deleteSetsByDayExercise: 'DELETE FROM sets WHERE day_exercise_id = ?',
   getMaxSetOrder: 'SELECT MAX(set_order) as max_order FROM sets WHERE day_exercise_id = ?',
