@@ -226,6 +226,56 @@ function DayWorkout() {
     }
   };
 
+  const handleMoveExerciseUp = async (index) => {
+    if (index === 0) return; // Already at top
+    
+    const currentExercise = dayExercises[index];
+    const previousExercise = dayExercises[index - 1];
+    
+    // Swap the exercise_order values
+    const response1 = await dayExercisesApi.update(currentExercise.dayExerciseId, {
+      exerciseId: currentExercise.exerciseId,
+      exerciseOrder: previousExercise.exerciseOrder
+    });
+    
+    const response2 = await dayExercisesApi.update(previousExercise.dayExerciseId, {
+      exerciseId: previousExercise.exerciseId,
+      exerciseOrder: currentExercise.exerciseOrder
+    });
+    
+    if (response1.success && response2.success) {
+      loadData();
+      showAlert('Exercise order updated');
+    } else {
+      showAlert(response1.error || response2.error, 'danger');
+    }
+  };
+
+  const handleMoveExerciseDown = async (index) => {
+    if (index === dayExercises.length - 1) return; // Already at bottom
+    
+    const currentExercise = dayExercises[index];
+    const nextExercise = dayExercises[index + 1];
+    
+    // Swap the exercise_order values
+    const response1 = await dayExercisesApi.update(currentExercise.dayExerciseId, {
+      exerciseId: currentExercise.exerciseId,
+      exerciseOrder: nextExercise.exerciseOrder
+    });
+    
+    const response2 = await dayExercisesApi.update(nextExercise.dayExerciseId, {
+      exerciseId: nextExercise.exerciseId,
+      exerciseOrder: currentExercise.exerciseOrder
+    });
+    
+    if (response1.success && response2.success) {
+      loadData();
+      showAlert('Exercise order updated');
+    } else {
+      showAlert(response1.error || response2.error, 'danger');
+    }
+  };
+
   if (!day) {
     return (
       <Container className="text-center mt-5">
@@ -376,6 +426,26 @@ function DayWorkout() {
                         )}
                       </div>
                       <div className="d-flex gap-2">
+                        <div className="d-flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => handleMoveExerciseUp(index)}
+                            disabled={index === 0}
+                            title="Move up"
+                          >
+                            ↑
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline-secondary"
+                            onClick={() => handleMoveExerciseDown(index)}
+                            disabled={index === dayExercises.length - 1}
+                            title="Move down"
+                          >
+                            ↓
+                          </Button>
+                        </div>
                         <Button
                           size="sm"
                           variant="success"
