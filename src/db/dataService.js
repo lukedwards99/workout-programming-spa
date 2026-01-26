@@ -589,15 +589,11 @@ export async function clearWorkoutData() {
 
 /**
  * Clear entire database (everything including days)
- * Forces complete deletion of IndexedDB and reinitializes with fresh schema
- * Used when doing a complete reset or when schema has changed
+ * Removes all data from all tables but keeps the database structure
  */
 export async function clearAllData() {
-  // Force delete the entire IndexedDB database
+  // Clear all data from tables
   await resetDatabase();
-  
-  // Reinitialize with fresh schema
-  await initDatabase();
 }
 
 /**

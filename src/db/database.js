@@ -229,20 +229,31 @@ async function loadDatabaseFromIndexedDB() {
 }
 
 /**
- * Clear all data and reset database
+ * Clear all data from database tables
+ * Keeps the database structure intact but removes all rows
+ * Safer than deleting the entire database - avoids race conditions
  */
 export async function resetDatabase() {
-  if (db) {
-    db.close();
+  if (!db) {
+    throw new Error('Database not initialized');
   }
   
-  // Clear IndexedDB
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.deleteDatabase('WorkoutProgrammingDB');
-    request.onsuccess = () => {
-      console.log('Database reset');
-      resolve();
-    };
-    request.onerror = () => reject(request.error);
-  });
+  try {
+    // Delete all data from tables in reverse dependency order
+    db.run('DELETE FROM sets');
+    db.run('DELETE FROM day_exercises');
+    db.run('DELETE FROM day_workout_groups');
+    db.run('DELETE FROM days');
+    db.run('DELETE FROM exercises');
+    db.run('DELETE FROM workout_groups');
+    
+    // Reset autoincrement sequences
+    db.run('DELETE FROM sqlite_sequence');
+    
+    console.log('All data cleared from database');
+    await saveDatabaseToIndexedDB();
+  } catch (error) {
+    console.error('Error clearing database:', error);
+    throw error;
+  }
 }
