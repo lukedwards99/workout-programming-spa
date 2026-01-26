@@ -186,7 +186,7 @@ function DataManagement() {
 
       <Row className="g-4">
         {/* Export Section */}
-        <Col md={12}>
+        <Col xl={6}>
           <Card>
             <Card.Header className="bg-success text-white">
               <h4 className="mb-0">Export Data</h4>
@@ -282,11 +282,9 @@ function DataManagement() {
             </Card.Body>
           </Card>
         </Col>
-      </Row>
 
       {/* Import Section */}
-      <Row className="mt-4">
-        <Col md={12}>
+        <Col xl={6}>
           <Card>
             <Card.Header className="bg-primary text-white">
               <h4 className="mb-0">Import Data</h4>
