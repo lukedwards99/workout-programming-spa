@@ -65,6 +65,9 @@ import {
   exportSetupDataToCSV,
   downloadSetupDataCSV,
   importSetupDataFromCSV,
+  exportCombinedToCSV,
+  downloadCombinedCSV,
+  importCombinedFromCSV,
   clearWorkoutData,
   clearAllData,
   seedSampleData,
@@ -710,6 +713,55 @@ export const setsApi = {
 // ===== DATA MANAGEMENT API =====
 
 export const dataApi = {
+  /**
+   * Export combined data (setup + program) to CSV format
+   * Returns the CSV string
+   */
+  exportCombined: async () => {
+    return handleApiCall(
+      () => {
+        const csv = exportCombinedToCSV();
+        return { csv };
+      },
+      'Failed to export combined data'
+    );
+  },
+
+  /**
+   * Download combined data as CSV file
+   * Triggers browser download
+   */
+  downloadCombined: async () => {
+    try {
+      downloadCombinedCSV();
+      const date = new Date().toISOString().split('T')[0];
+      const filename = `workout-complete-${date}.csv`;
+      return successResponse({ filename }, 'CSV file downloaded successfully');
+    } catch (error) {
+      console.error('Failed to download combined CSV', error);
+      return errorResponse(error, 'EXPORT_ERROR');
+    }
+  },
+
+  /**
+   * Import combined data from CSV string
+   * Clears all existing data and rebuilds from CSV
+   */
+  importCombined: async (csvString) => {
+    try {
+      validateRequired(csvString, 'CSV data');
+      
+      const result = await importCombinedFromCSV(csvString);
+      return successResponse(
+        { rowCount: result.rowCount },
+        `Successfully imported ${result.rowCount} rows`
+      );
+    } catch (error) {
+      console.error('Failed to import combined CSV', error);
+      return errorResponse(error, 'IMPORT_ERROR');
+    }
+  },
+
   /**
    * Export all workout data to CSV format
    * Returns the CSV string

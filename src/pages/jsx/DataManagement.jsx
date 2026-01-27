@@ -6,66 +6,41 @@ import '../css/DataManagement.css';
 function DataManagement() {
   const [alert, setAlert] = useState(null);
   const [importing, setImporting] = useState(false);
-  const [setupFile, setSetupFile] = useState(null);
-  const [programFile, setProgramFile] = useState(null);
-  const [csvPreview, setCsvPreview] = useState({ setup: '', program: '' });
+  const [dataFile, setDataFile] = useState(null);
+  const [csvPreview, setCsvPreview] = useState('');
 
   const showAlert = (message, variant = 'success') => {
     setAlert({ message, variant });
   };
 
-  const handleExportSetup = async () => {
-    const response = await dataApi.downloadSetup();
+  const handleExportData = async () => {
+    const response = await dataApi.downloadCombined();
     
     if (response.success) {
-      showAlert('Setup data exported: ' + response.data.filename);
-    } else {
-      showAlert(response.error, 'danger');
-    }
-  };
-
-  const handleExportProgram = async () => {
-    const response = await dataApi.download();
-    
-    if (response.success) {
-      showAlert('Program data exported: ' + response.data.filename);
-    } else {
-      showAlert(response.error, 'danger');
-    }
-  };
-
-  const handleExportAll = async () => {
-    const response = await dataApi.downloadAll();
-    
-    if (response.success) {
-      showAlert(`Both files exported: ${response.data.setupFilename} and ${response.data.programFilename}`);
+      showAlert('Data exported: ' + response.data.filename);
     } else {
       showAlert(response.error, 'danger');
     }
   };
 
   const handlePreview = async () => {
-    const setupResponse = await dataApi.exportSetup();
-    const programResponse = await dataApi.export();
+    const response = await dataApi.exportCombined();
     
-    if (setupResponse.success && programResponse.success) {
-      const setupLines = setupResponse.data.csv.split('\n');
-      const setupPreview = setupLines.slice(0, 11).join('\n');
+    if (response.success) {
+      const lines = response.data.csv.split('\n');
+      const preview = lines.slice(0, 21).join('\n');
       
-      const programLines = programResponse.data.csv.split('\n');
-      const programPreview = programLines.slice(0, 11).join('\n');
-      
-      setCsvPreview({ setup: setupPreview, program: programPreview });
-      showAlert('Preview loaded (showing first 10 rows of each file)', 'info');
+      setCsvPreview(preview);
+      showAlert('Preview loaded (showing first 20 rows)', 'info');
     } else {
       showAlert('Failed to generate preview', 'danger');
     }
   };
 
-  const handleSetupFileSelect = (e) => {
+  const handleFileSelect = (e) => {
     const file = e.target.files[0];
     if (!file) {
-      setSetupFile(null);
+      setDataFile(null);
       return;
     }
 
@@ -75,30 +50,14 @@ function DataManagement() {
       return;
     }
 
-    setSetupFile(file);
-  };
-
-  const handleProgramFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) {
-      setProgramFile(null);
-      return;
-    }
-
-    if (!file.name.endsWith('.csv')) {
-      showAlert('Please upload a CSV file', 'warning');
-      e.target.value = '';
-      return;
-    }
-
-    setProgramFile(file);
+    setDataFile(file);
   };
 
   const handleFileUpload = async (e) => {
     e.preventDefault();
 
-    if (!setupFile || !programFile) {
-      showAlert('Please select both setup and program CSV files', 'warning');
+    if (!dataFile) {
+      showAlert('Please select a CSV file', 'warning');
       return;
     }
 
@@ -109,19 +68,17 @@ function DataManagement() {
     setImporting(true);
 
     try {
-      const setupText = await setupFile.text();
-      const programText = await programFile.text();
+      const text = await dataFile.text();
       
-      const response = await dataApi.importAll(setupText, programText);
+      const response = await dataApi.importCombined(text);
       
       if (response.success) {
         showAlert(response.message, 'success');
-        // Clear file inputs
-        setSetupFile(null);
-        setProgramFile(null);
-        // Reset file input elements
-        document.getElementById('setupFileInput').value = '';
-        document.getElementById('programFileInput').value = '';
+        // Clear file input
+        setDataFile(null);
+        // Reset file input element
+        document.getElementById('dataFileInput').value = '';
+        setCsvPreview('');
       } else {
         showAlert(response.error, 'danger');
       }
@@ -192,55 +149,28 @@ function DataManagement() {
               <h4 className="mb-0">Export Data</h4>
             </Card.Header>
             <Card.Body>
-              <Alert variant="info" className="mb-3">
-                <strong>Note:</strong> Your workout data is stored in two tightly coupled files. 
-                Both files must be exported and imported together for data consistency.
-              </Alert>
-
               <p>
-                Download your workout data as CSV files. You can edit these files in Excel or 
-                Google Sheets, then re-upload them to update your program.
+                Download your complete workout program as a single CSV file. This includes:
               </p>
+              <ul>
+                <li>Workout groups</li>
+                <li>Exercises</li>
+                <li>Days and schedule</li>
+                <li>Sets, reps, and RIR</li>
+              </ul>
               
-              <Row className="mb-3">
-                <Col md={6}>
-                  <h6>Setup Data (Workout Groups & Exercises)</h6>
-                  <p className="small text-muted">
-                    Contains all your workout groups and exercises library. This is the foundation 
-                    of your program.
-                  </p>
-                  <Button 
-                    variant="success" 
-                    className="w-100 mb-2"
-                    onClick={handleExportSetup}
-                  >
-                    Download Setup Data
-                  </Button>
-                </Col>
-                
-                <Col md={6}>
-                  <h6>Program Data (Days, Sets & Schedule)</h6>
-                  <p className="small text-muted">
-                    Contains your weekly schedule, all sets, reps, RIR, and how workout groups 
-                    are assigned to days.
-                  </p>
-                  <Button 
-                    variant="success" 
-                    className="w-100 mb-2"
-                    onClick={handleExportProgram}
-                  >
-                    Download Program Data
-                  </Button>
-                </Col>
-              </Row>
+              <p className="text-muted small">
+                You can edit this file in Excel or Google Sheets, then re-upload it to update 
+                your program.
+              </p>
 
               <div className="d-grid gap-2 mb-3">
                 <Button 
-                  variant="primary" 
+                  variant="success" 
                   size="lg"
-                  onClick={handleExportAll}
+                  onClick={handleExportData}
                 >
-                  📦 Download Both Files
+                  📦 Download Complete Program
                 </Button>
                 
                 <Button 
@@ -251,32 +181,21 @@ function DataManagement() {
                 </Button>
               </div>
 
-              {(csvPreview.setup || csvPreview.program) && (
+              {csvPreview && (
                 <div className="mt-3">
-                  <Row>
-                    {csvPreview.setup && (
-                      <Col md={6}>
-                        <h6>Setup Data Preview (first 10 rows):</h6>
-                        <pre className="csv-preview">{csvPreview.setup}</pre>
-                      </Col>
-                    )}
-                    {csvPreview.program && (
-                      <Col md={6}>
-                        <h6>Program Data Preview (first 10 rows):</h6>
-                        <pre className="csv-preview">{csvPreview.program}</pre>
-                      </Col>
-                    )}
-                  </Row>
+                  <h6>Data Preview (first 20 rows):</h6>
+                  <pre className="csv-preview">{csvPreview}</pre>
                 </div>
               )}
 
               <div className="mt-4">
-                <h6>File Descriptions:</h6>
+                <h6>File Format:</h6>
                 <ul className="small text-muted">
-                  <li><strong>workout-setup-YYYY-MM-DD.csv</strong> - Workout groups and exercises</li>
-                  <li><strong>workout-program-YYYY-MM-DD.csv</strong> - Days, sets, reps, RIR, and assignments</li>
-                  <li>Both files are required for a complete backup</li>
+                  <li><strong>workout-complete-YYYY-MM-DD.csv</strong> - Complete workout program</li>
+                  <li>First rows contain workout groups and exercises</li>
+                  <li>Remaining rows contain your program data (days, sets, reps, RIR)</li>
                   <li>Open with Excel, Google Sheets, or any CSV editor</li>
+                  <li>Keep the header row intact when editing</li>
                 </ul>
               </div>
             </Card.Body>
@@ -292,66 +211,41 @@ function DataManagement() {
             <Card.Body>
               <Alert variant="danger" className="mb-3">
                 <strong>⚠️ WARNING:</strong> Importing will completely replace ALL existing data, 
-                including days, workout groups, exercises, and all workout data. Both files must 
-                be from the same export session. This action cannot be undone.
+                including days, workout groups, exercises, and all workout data. This action cannot 
+                be undone.
               </Alert>
 
               <p>
-                Upload both CSV files to restore or update your complete workout program. 
-                Both files are required and must be provided together.
+                Upload a CSV file to restore or update your complete workout program.
               </p>
 
               <Form onSubmit={handleFileUpload}>
-                <Row className="mb-3">
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>
-                        <strong>1. Setup Data File</strong> (workout-setup-*.csv)
-                      </Form.Label>
-                      <Form.Control
-                        id="setupFileInput"
-                        type="file"
-                        accept=".csv"
-                        onChange={handleSetupFileSelect}
-                        disabled={importing}
-                      />
-                      {setupFile && (
-                        <Form.Text className="text-success">
-                          ✓ {setupFile.name}
-                        </Form.Text>
-                      )}
-                    </Form.Group>
-                  </Col>
-                  
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>
-                        <strong>2. Program Data File</strong> (workout-program-*.csv)
-                      </Form.Label>
-                      <Form.Control
-                        id="programFileInput"
-                        type="file"
-                        accept=".csv"
-                        onChange={handleProgramFileSelect}
-                        disabled={importing}
-                      />
-                      {programFile && (
-                        <Form.Text className="text-success">
-                          ✓ {programFile.name}
-                        </Form.Text>
-                      )}
-                    </Form.Group>
-                  </Col>
-                </Row>
+                <Form.Group className="mb-3">
+                  <Form.Label>
+                    <strong>Select CSV File</strong> (workout-complete-*.csv)
+                  </Form.Label>
+                  <Form.Control
+                    id="dataFileInput"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleFileSelect}
+                    disabled={importing}
+                  />
+                  {dataFile && (
+                    <Form.Text className="text-success">
+                      ✓ {dataFile.name}
+                    </Form.Text>
+                  )}
+                </Form.Group>
 
                 <div className="d-grid">
                   <Button 
                     type="submit"
                     variant="primary" 
                     size="lg"
-                    disabled={importing || !setupFile || !programFile}
+                    disabled={importing || !dataFile}
                   >
-                    {importing ? 'Importing...' : '📥 Import Both Files'}
+                    {importing ? 'Importing...' : '📥 Import Complete Program'}
                   </Button>
                 </div>
               </Form>
@@ -368,18 +262,18 @@ function DataManagement() {
               <div className="mt-4">
                 <h6>Import Instructions:</h6>
                 <ol className="small text-muted">
-                  <li>Export both files using the "Download Both Files" button above</li>
-                  <li>Edit the CSV files in Excel or Google Sheets as needed</li>
-                  <li>Save both files as CSV format</li>
-                  <li>Select both files using the inputs above</li>
-                  <li>Click "Import Both Files" to replace all data</li>
+                  <li>Export your data using the "Download Complete Program" button</li>
+                  <li>Edit the CSV file in Excel or Google Sheets as needed</li>
+                  <li>Save the file as CSV format</li>
+                  <li>Select the file using the input above</li>
+                  <li>Click "Import Complete Program" to replace all data</li>
                   <li>Wait for the import to complete (may take a moment for large programs)</li>
                 </ol>
                 
-                <Alert variant="warning" className="mb-0 mt-3">
-                  <strong>Important:</strong> Both files must be from the same export session. 
-                  The setup file contains IDs that the program file references. Mixing files 
-                  from different exports may cause import errors.
+                <Alert variant="info" className="mb-0 mt-3">
+                  <strong>Tip:</strong> The CSV file has a specific structure with workout groups 
+                  and exercises in the first rows, followed by program data. Keep this structure 
+                  intact when editing.
                 </Alert>
               </div>
             </Card.Body>
@@ -396,37 +290,34 @@ function DataManagement() {
               
               <Row>
                 <Col md={4} className="mb-3">
-                  <h6>1. Export Both Files</h6>
+                  <h6>1. Export Your Program</h6>
                   <p className="small">
-                    Click "Download Both Files" to export your complete workout program. 
-                    You'll get two files: setup data (workout groups & exercises) and 
-                    program data (days, sets, schedule).
+                    Click "Download Complete Program" to export your entire workout program as a 
+                    single CSV file. This includes workout groups, exercises, days, and all sets.
                   </p>
                 </Col>
                 
                 <Col md={4} className="mb-3">
                   <h6>2. Edit As Needed</h6>
                   <p className="small">
-                    Open the CSV files in Excel, Google Sheets, or any spreadsheet software. 
-                    Update as needed, but keep the header rows intact. Be careful not to 
-                    change IDs in the setup file.
+                    Open the CSV file in Excel, Google Sheets, or any spreadsheet software. 
+                    Update as needed, but keep the header row and overall structure intact.
                   </p>
                 </Col>
                 
                 <Col md={4} className="mb-3">
-                  <h6>3. Import Both Files Together</h6>
+                  <h6>3. Import Your Changes</h6>
                   <p className="small">
-                    Select both edited CSV files and click "Import Both Files". Your entire 
-                    program will be replaced with the data from these files. Perfect for 
-                    backing up and restoring your program.
+                    Select the edited CSV file and click "Import Complete Program". Your entire 
+                    program will be replaced with the data from the file.
                   </p>
                 </Col>
               </Row>
 
               <Alert variant="info" className="mb-0 mt-3">
-                <strong>Tip:</strong> Use export/import to create program variations, backup 
-                before making changes, or transfer your program to another device. Always keep 
-                both files together!
+                <strong>Tip:</strong> Use export/import to backup your program, make bulk changes 
+                in a spreadsheet, create program variations, or transfer your program to another 
+                device.
               </Alert>
             </Card.Body>
           </Card>
