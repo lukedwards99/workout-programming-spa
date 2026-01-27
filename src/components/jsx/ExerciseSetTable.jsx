@@ -1,7 +1,9 @@
-import React from 'react';
-import { Table, Form, Button } from 'react-bootstrap';
+import React, { useState } from 'react';
+import { Table, Form, Button, Row, Col } from 'react-bootstrap';
 
 function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExerciseId }) {
+  const [showMobileNotes, setShowMobileNotes] = useState(false);
+
   if (sets.length === 0) {
     return (
       <div className="text-center text-muted py-3">
@@ -11,17 +13,18 @@ function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExercis
   }
 
   return (
-    <Table striped bordered hover responsive className="mb-0">
-      <thead>
-        <tr>
-          <th width="8%">Set</th>
-          <th width="15%">Reps</th>
-          <th width="15%">Weight</th>
-          <th width="15%">RIR</th>
-          <th width="32%" className="d-none d-md-table-cell">Notes</th>
-          <th width="15%">Actions</th>
-        </tr>
-      </thead>
+    <>
+      <Table striped bordered hover responsive className="mb-0">
+        <thead>
+          <tr>
+            <th width="8%">Set</th>
+            <th width="15%">Reps</th>
+            <th width="15%">Weight</th>
+            <th width="15%">RIR</th>
+            <th width="32%" className="d-none d-md-table-cell">Notes</th>
+            <th width="15%">Actions</th>
+          </tr>
+        </thead>
       <tbody>
         {sets.map(set => (
           <React.Fragment key={set.id}>
@@ -62,7 +65,8 @@ function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExercis
               </td>
               <td className="d-none d-md-table-cell">
                 <Form.Control
-                  type="text"
+                  as="textarea"
+                  rows={2}
                   value={set.notes || ''}
                   onChange={(e) => onUpdateSet(set.id, 'notes', e.target.value)}
                   size="sm"
@@ -79,22 +83,35 @@ function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExercis
                 </Button>
               </td>
             </tr>
-            <tr className="d-md-none">
-              <td colSpan="5" className="py-2 px-3 bg-light">
-                <small className="text-muted d-block mb-1">Notes:</small>
-                <Form.Control
-                  type="text"
-                  value={set.notes || ''}
-                  onChange={(e) => onUpdateSet(set.id, 'notes', e.target.value)}
-                  size="sm"
-                  placeholder="Optional notes"
-                />
-              </td>
-            </tr>
+            {showMobileNotes && (
+              <tr className="d-md-none">
+                <td colSpan="5" className="py-2 px-3 bg-light">
+                  <small className="text-muted d-block mb-1">Notes:</small>
+                  <Form.Control
+                    as="textarea"
+                    rows={2}
+                    value={set.notes || ''}
+                    onChange={(e) => onUpdateSet(set.id, 'notes', e.target.value)}
+                    size="sm"
+                    placeholder="Optional notes"
+                  />
+                </td>
+              </tr>
+            )}
           </React.Fragment>
         ))}
       </tbody>
     </Table>
+      <div className="d-md-none mb-2 text-center pt-2">
+        <Button
+          size="sm"
+          variant="outline-secondary"
+          onClick={() => setShowMobileNotes(!showMobileNotes)}
+        >
+          {showMobileNotes ? 'Hide' : 'Show'} Notes
+        </Button>
+      </div>
+    </>
   );
 }
 

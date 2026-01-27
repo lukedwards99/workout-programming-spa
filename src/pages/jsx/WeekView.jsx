@@ -108,16 +108,16 @@ function WeekView() {
       <div className="hero-section text-center mb-4">
         <h1 className="display-4 mb-3">Build Your Program</h1>
         <p className="lead text-muted mb-4">
-          Plan your training days, build workouts, and track your progress
+          Plan your training days, build workouts, and track your progress. Free, open source, forever.
         </p>
         <div className="d-flex justify-content-center gap-3 flex-wrap">
-          <Button 
+          {/* <Button 
             variant="primary" 
             size="lg"
             onClick={handleAutoProgramming}
           >
             Auto-Generate Program
-          </Button>
+          </Button> */}
           <Button 
             as={Link}
             to="/data"
