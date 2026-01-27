@@ -88,6 +88,25 @@ export async function addDay(dayName) {
   return await executeInsert(queries.insertDay, [dayName, nextOrder]);
 }
 
+export async function insertDayAfter(dayName, afterDayId) {
+  // Get the day_order of the day we're inserting after
+  const afterDay = getDayById(afterDayId);
+  if (!afterDay) {
+    throw new Error('Day not found');
+  }
+  
+  const insertOrder = afterDay.day_order + 1;
+  
+  // Shift all days after this position up by 1
+  const daysToShift = executeQuery('SELECT * FROM days WHERE day_order >= ? ORDER BY day_order DESC', [insertOrder]);
+  for (const day of daysToShift) {
+    await executeUpdate(queries.updateDayOrder, [day.day_order + 1, day.id]);
+  }
+  
+  // Insert the new day
+  return await executeInsert(queries.insertDay, [dayName, insertOrder]);
+}
+
 export async function removeLastDay() {
   const count = getDaysCount();
   if (count === 0) {
@@ -95,6 +114,22 @@ export async function removeLastDay() {
   }
   
   await executeUpdate(queries.deleteLastDay);
+}
+
+export async function deleteDay(dayId) {
+  const day = getDayById(dayId);
+  if (!day) {
+    throw new Error('Day not found');
+  }
+  
+  // Delete the day
+  await executeUpdate(queries.deleteDay, [dayId]);
+  
+  // Reorder remaining days to close the gap
+  const remainingDays = executeQuery('SELECT * FROM days WHERE day_order > ? ORDER BY day_order', [day.day_order]);
+  for (const remainingDay of remainingDays) {
+    await executeUpdate(queries.updateDayOrder, [remainingDay.day_order - 1, remainingDay.id]);
+  }
 }
 
 export function getNextDayOfWeek(currentDayName) {

@@ -10,6 +10,8 @@ export const queries = {
   getMaxDayOrder: 'SELECT MAX(day_order) as max_order FROM days',
   insertDay: 'INSERT INTO days (day_name, day_order) VALUES (?, ?)',
   deleteLastDay: 'DELETE FROM days WHERE day_order = (SELECT MAX(day_order) FROM days)',
+  deleteDay: 'DELETE FROM days WHERE id = ?',
+  updateDayOrder: 'UPDATE days SET day_order = ? WHERE id = ?',
   getDaysCount: 'SELECT COUNT(*) as count FROM days',
 
   // ===== WORKOUT GROUPS =====

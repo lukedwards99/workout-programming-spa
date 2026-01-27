@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Badge, Alert, Modal, Form } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Badge, Alert, Modal, Form, Dropdown } from 'react-bootstrap';
 import {
   daysApi,
   dayWorkoutGroupsApi,
@@ -14,6 +14,7 @@ function WeekView() {
   const [alert, setAlert] = useState(null);
   const [showAddDayModal, setShowAddDayModal] = useState(false);
   const [newDayName, setNewDayName] = useState('');
+  const [addAfterDayId, setAddAfterDayId] = useState(null);
 
   useEffect(() => {
     loadData();
@@ -55,6 +56,13 @@ function WeekView() {
 
   const handleOpenAddDay = () => {
     setNewDayName('');
+    setAddAfterDayId(null);
+    setShowAddDayModal(true);
+  };
+
+  const handleOpenAddDayAfter = (dayId) => {
+    setNewDayName('');
+    setAddAfterDayId(dayId);
     setShowAddDayModal(true);
   };
 
@@ -70,7 +78,12 @@ function WeekView() {
       return;
     }
 
-    const response = await daysApi.add(newDayName.trim());
+    let response;
+    if (addAfterDayId) {
+      response = await daysApi.insertAfter(newDayName.trim(), addAfterDayId);
+    } else {
+      response = await daysApi.add(newDayName.trim());
+    }
     
     if (response.success) {
       showAlert(`Day "${newDayName}" added successfully`);
@@ -97,6 +110,21 @@ function WeekView() {
     
     if (response.success) {
       showAlert('Day removed successfully');
+      loadData();
+    } else {
+      showAlert(response.error, 'danger');
+    }
+  };
+
+  const handleDeleteDay = async (day) => {
+    if (!window.confirm(`Delete "${day.day_name}"? This will delete all associated workout data for this day and reorder the remaining days.`)) {
+      return;
+    }
+
+    const response = await daysApi.delete(day.id);
+    
+    if (response.success) {
+      showAlert('Day deleted successfully');
       loadData();
     } else {
       showAlert(response.error, 'danger');
@@ -157,8 +185,30 @@ function WeekView() {
           return (
             <Col key={day.id} xs={12} sm={6} lg={4} xl={3}>
               <Card className="day-card h-100">
-                <Card.Header className={`text-white ${hasWorkout ? 'bg-success' : 'bg-secondary'}`}>
+                <Card.Header className={`text-white ${hasWorkout ? 'bg-success' : 'bg-secondary'} d-flex justify-content-between align-items-center`}>
                   <h5 className="mb-0">{day.day_name}</h5>
+                  <Dropdown align="end">
+                    <Dropdown.Toggle 
+                      variant="link" 
+                      size="sm" 
+                      className="text-white p-0 shadow-none"
+                      style={{ fontSize: '1.2rem' }}
+                    >
+                      ⋮
+                    </Dropdown.Toggle>
+                    <Dropdown.Menu>
+                      <Dropdown.Item onClick={() => handleOpenAddDayAfter(day.id)}>
+                        ➕ Add Day After
+                      </Dropdown.Item>
+                      <Dropdown.Divider />
+                      <Dropdown.Item 
+                        onClick={() => handleDeleteDay(day)}
+                        className="text-danger"
+                      >
+                        🗑️ Delete Day
+                      </Dropdown.Item>
+                    </Dropdown.Menu>
+                  </Dropdown>
                 </Card.Header>
                 <Card.Body>
                   {hasWorkout ? (
@@ -204,7 +254,11 @@ function WeekView() {
       {/* Add Day Modal */}
       <Modal show={showAddDayModal} onHide={() => setShowAddDayModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>Add New Day</Modal.Title>
+          <Modal.Title>
+            {addAfterDayId 
+              ? `Add Day After "${days.find(d => d.id === addAfterDayId)?.day_name}"` 
+              : 'Add New Day'}
+          </Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form>
@@ -216,6 +270,12 @@ function WeekView() {
                 onChange={(e) => setNewDayName(e.target.value)}
                 placeholder="e.g., Monday, Day 1, Upper Body"
                 autoFocus
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddDay();
+                  }
+                }}
               />
               <Form.Text className="text-muted">
                 Enter a unique name for this day

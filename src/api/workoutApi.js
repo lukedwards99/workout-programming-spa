@@ -18,7 +18,9 @@ import {
   getDayById,
   getDaysCount,
   addDay,
+  insertDayAfter,
   removeLastDay,
+  deleteDay,
   
   // Workout Groups
   getAllWorkoutGroups,
@@ -405,6 +407,28 @@ export const daysApi = {
   },
 
   /**
+   * Insert a new day after a specific day
+   */
+  insertAfter: async (dayName, afterDayId) => {
+    try {
+      validateRequired(dayName, 'Day name');
+      validateRequired(afterDayId, 'Day ID');
+      
+      // Check for duplicate name
+      const existingDays = getAllDays();
+      if (existingDays.some(d => d.day_name.toLowerCase() === dayName.trim().toLowerCase())) {
+        return errorResponse('A day with this name already exists', 'VALIDATION_ERROR');
+      }
+      
+      const id = await insertDayAfter(dayName.trim(), afterDayId);
+      return successResponse({ id }, 'Day added successfully');
+    } catch (error) {
+      console.error('Failed to insert day', error);
+      return errorResponse(error, 'VALIDATION_ERROR');
+    }
+  },
+
+  /**
    * Remove the last day
    */
   removeLast: async () => {
@@ -418,6 +442,21 @@ export const daysApi = {
       return successResponse(null, 'Day removed successfully');
     } catch (error) {
       console.error('Failed to remove day', error);
+      return errorResponse(error);
+    }
+  },
+
+  /**
+   * Delete a specific day
+   */
+  delete: async (dayId) => {
+    try {
+      validateRequired(dayId, 'Day ID');
+      
+      await deleteDay(dayId);
+      return successResponse(null, 'Day deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete day', error);
       return errorResponse(error);
     }
   }
