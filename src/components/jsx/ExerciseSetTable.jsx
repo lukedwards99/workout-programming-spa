@@ -3,6 +3,7 @@ import { Table, Form, Button, Row, Col } from 'react-bootstrap';
 
 function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExerciseId }) {
   const [showMobileNotes, setShowMobileNotes] = useState(false);
+  const [localNotes, setLocalNotes] = useState({});
 
   if (sets.length === 0) {
     return (
@@ -35,40 +36,45 @@ function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExercis
               <td>
                 <Form.Control
                   type="number"
-                  value={set.reps || ''}
-                  onChange={(e) => onUpdateSet(set.id, 'reps', e.target.value ? parseInt(e.target.value) : null)}
+                  value={set.reps ?? ''}
+                  onChange={(e) => onUpdateSet(set.id, 'reps', e.target.value !== '' ? parseInt(e.target.value) : null)}
                   size="sm"
-                  min="1"
-                  placeholder="8"
+                  min="0"
                 />
               </td>
               <td>
                 <Form.Control
                   type="number"
-                  value={set.weight || ''}
-                  onChange={(e) => onUpdateSet(set.id, 'weight', e.target.value ? parseFloat(e.target.value) : null)}
+                  value={set.weight ?? ''}
+                  onChange={(e) => onUpdateSet(set.id, 'weight', e.target.value !== '' ? parseFloat(e.target.value) : null)}
                   size="sm"
                   min="0"
                   step="0.5"
-                  placeholder="135"
                 />
               </td>
               <td>
                 <Form.Control
                   type="number"
-                  value={set.rir || ''}
-                  onChange={(e) => onUpdateSet(set.id, 'rir', e.target.value ? parseInt(e.target.value) : null)}
+                  value={set.rir ?? ''}
+                  onChange={(e) => onUpdateSet(set.id, 'rir', e.target.value !== '' ? parseInt(e.target.value) : null)}
                   size="sm"
                   min="0"
-                  placeholder="2"
                 />
               </td>
               <td className="d-none d-md-table-cell">
                 <Form.Control
                   as="textarea"
                   rows={2}
-                  value={set.notes || ''}
-                  onChange={(e) => onUpdateSet(set.id, 'notes', e.target.value)}
+                  value={localNotes[set.id] ?? set.notes ?? ''}
+                  onChange={(e) => setLocalNotes(prev => ({ ...prev, [set.id]: e.target.value }))}
+                  onBlur={(e) => {
+                    onUpdateSet(set.id, 'notes', e.target.value);
+                    setLocalNotes(prev => {
+                      const newNotes = { ...prev };
+                      delete newNotes[set.id];
+                      return newNotes;
+                    });
+                  }}
                   size="sm"
                   placeholder="Optional notes"
                 />
@@ -90,8 +96,16 @@ function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExercis
                   <Form.Control
                     as="textarea"
                     rows={2}
-                    value={set.notes || ''}
-                    onChange={(e) => onUpdateSet(set.id, 'notes', e.target.value)}
+                    value={localNotes[set.id] ?? set.notes ?? ''}
+                    onChange={(e) => setLocalNotes(prev => ({ ...prev, [set.id]: e.target.value }))}
+                    onBlur={(e) => {
+                      onUpdateSet(set.id, 'notes', e.target.value);
+                      setLocalNotes(prev => {
+                        const newNotes = { ...prev };
+                        delete newNotes[set.id];
+                        return newNotes;
+                      });
+                    }}
                     size="sm"
                     placeholder="Optional notes"
                   />
