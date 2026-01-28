@@ -12,6 +12,8 @@
  * - Future-proof for backend migration
  */
 
+import * as csvService from '../services/csvService.js';
+
 import {
   // Days
   getAllDays,
@@ -60,16 +62,7 @@ import {
   deleteSet,
   deleteSetsByDayExercise,
   
-  // CSV Export/Import
-  exportToCSV,
-  downloadCSV,
-  importFromCSV,
-  exportSetupDataToCSV,
-  downloadSetupDataCSV,
-  importSetupDataFromCSV,
-  exportCombinedToCSV,
-  downloadCombinedCSV,
-  importCombinedFromCSV,
+  // Data Management
   clearWorkoutData,
   clearAllData,
   seedSampleData,
@@ -182,7 +175,7 @@ export const workoutGroupsApi = {
         return errorResponse('A workout group with this name already exists', 'VALIDATION_ERROR');
       }
       
-      const id = await createWorkoutGroup(data.name.trim(), data.notes || '');
+      const id = await createWorkoutGroup(data.name.trim(), data.notes || '', data.id || null);
       return successResponse({ id }, 'Workout group created successfully');
     } catch (error) {
       console.error('Failed to create workout group', error);
@@ -388,18 +381,18 @@ export const daysApi = {
   /**
    * Add a new day
    */
-  add: async (dayName) => {
+  add: async (dayName, id = null) => {
     try {
       validateRequired(dayName, 'Day name');
       
       // Check for duplicate name
       const existingDays = getAllDays();
       if (existingDays.some(d => d.day_name.toLowerCase() === dayName.trim().toLowerCase())) {
-        return errorResponse('A day with this name already exists', 'VALIDATION_ERROR');
+        throw new Error('A day with this name already exists');
       }
       
-      const id = await addDay(dayName.trim());
-      return successResponse({ id }, 'Day added successfully');
+      const newId = await addDay(dayName.trim(), id);
+      return successResponse({ id: newId }, 'Day added successfully');
     } catch (error) {
       console.error('Failed to add day', error);
       return errorResponse(error, 'VALIDATION_ERROR');
@@ -542,7 +535,12 @@ export const dayExercisesApi = {
         return errorResponse('Exercise not found', 'VALIDATION_ERROR');
       }
       
-      const id = await createDayExercise(data.dayId, data.exerciseId);
+      const id = await createDayExercise(
+        data.dayId,
+        data.exerciseId,
+        data.exerciseOrder || null,
+        data.id || null
+      );
       return successResponse({ id }, 'Exercise added to day successfully');
     } catch (error) {
       console.error('Failed to add exercise to day', error);
@@ -687,7 +685,9 @@ export const setsApi = {
         data.reps,
         data.weight,
         data.rir,
-        data.notes || ''
+        data.notes || '',
+        data.setOrder || null,
+        data.id || null
       );
       return successResponse({ id }, 'Set added successfully');
     } catch (error) {
@@ -754,147 +754,49 @@ export const setsApi = {
 export const dataApi = {
   /**
    * Export combined data (setup + program) to CSV format
-   * Returns the CSV string
    */
   exportCombined: async () => {
-    return handleApiCall(
-      () => {
-        const csv = exportCombinedToCSV();
-        return { csv };
-      },
-      'Failed to export combined data'
-    );
+    try {
+      const csv = await csvService.exportAllData();
+      return successResponse({ csv }, 'Data exported successfully');
+    } catch (error) {
+      console.error('Failed to export data', error);
+      return errorResponse(error, 'EXPORT_ERROR');
+    }
   },
 
   /**
    * Download combined data as CSV file
-   * Triggers browser download
    */
   downloadCombined: async () => {
     try {
-      downloadCombinedCSV();
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `workout-complete-${date}.csv`;
-      return successResponse({ filename }, 'CSV file downloaded successfully');
+      const csv = await csvService.exportAllData();
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `workout-complete-${timestamp}.csv`;
+      
+      csvService.downloadCSV(filename, csv);
+      
+      return successResponse({ filename }, `Data exported to ${filename}`);
     } catch (error) {
-      console.error('Failed to download combined CSV', error);
+      console.error('Failed to download data', error);
       return errorResponse(error, 'EXPORT_ERROR');
     }
   },
 
   /**
    * Import combined data from CSV string
-   * Clears all existing data and rebuilds from CSV
    */
   importCombined: async (csvString) => {
     try {
       validateRequired(csvString, 'CSV data');
       
-      const result = await importCombinedFromCSV(csvString);
-      return successResponse(
-        { rowCount: result.rowCount },
-        `Successfully imported ${result.rowCount} rows`
-      );
-    } catch (error) {
-      console.error('Failed to import combined CSV', error);
-      return errorResponse(error, 'IMPORT_ERROR');
-    }
-  },
-
-  /**
-   * Export all workout data to CSV format
-   * Returns the CSV string
-   */
-  export: async () => {
-    return handleApiCall(
-      () => {
-        const csv = exportToCSV();
-        return { csv };
-      },
-      'Failed to export data'
-    );
-  },
-
-  /**
-   * Download all workout data as CSV file
-   * Triggers browser download
-   */
-  download: async () => {
-    try {
-      downloadCSV();
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `workout-program-${date}.csv`;
-      return successResponse({ filename }, 'CSV file downloaded successfully');
-    } catch (error) {
-      console.error('Failed to download CSV', error);
-      return errorResponse(error, 'EXPORT_ERROR');
-    }
-  },
-
-  /**
-   * Import workout data from CSV string
-   * Clears existing sets and rebuilds from CSV
-   */
-  import: async (csvString) => {
-    try {
-      validateRequired(csvString, 'CSV data');
+      const result = await csvService.importAllData(csvString);
       
-      const result = await importFromCSV(csvString);
-      return successResponse(
-        { rowCount: result.rowCount },
-        `Successfully imported ${result.rowCount} rows`
-      );
-    } catch (error) {
-      console.error('Failed to import CSV', error);
-      return errorResponse(error, 'IMPORT_ERROR');
-    }
-  },
-
-  /**
-   * Export setup data (workout groups & exercises) to CSV format
-   * Returns the CSV string
-   */
-  exportSetup: async () => {
-    return handleApiCall(
-      () => {
-        const csv = exportSetupDataToCSV();
-        return { csv };
-      },
-      'Failed to export setup data'
-    );
-  },
-
-  /**
-   * Download setup data as CSV file
-   * Triggers browser download
-   */
-  downloadSetup: async () => {
-    try {
-      downloadSetupDataCSV();
-      const date = new Date().toISOString().split('T')[0];
-      const filename = `workout-setup-${date}.csv`;
-      return successResponse({ filename }, 'Setup CSV file downloaded successfully');
-    } catch (error) {
-      console.error('Failed to download setup CSV', error);
-      return errorResponse(error, 'EXPORT_ERROR');
-    }
-  },
-
-  /**
-   * Import setup data from CSV string
-   * Clears existing workout groups and exercises, then rebuilds
-   */
-  importSetup: async (csvString) => {
-    try {
-      validateRequired(csvString, 'CSV data');
+      const message = `Successfully imported: ${result.counts.workoutGroups} workout groups, ${result.counts.exercises} exercises, ${result.counts.days} days, ${result.counts.dayExercises} day exercises, ${result.counts.sets} sets`;
       
-      const result = await importSetupDataFromCSV(csvString);
-      return successResponse(
-        { rowCount: result.rowCount },
-        `Successfully imported ${result.rowCount} setup items`
-      );
+      return successResponse(result.counts, message);
     } catch (error) {
-      console.error('Failed to import setup CSV', error);
+      console.error('Failed to import data', error);
       return errorResponse(error, 'IMPORT_ERROR');
     }
   },
@@ -939,69 +841,6 @@ export const dataApi = {
       },
       'Failed to seed sample data'
     );
-  },
-
-  /**
-   * Download both setup and program data files
-   * Downloads two CSV files with matching timestamps
-   */
-  downloadAll: async () => {
-    try {
-      const date = new Date().toISOString().split('T')[0];
-      
-      // Download setup file
-      downloadSetupDataCSV();
-      
-      // Small delay to prevent browser blocking multiple downloads
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Download program file
-      downloadCSV();
-      
-      return successResponse(
-        { 
-          setupFilename: `workout-setup-${date}.csv`,
-          programFilename: `workout-program-${date}.csv`
-        },
-        'Both CSV files downloaded successfully'
-      );
-    } catch (error) {
-      console.error('Failed to download files', error);
-      return errorResponse(error, 'EXPORT_ERROR');
-    }
-  },
-
-  /**
-   * Import both setup and program data from CSV strings
-   * Clears all existing data and rebuilds from both CSV files
-   * Both files must be provided and are tightly coupled
-   */
-  importAll: async (setupCsv, programCsv) => {
-    try {
-      // Validate both files are provided
-      validateRequired(setupCsv, 'Setup CSV data');
-      validateRequired(programCsv, 'Program CSV data');
-      
-      // Clear all existing data
-      await clearAllData();
-      
-      // Import setup data first (workout groups and exercises)
-      const setupResult = await importSetupDataFromCSV(setupCsv);
-      
-      // Then import program data (days, sets, associations)
-      const programResult = await importFromCSV(programCsv);
-      
-      return successResponse(
-        { 
-          setupRows: setupResult.rowCount,
-          programRows: programResult.rowCount
-        },
-        `Successfully imported ${setupResult.rowCount} setup items and ${programResult.rowCount} program rows`
-      );
-    } catch (error) {
-      console.error('Failed to import data', error);
-      return errorResponse(error, 'IMPORT_ERROR');
-    }
   }
 };
 

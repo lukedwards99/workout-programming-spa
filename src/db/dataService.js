@@ -80,10 +80,15 @@ export function getDaysCount() {
   return result ? result.count : 0;
 }
 
-export async function addDay(dayName) {
+export async function addDay(dayName, id = null) {
   // Get next day order
   const result = executeQueryOne(queries.getMaxDayOrder);
   const nextOrder = (result && result.max_order ? result.max_order : 0) + 1;
+  
+  if (id !== null) {
+    // Insert with specific ID
+    return await executeInsert('INSERT INTO days (id, day_name, day_order) VALUES (?, ?, ?)', [id, dayName, nextOrder]);
+  }
   
   return await executeInsert(queries.insertDay, [dayName, nextOrder]);
 }
@@ -153,7 +158,12 @@ export function getWorkoutGroupById(id) {
   return executeQueryOne(queries.getWorkoutGroupById, [id]);
 }
 
-export async function createWorkoutGroup(name, notes = '') {
+export async function createWorkoutGroup(name, notes = '', id = null) {
+  if (id !== null) {
+    // Insert with specific ID
+    return await executeInsert('INSERT INTO workout_groups (id, name, notes) VALUES (?, ?, ?)', [id, name, notes]);
+  }
+  
   return await executeInsert(queries.insertWorkoutGroup, [name, notes]);
 }
 
@@ -189,7 +199,12 @@ export function getExercisesByWorkoutGroups(workoutGroupIds) {
   return executeQuery(query, workoutGroupIds);
 }
 
-export async function createExercise(workoutGroupId, name, notes = '') {
+export async function createExercise(workoutGroupId, name, notes = '', id = null) {
+  if (id !== null) {
+    // Insert with specific ID
+    return await executeInsert('INSERT INTO exercises (id, workout_group_id, name, notes) VALUES (?, ?, ?, ?)', [id, workoutGroupId, name, notes]);
+  }
+  
   return await executeInsert(queries.insertExercise, [workoutGroupId, name, notes]);
 }
 
@@ -247,10 +262,17 @@ export function getDayExerciseById(id) {
   return executeQueryOne(queries.getDayExerciseById, [id]);
 }
 
-export async function createDayExercise(dayId, exerciseId) {
-  // Get next exercise order for this day
-  const result = executeQueryOne(queries.getMaxExerciseOrder, [dayId]);
-  const exerciseOrder = (result && result.max_order ? result.max_order : 0) + 1;
+export async function createDayExercise(dayId, exerciseId, exerciseOrder = null, id = null) {
+  // Get next exercise order for this day if not provided
+  if (exerciseOrder === null) {
+    const result = executeQueryOne(queries.getMaxExerciseOrder, [dayId]);
+    exerciseOrder = (result && result.max_order ? result.max_order : 0) + 1;
+  }
+  
+  if (id !== null) {
+    // Insert with specific ID
+    return await executeInsert('INSERT INTO day_exercises (id, day_id, exercise_id, exercise_order) VALUES (?, ?, ?, ?)', [id, dayId, exerciseId, exerciseOrder]);
+  }
   
   return await executeInsert(queries.insertDayExercise, [dayId, exerciseId, exerciseOrder]);
 }
@@ -281,10 +303,17 @@ export function getSetById(id) {
   return executeQueryOne(queries.getSetById, [id]);
 }
 
-export async function createSet(dayExerciseId, reps = null, weight = null, rir = null, notes = '') {
-  // Get next set order for this day exercise
-  const result = executeQueryOne(queries.getMaxSetOrder, [dayExerciseId]);
-  const setOrder = (result && result.max_order ? result.max_order : 0) + 1;
+export async function createSet(dayExerciseId, reps = null, weight = null, rir = null, notes = '', setOrder = null, id = null) {
+  // Get next set order for this day exercise if not provided
+  if (setOrder === null) {
+    const result = executeQueryOne(queries.getMaxSetOrder, [dayExerciseId]);
+    setOrder = (result && result.max_order ? result.max_order : 0) + 1;
+  }
+  
+  if (id !== null) {
+    // Insert with specific ID
+    return await executeInsert('INSERT INTO sets (id, day_exercise_id, set_order, reps, weight, rir, notes) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, dayExerciseId, setOrder, reps, weight, rir, notes]);
+  }
   
   return await executeInsert(queries.insertSet, [dayExerciseId, setOrder, reps, weight, rir, notes]);
 }
@@ -302,573 +331,7 @@ export async function deleteSetsByDayExercise(dayExerciseId) {
 }
 
 // ===== CSV EXPORT/IMPORT =====
-
-/**
- * Export all data to CSV format
- * Returns CSV string with denormalized data
- */
-export function exportToCSV() {
-  const data = executeQuery(queries.getExportData);
-  
-  // Convert to CSV format
-  const csv = Papa.unparse(data, {
-    columns: [
-      'day_name',
-      'day_order',
-      'workout_group_name',
-      'exercise_name',
-      'exercise_notes',
-      'exercise_order',
-      'set_order',
-      'reps',
-      'rir',
-      'set_notes'
-    ],
-    header: true
-  });
-  
-  return csv;
-}
-
-/**
- * Download CSV file
- */
-export function downloadCSV() {
-  const csv = exportToCSV();
-  const date = new Date().toISOString().split('T')[0];
-  const filename = `workout-program-${date}.csv`;
-  
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-/**
- * Import data from CSV
- * Clears existing sets and rebuilds from CSV
- */
-export async function importFromCSV(csvString) {
-  return new Promise((resolve, reject) => {
-    Papa.parse(csvString, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const db = getDatabase();
-          
-          // Track workout groups, exercises, days, and day_exercises to create/find
-          const workoutGroupMap = new Map();
-          const exerciseMap = new Map();
-          const dayMap = new Map();
-          const dayExerciseMap = new Map(); // key: "dayId-exerciseId-exerciseOrder", value: dayExerciseId
-          const dayWorkoutGroupsSet = new Set(); // Track day-workout_group associations
-          
-          // Get existing workout groups
-          const existingGroups = getAllWorkoutGroups();
-          existingGroups.forEach(group => {
-            workoutGroupMap.set(group.name, group.id);
-          });
-          
-          // Get existing exercises
-          const existingExercises = getAllExercises();
-          existingExercises.forEach(exercise => {
-            exerciseMap.set(`${exercise.workout_group_id}-${exercise.name}`, exercise.id);
-          });
-          
-          // Get existing days
-          const existingDays = getAllDays();
-          existingDays.forEach(day => {
-            dayMap.set(day.day_name, day.id);
-          });
-          
-          // Process each row
-          for (const row of results.data) {
-            const {
-              day_name,
-              day_order,
-              workout_group_name,
-              exercise_name,
-              exercise_notes,
-              exercise_order,
-              set_order,
-              reps,
-              rir,
-              set_notes
-            } = row;
-            
-            // Find or create workout group
-            let workoutGroupId = workoutGroupMap.get(workout_group_name);
-            if (!workoutGroupId) {
-              workoutGroupId = await createWorkoutGroup(workout_group_name, '');
-              workoutGroupMap.set(workout_group_name, workoutGroupId);
-            }
-            
-            // Find or create exercise
-            const exerciseKey = `${workoutGroupId}-${exercise_name}`;
-            let exerciseId = exerciseMap.get(exerciseKey);
-            if (!exerciseId) {
-              exerciseId = await createExercise(workoutGroupId, exercise_name, exercise_notes || '');
-              exerciseMap.set(exerciseKey, exerciseId);
-            }
-            
-            // Find or create day
-            let dayId = dayMap.get(day_name);
-            if (!dayId) {
-              // Create day with the order from CSV
-              const order = parseInt(day_order) || 1;
-              db.run(queries.insertDay, [day_name, order]);
-              const result = executeQueryOne('SELECT last_insert_rowid() as id');
-              dayId = result ? result.id : null;
-              if (dayId) {
-                dayMap.set(day_name, dayId);
-              } else {
-                console.warn(`Failed to create day: ${day_name}`);
-                continue;
-              }
-            }
-            
-            // Track the day-workout_group association
-            const associationKey = `${dayId}-${workoutGroupId}`;
-            dayWorkoutGroupsSet.add(associationKey);
-            
-            // Find or create day_exercise
-            const exOrder = parseInt(exercise_order) || 1;
-            const dayExerciseKey = `${dayId}-${exerciseId}-${exOrder}`;
-            let dayExerciseId = dayExerciseMap.get(dayExerciseKey);
-            if (!dayExerciseId) {
-              // Create day_exercise
-              db.run(queries.insertDayExercise, [dayId, exerciseId, exOrder]);
-              const result = executeQueryOne('SELECT last_insert_rowid() as id');
-              dayExerciseId = result ? result.id : null;
-              if (dayExerciseId) {
-                dayExerciseMap.set(dayExerciseKey, dayExerciseId);
-              } else {
-                console.warn(`Failed to create day_exercise for day ${day_name}, exercise ${exercise_name}`);
-                continue;
-              }
-            }
-            
-            // Insert set
-            db.run(queries.insertSet, [
-              dayExerciseId,
-              parseInt(set_order) || 1,
-              parseInt(reps) || null,
-              parseInt(rir) || null,
-              set_notes || ''
-            ]);
-          }
-          
-          // Create day_workout_groups associations
-          for (const key of dayWorkoutGroupsSet) {
-            const [dayId, workoutGroupId] = key.split('-').map(id => parseInt(id));
-            db.run(queries.insertDayWorkoutGroup, [dayId, workoutGroupId]);
-          }
-          
-          await saveDatabaseToIndexedDB();
-          resolve({ success: true, rowCount: results.data.length });
-        } catch (error) {
-          console.error('Error importing CSV:', error);
-          reject(error);
-        }
-      },
-      error: (error) => {
-        reject(error);
-      }
-    });
-  });
-}
-
-/**
- * Export combined data (setup + program) to CSV
- * Returns a single CSV string with setup data in first rows and program data in remaining rows
- */
-export function exportCombinedToCSV() {
-  const workoutGroups = getAllWorkoutGroups();
-  const exercises = getAllExercises();
-  const programData = executeQuery(queries.getExportData);
-  
-  // Create rows with type identifier
-  const rows = [];
-  
-  // Add workout groups
-  workoutGroups.forEach(group => {
-    rows.push({
-      row_type: 'group',
-      group_id: group.id,
-      group_name: group.name,
-      group_notes: group.notes || '',
-      exercise_id: '',
-      exercise_name: '',
-      exercise_notes: '',
-      day_name: '',
-      day_order: '',
-      exercise_order: '',
-      set_order: '',
-      reps: '',
-      rir: '',
-      set_notes: ''
-    });
-  });
-  
-  // Add exercises
-  exercises.forEach(exercise => {
-    rows.push({
-      row_type: 'exercise',
-      group_id: exercise.workout_group_id,
-      group_name: '',
-      group_notes: '',
-      exercise_id: exercise.id,
-      exercise_name: exercise.name,
-      exercise_notes: exercise.notes || '',
-      day_name: '',
-      day_order: '',
-      exercise_order: '',
-      set_order: '',
-      reps: '',
-      rir: '',
-      set_notes: ''
-    });
-  });
-  
-  // Add program data (sets)
-  programData.forEach(row => {
-    rows.push({
-      row_type: 'set',
-      group_id: '',
-      group_name: row.workout_group_name,
-      group_notes: '',
-      exercise_id: '',
-      exercise_name: row.exercise_name,
-      exercise_notes: row.exercise_notes || '',
-      day_name: row.day_name,
-      day_order: row.day_order,
-      exercise_order: row.exercise_order,
-      set_order: row.set_order,
-      reps: row.reps || '',
-      rir: row.rir || '',
-      set_notes: row.set_notes || ''
-    });
-  });
-  
-  const csv = Papa.unparse(rows, {
-    columns: ['row_type', 'group_id', 'group_name', 'group_notes', 'exercise_id', 'exercise_name', 'exercise_notes', 'day_name', 'day_order', 'exercise_order', 'set_order', 'reps', 'rir', 'set_notes'],
-    header: true
-  });
-  
-  return csv;
-}
-
-/**
- * Export setup data (workout groups and exercises) to CSV
- * Returns CSV string with workout groups and exercises
- */
-export function exportSetupDataToCSV() {
-  const workoutGroups = getAllWorkoutGroups();
-  const exercises = getAllExercises();
-  
-  // Create rows with type identifier
-  const rows = [];
-  
-  // Add workout groups
-  workoutGroups.forEach(group => {
-    rows.push({
-      type: 'group',
-      id: group.id,
-      workout_group_id: '',
-      name: group.name,
-      notes: group.notes || ''
-    });
-  });
-  
-  // Add exercises
-  exercises.forEach(exercise => {
-    rows.push({
-      type: 'exercise',
-      id: exercise.id,
-      workout_group_id: exercise.workout_group_id,
-      name: exercise.name,
-      notes: exercise.notes || ''
-    });
-  });
-  
-  const csv = Papa.unparse(rows, {
-    columns: ['type', 'id', 'workout_group_id', 'name', 'notes'],
-    header: true
-  });
-  
-  return csv;
-}
-
-/**
- * Download combined data CSV file
- */
-export function downloadCombinedCSV() {
-  const csv = exportCombinedToCSV();
-  const date = new Date().toISOString().split('T')[0];
-  const filename = `workout-complete-${date}.csv`;
-  
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-/**
- * Download setup data CSV file
- */
-export function downloadSetupDataCSV() {
-  const csv = exportSetupDataToCSV();
-  const date = new Date().toISOString().split('T')[0];
-  const filename = `workout-setup-${date}.csv`;
-  
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-}
-
-/**
- * Import combined data from CSV
- * Parses a combined CSV with setup data (groups & exercises) and program data (sets)
- * Clears all existing data and rebuilds from CSV
- */
-export async function importCombinedFromCSV(csvString) {
-  return new Promise((resolve, reject) => {
-    Papa.parse(csvString, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const db = getDatabase();
-          
-          // Clear all existing data first
-          await clearAllData();
-          
-          // Track ID mappings (old ID -> new ID)
-          const groupIdMap = new Map();
-          const exerciseIdMap = new Map();
-          
-          // Track workout groups, days, and day_exercises to create/find
-          const workoutGroupMap = new Map(); // name -> id
-          const exerciseMap = new Map(); // "groupId-name" -> id
-          const dayMap = new Map(); // name -> id
-          const dayExerciseMap = new Map(); // "dayId-exerciseId-exerciseOrder" -> dayExerciseId
-          const dayWorkoutGroupsSet = new Set(); // Track day-workout_group associations
-          
-          // First pass: Create all workout groups
-          for (const row of results.data) {
-            if (row.row_type === 'group') {
-              const oldId = row.group_id ? parseInt(row.group_id) : null;
-              const newId = await createWorkoutGroup(row.group_name, row.group_notes || '');
-              
-              if (oldId) {
-                groupIdMap.set(oldId, newId);
-              }
-              workoutGroupMap.set(row.group_name, newId);
-            }
-          }
-          
-          // Second pass: Create all exercises with mapped workout group IDs
-          for (const row of results.data) {
-            if (row.row_type === 'exercise') {
-              const oldExerciseId = row.exercise_id ? parseInt(row.exercise_id) : null;
-              const oldGroupId = row.group_id ? parseInt(row.group_id) : null;
-              const newGroupId = groupIdMap.get(oldGroupId);
-              
-              if (newGroupId && typeof newGroupId === 'number') {
-                const newExerciseId = await createExercise(newGroupId, row.exercise_name, row.exercise_notes || '');
-                
-                if (oldExerciseId) {
-                  exerciseIdMap.set(oldExerciseId, newExerciseId);
-                }
-                
-                const exerciseKey = `${newGroupId}-${row.exercise_name}`;
-                exerciseMap.set(exerciseKey, newExerciseId);
-              } else {
-                console.warn(`Workout group not found for exercise: ${row.exercise_name}`);
-              }
-            }
-          }
-          
-          // Third pass: Process all set rows
-          for (const row of results.data) {
-            if (row.row_type === 'set') {
-              const {
-                group_name,
-                exercise_name,
-                exercise_notes,
-                day_name,
-                day_order,
-                exercise_order,
-                set_order,
-                reps,
-                rir,
-                set_notes
-              } = row;
-              
-              // Find workout group by name
-              let workoutGroupId = workoutGroupMap.get(group_name);
-              if (!workoutGroupId) {
-                workoutGroupId = await createWorkoutGroup(group_name, '');
-                workoutGroupMap.set(group_name, workoutGroupId);
-              }
-              
-              // Find or create exercise
-              const exerciseKey = `${workoutGroupId}-${exercise_name}`;
-              let exerciseId = exerciseMap.get(exerciseKey);
-              if (!exerciseId) {
-                exerciseId = await createExercise(workoutGroupId, exercise_name, exercise_notes || '');
-                exerciseMap.set(exerciseKey, exerciseId);
-              }
-              
-              // Find or create day
-              let dayId = dayMap.get(day_name);
-              if (!dayId) {
-                const order = parseInt(day_order) || 1;
-                db.run(queries.insertDay, [day_name, order]);
-                const result = executeQueryOne('SELECT last_insert_rowid() as id');
-                dayId = result ? result.id : null;
-                if (dayId) {
-                  dayMap.set(day_name, dayId);
-                } else {
-                  console.warn(`Failed to create day: ${day_name}`);
-                  continue;
-                }
-              }
-              
-              // Track the day-workout_group association
-              const associationKey = `${dayId}-${workoutGroupId}`;
-              dayWorkoutGroupsSet.add(associationKey);
-              
-              // Find or create day_exercise
-              const exOrder = parseInt(exercise_order) || 1;
-              const dayExerciseKey = `${dayId}-${exerciseId}-${exOrder}`;
-              let dayExerciseId = dayExerciseMap.get(dayExerciseKey);
-              if (!dayExerciseId) {
-                db.run(queries.insertDayExercise, [dayId, exerciseId, exOrder]);
-                const result = executeQueryOne('SELECT last_insert_rowid() as id');
-                dayExerciseId = result ? result.id : null;
-                if (dayExerciseId) {
-                  dayExerciseMap.set(dayExerciseKey, dayExerciseId);
-                } else {
-                  console.warn(`Failed to create day_exercise for day ${day_name}, exercise ${exercise_name}`);
-                  continue;
-                }
-              }
-              
-              // Insert set
-              db.run(queries.insertSet, [
-                dayExerciseId,
-                parseInt(set_order) || 1,
-                parseInt(reps) || null,
-                parseInt(rir) || null,
-                set_notes || ''
-              ]);
-            }
-          }
-          
-          // Create day_workout_groups associations
-          for (const key of dayWorkoutGroupsSet) {
-            const [dayId, workoutGroupId] = key.split('-').map(id => parseInt(id));
-            db.run(queries.insertDayWorkoutGroup, [dayId, workoutGroupId]);
-          }
-          
-          await saveDatabaseToIndexedDB();
-          resolve({ success: true, rowCount: results.data.length });
-        } catch (error) {
-          console.error('Error importing combined CSV:', error);
-          reject(error);
-        }
-      },
-      error: (error) => {
-        reject(error);
-      }
-    });
-  });
-}
-
-/**
- * Import setup data from CSV
- * Clears existing workout groups and exercises, then rebuilds from CSV
- */
-export async function importSetupDataFromCSV(csvString) {
-  return new Promise((resolve, reject) => {
-    Papa.parse(csvString, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const db = getDatabase();
-          
-          // Track ID mappings (old ID -> new ID)
-          const groupIdMap = new Map();
-          
-          // First pass: Create all workout groups
-          for (const row of results.data) {
-            if (row.type === 'group') {
-              const oldId = parseInt(row.id);
-              console.log(`Creating group: ${row.name}, oldId: ${oldId}, raw id: ${row.id}`);
-              const newId = await createWorkoutGroup(row.name, row.notes || '');
-              console.log(`Created group with newId: ${newId}`);
-              groupIdMap.set(oldId, newId);
-            }
-          }
-          
-          console.log('Group ID Map:', Array.from(groupIdMap.entries()));
-          
-          // Second pass: Create all exercises with mapped workout group IDs
-          for (const row of results.data) {
-            if (row.type === 'exercise') {
-              const oldGroupId = parseInt(row.workout_group_id);
-              console.log(`Processing exercise: ${row.name}, oldGroupId: ${oldGroupId}, raw workout_group_id: ${row.workout_group_id}`);
-              const newGroupId = groupIdMap.get(oldGroupId);
-              console.log(`Mapped to newGroupId: ${newGroupId}, type: ${typeof newGroupId}`);
-              console.log(`Map has key ${oldGroupId}:`, groupIdMap.has(oldGroupId));
-              
-              // Check if newGroupId exists and is a valid number
-              if (newGroupId && typeof newGroupId === 'number') {
-                await createExercise(newGroupId, row.name, row.notes || '');
-                console.log(`Created exercise: ${row.name}`);
-              } else {
-                console.warn(`Workout group not found for exercise: ${row.name}, looking for oldGroupId: ${oldGroupId}`);
-                console.warn('Available group IDs:', Array.from(groupIdMap.keys()));
-                console.warn('Full map:', Array.from(groupIdMap.entries()));
-              }
-            }
-          }
-          
-          await saveDatabaseToIndexedDB();
-          resolve({ success: true, rowCount: results.data.length });
-        } catch (error) {
-          console.error('Error importing setup data:', error);
-          reject(error);
-        }
-      },
-      error: (error) => {
-        reject(error);
-      }
-    });
-  });
-}
+// NOTE: CSV functionality has been removed and will be rebuilt in Phase 2 with normalized format
 
 /**
  * Clear all workout data (sets and day workout groups)

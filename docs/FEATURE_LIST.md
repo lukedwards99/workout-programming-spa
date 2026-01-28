@@ -2,6 +2,7 @@ Cleaning:
 
 - Remove old import code
 - make components smaller
+- fix 
 
 MVP Features that need added:
 
