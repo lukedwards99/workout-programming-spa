@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Card, Button, Form, Alert } from 'react-bootstrap';
 import { dataApi } from '../../api/workoutApi';
+import * as csvService from '../../services/csvService';
 import '../css/DataManagement.css';
 
 function DataManagement() {
@@ -14,26 +15,25 @@ function DataManagement() {
   };
 
   const handleExportData = async () => {
-    const response = await dataApi.downloadCombined();
+    const result = await csvService.downloadAllData();
     
-    if (response.success) {
-      showAlert('Data exported: ' + response.data.filename);
+    if (result.success) {
+      showAlert('Data exported: ' + result.filename);
     } else {
-      showAlert(response.error, 'danger');
+      showAlert(result.error, 'danger');
     }
   };
 
   const handlePreview = async () => {
-    const response = await dataApi.exportCombined();
-    
-    if (response.success) {
-      const lines = response.data.csv.split('\n');
+    try {
+      const csv = await csvService.exportAllData();
+      const lines = csv.split('\n');
       const preview = lines.slice(0, 21).join('\n');
       
       setCsvPreview(preview);
       showAlert('Preview loaded (showing first 20 rows)', 'info');
-    } else {
-      showAlert('Failed to generate preview', 'danger');
+    } catch (error) {
+      showAlert('Failed to generate preview: ' + error.message, 'danger');
     }
   };
 
@@ -70,17 +70,18 @@ function DataManagement() {
     try {
       const text = await dataFile.text();
       
-      const response = await dataApi.importCombined(text);
+      const result = await csvService.importAllData(text);
       
-      if (response.success) {
-        showAlert(response.message, 'success');
+      if (result.success) {
+        const message = `Successfully imported: ${result.counts.workoutGroups} workout groups, ${result.counts.exercises} exercises, ${result.counts.days} days, ${result.counts.dayExercises} day exercises, ${result.counts.sets} sets`;
+        showAlert(message, 'success');
         // Clear file input
         setDataFile(null);
         // Reset file input element
         document.getElementById('dataFileInput').value = '';
         setCsvPreview('');
       } else {
-        showAlert(response.error, 'danger');
+        showAlert(result.error, 'danger');
       }
     } catch (error) {
       showAlert('Error importing CSV: ' + error.message, 'danger');

@@ -12,8 +12,6 @@
  * - Future-proof for backend migration
  */
 
-import * as csvService from '../services/csvService.js';
-
 import {
   // Days
   getAllDays,
@@ -752,55 +750,6 @@ export const setsApi = {
 // ===== DATA MANAGEMENT API =====
 
 export const dataApi = {
-  /**
-   * Export combined data (setup + program) to CSV format
-   */
-  exportCombined: async () => {
-    try {
-      const csv = await csvService.exportAllData();
-      return successResponse({ csv }, 'Data exported successfully');
-    } catch (error) {
-      console.error('Failed to export data', error);
-      return errorResponse(error, 'EXPORT_ERROR');
-    }
-  },
-
-  /**
-   * Download combined data as CSV file
-   */
-  downloadCombined: async () => {
-    try {
-      const csv = await csvService.exportAllData();
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `workout-complete-${timestamp}.csv`;
-      
-      csvService.downloadCSV(filename, csv);
-      
-      return successResponse({ filename }, `Data exported to ${filename}`);
-    } catch (error) {
-      console.error('Failed to download data', error);
-      return errorResponse(error, 'EXPORT_ERROR');
-    }
-  },
-
-  /**
-   * Import combined data from CSV string
-   */
-  importCombined: async (csvString) => {
-    try {
-      validateRequired(csvString, 'CSV data');
-      
-      const result = await csvService.importAllData(csvString);
-      
-      const message = `Successfully imported: ${result.counts.workoutGroups} workout groups, ${result.counts.exercises} exercises, ${result.counts.days} days, ${result.counts.dayExercises} day exercises, ${result.counts.sets} sets`;
-      
-      return successResponse(result.counts, message);
-    } catch (error) {
-      console.error('Failed to import data', error);
-      return errorResponse(error, 'IMPORT_ERROR');
-    }
-  },
-
   /**
    * Clear all workout data (sets and day associations)
    * Preserves workout groups and exercises

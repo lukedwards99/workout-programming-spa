@@ -159,6 +159,25 @@ export function downloadCSV(filename, csvContent) {
   URL.revokeObjectURL(url);
 }
 
+/**
+ * Export and download all data as CSV file
+ * @returns {Promise<{success: boolean, filename?: string, error?: string}>}
+ */
+export async function downloadAllData() {
+  try {
+    const csv = await exportAllData();
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `workout-complete-${timestamp}.csv`;
+    
+    downloadCSV(filename, csv);
+    
+    return { success: true, filename };
+  } catch (error) {
+    console.error('Failed to download data', error);
+    return { success: false, error: error.message };
+  }
+}
+
 // ===== IMPORT FUNCTIONS =====
 
 /**
@@ -311,7 +330,7 @@ export async function importAllData(csvString) {
     return { success: true, counts };
   } catch (error) {
     console.error('Import failed:', error);
-    throw error;
+    return { success: false, error: error.message };
   }
 }
 
