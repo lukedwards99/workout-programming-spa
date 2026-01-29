@@ -9,6 +9,9 @@
  * - Exports all tables in dependency order
  * - Imports in same order to maintain referential integrity
  * - Preserves IDs on import (requires clearing data first)
+ * 
+ * New simplified schema:
+ * - workout_sets replaces day_exercises + sets tables
  */
 
 import Papa from 'papaparse';
@@ -17,8 +20,7 @@ import {
   exercisesApi,
   daysApi,
   dayWorkoutGroupsApi,
-  dayExercisesApi,
-  setsApi,
+  workoutSetsApi,
   dataApi
 } from '../api/workoutApi.js';
 
@@ -35,22 +37,19 @@ export async function exportAllData() {
       workoutGroupsRes,
       exercisesRes,
       daysRes,
-      dayExercisesRes,
-      setsRes
+      workoutSetsRes
     ] = await Promise.all([
       workoutGroupsApi.getAll(),
       exercisesApi.getAll(),
       daysApi.getAll(),
-      dayExercisesApi.getAll(),
-      setsApi.getAll()
+      workoutSetsApi.getAll()
     ]);
 
     // Extract data from responses
     const workoutGroups = workoutGroupsRes.data || [];
     const exercises = exercisesRes.data || [];
     const days = daysRes.data || [];
-    const dayExercises = dayExercisesRes.data || [];
-    const sets = setsRes.data || [];
+    const workoutSets = workoutSetsRes.data || [];
 
     // Fetch day workout groups for all days
     const dayWorkoutGroupsPromises = days.map(day => dayWorkoutGroupsApi.getByDay(day.id));
@@ -63,9 +62,9 @@ export async function exportAllData() {
       const groups = response.data || [];
       groups.forEach(group => {
         dayWorkoutGroups.push({
-          id: group.dwg_id,
+          id: group.id,
           day_id: dayId,
-          workout_group_id: group.id
+          workout_group_id: group.workout_group_id
         });
       });
     });
@@ -113,21 +112,11 @@ export async function exportAllData() {
       csv += '\n\n';
     }
 
-    // [DAY_EXERCISES] section
-    if (dayExercises.length > 0) {
-      csv += '[DAY_EXERCISES]\n';
-      csv += Papa.unparse(dayExercises, {
-        columns: ['id', 'day_id', 'exercise_id', 'exercise_order'],
-        header: true
-      });
-      csv += '\n\n';
-    }
-
-    // [SETS] section
-    if (sets.length > 0) {
-      csv += '[SETS]\n';
-      csv += Papa.unparse(sets, {
-        columns: ['id', 'day_exercise_id', 'set_order', 'reps', 'weight', 'rir', 'notes'],
+    // [WORKOUT_SETS] section (replaces DAY_EXERCISES + SETS)
+    if (workoutSets.length > 0) {
+      csv += '[WORKOUT_SETS]\n';
+      csv += Papa.unparse(workoutSets, {
+        columns: ['id', 'day_id', 'exercise_id', 'exercise_order', 'set_order', 'reps', 'weight', 'rir', 'notes'],
         header: true
       });
       csv += '\n\n';
@@ -178,6 +167,92 @@ export async function downloadAllData() {
   }
 }
 
+/**
+ * Export workout program as pretty-printed, human-readable CSV
+ * Format: Day, Exercise, Workout Group, Set #, Reps, Weight, RIR, Notes
+ * @returns {Promise<string>} Human-readable CSV string
+ */
+export async function exportPrettyPrintProgram() {
+  try {
+    // Fetch all days
+    const daysRes = await daysApi.getAll();
+    const days = daysRes.data || [];
+    
+    if (days.length === 0) {
+      throw new Error('No workout days found');
+    }
+    
+    // Build flat array of rows
+    const rows = [];
+    
+    for (const day of days) {
+      // Get exercises and sets for this day, grouped by exercise
+      const groupedRes = await workoutSetsApi.getByDayGrouped(day.id);
+      const exercisesWithSets = groupedRes.data || [];
+      
+      if (exercisesWithSets.length === 0) {
+        // Add empty day row
+        rows.push({
+          day: day.day_name,
+          exercise: '(No exercises)',
+          workout_group: '',
+          set_number: '',
+          reps: '',
+          weight: '',
+          rir: '',
+          notes: ''
+        });
+      } else {
+        // Add rows for each set
+        exercisesWithSets.forEach(exercise => {
+          exercise.sets.forEach(set => {
+            rows.push({
+              day: day.day_name,
+              exercise: exercise.exercise_name,
+              workout_group: exercise.workout_group_name,
+              set_number: set.set_order,
+              reps: set.reps || '',
+              weight: set.weight || '',
+              rir: set.rir !== null && set.rir !== undefined ? set.rir : '',
+              notes: set.notes || ''
+            });
+          });
+        });
+      }
+    }
+    
+    // Convert to CSV
+    const csv = Papa.unparse(rows, {
+      columns: ['day', 'exercise', 'workout_group', 'set_number', 'reps', 'weight', 'rir', 'notes'],
+      header: true
+    });
+    
+    return csv;
+  } catch (error) {
+    console.error('Pretty print export failed:', error);
+    throw new Error(`Failed to export pretty print program: ${error.message}`);
+  }
+}
+
+/**
+ * Export and download workout program as pretty-printed CSV
+ * @returns {Promise<{success: boolean, filename?: string, error?: string}>}
+ */
+export async function downloadPrettyPrintProgram() {
+  try {
+    const csv = await exportPrettyPrintProgram();
+    const timestamp = new Date().toISOString().split('T')[0];
+    const filename = `workout-program-${timestamp}.csv`;
+    
+    downloadCSV(filename, csv);
+    
+    return { success: true, filename };
+  } catch (error) {
+    console.error('Failed to download pretty print program', error);
+    return { success: false, error: error.message };
+  }
+}
+
 // ===== IMPORT FUNCTIONS =====
 
 /**
@@ -212,8 +287,7 @@ export async function importAllData(csvString) {
       exercises: 0,
       days: 0,
       dayWorkoutGroups: 0,
-      dayExercises: 0,
-      sets: 0
+      workoutSets: 0
     };
 
     // 1. Import Workout Groups (no dependencies)
@@ -289,30 +363,15 @@ export async function importAllData(csvString) {
       }
     }
 
-    // 5. Import Day Exercises (depend on days and exercises)
-    if (sections.day_exercises && sections.day_exercises.length > 0) {
-      console.log(`Importing ${sections.day_exercises.length} day exercises...`);
-      for (const row of sections.day_exercises) {
-        const response = await dayExercisesApi.create({
+    // 5. Import Workout Sets (depend on days and exercises)
+    if (sections.workout_sets && sections.workout_sets.length > 0) {
+      console.log(`Importing ${sections.workout_sets.length} workout sets...`);
+      for (const row of sections.workout_sets) {
+        const response = await workoutSetsApi.create({
           id: parseInt(row.id),
           dayId: parseInt(row.day_id),
           exerciseId: parseInt(row.exercise_id),
-          exerciseOrder: parseInt(row.exercise_order)
-        });
-        if (!response.success) {
-          throw new Error(`Failed to import day exercise: ${response.error}`);
-        }
-        counts.dayExercises++;
-      }
-    }
-
-    // 6. Import Sets (depend on day_exercises)
-    if (sections.sets && sections.sets.length > 0) {
-      console.log(`Importing ${sections.sets.length} sets...`);
-      for (const row of sections.sets) {
-        const response = await setsApi.create({
-          id: parseInt(row.id),
-          dayExerciseId: parseInt(row.day_exercise_id),
+          exerciseOrder: parseInt(row.exercise_order),
           setOrder: parseInt(row.set_order),
           reps: row.reps ? parseInt(row.reps) : null,
           weight: row.weight ? parseFloat(row.weight) : null,
@@ -320,9 +379,9 @@ export async function importAllData(csvString) {
           notes: row.notes || ''
         });
         if (!response.success) {
-          throw new Error(`Failed to import set: ${response.error}`);
+          throw new Error(`Failed to import workout set: ${response.error}`);
         }
-        counts.sets++;
+        counts.workoutSets++;
       }
     }
 
@@ -400,13 +459,19 @@ function parseCSVSection(csvString) {
 /**
  * Detect CSV format version
  * @param {string} csvString - CSV content
- * @returns {string} Format version: 'phase2' (sectioned) or 'unknown'
+ * @returns {string} Format version: 'v2' (current) or 'unknown'
  */
 export function detectCSVFormat(csvString) {
+  if (csvString.includes('[WORKOUT_SETS]')) {
+    return 'v2'; // New simplified format
+  }
+  if (csvString.includes('[DAY_EXERCISES]') && csvString.includes('[SETS]')) {
+    return 'v1'; // Old normalized format (not supported for import)
+  }
   if (csvString.includes('[WORKOUT_GROUPS]') || 
       csvString.includes('[EXERCISES]') || 
       csvString.includes('[DAYS]')) {
-    return 'phase2';
+    return 'v2'; // Could be v2 without workout sets yet
   }
   return 'unknown';
 }

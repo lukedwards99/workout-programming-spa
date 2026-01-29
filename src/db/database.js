@@ -1,7 +1,7 @@
 import { schema } from './databaseDDL.js';
 
 // Schema version - increment this when making schema changes to force rebuild
-const SCHEMA_VERSION = 2; // Added weight column to sets table
+const SCHEMA_VERSION = 3; // Denormalized schema: replaced day_exercises + sets with workout_sets
 
 let db = null;
 let SQL = null;

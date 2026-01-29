@@ -1,6 +1,8 @@
 /**
  * SQL Queries module
  * Contains all SQL query strings used throughout the application
+ * 
+ * New schema uses workout_sets table (combines day_exercises + sets)
  */
 
 export const queries = {
@@ -64,94 +66,91 @@ export const queries = {
   deleteDayWorkoutGroups: 'DELETE FROM day_workout_groups WHERE day_id = ?',
   deleteDayWorkoutGroup: 'DELETE FROM day_workout_groups WHERE day_id = ? AND workout_group_id = ?',
 
-  // ===== DAY EXERCISES =====
-  getAllDayExercises: `
-    SELECT de.*, d.day_name, e.name as exercise_name, e.notes as exercise_notes,
-           wg.name as workout_group_name
-    FROM day_exercises de
-    JOIN days d ON de.day_id = d.id
-    JOIN exercises e ON de.exercise_id = e.id
-    JOIN workout_groups wg ON e.workout_group_id = wg.id
-    ORDER BY d.day_order, de.exercise_order
-  `,
-  getDayExercisesByDay: `
-    SELECT de.*, e.name as exercise_name, e.notes as exercise_notes,
-           wg.name as workout_group_name
-    FROM day_exercises de
-    JOIN exercises e ON de.exercise_id = e.id
-    JOIN workout_groups wg ON e.workout_group_id = wg.id
-    WHERE de.day_id = ?
-    ORDER BY de.exercise_order
-  `,
-  getDayExerciseById: `
-    SELECT de.*, e.name as exercise_name, e.notes as exercise_notes,
-           wg.name as workout_group_name
-    FROM day_exercises de
-    JOIN exercises e ON de.exercise_id = e.id
-    JOIN workout_groups wg ON e.workout_group_id = wg.id
-    WHERE de.id = ?
-  `,
-  insertDayExercise: 'INSERT INTO day_exercises (day_id, exercise_id, exercise_order) VALUES (?, ?, ?)',
-  updateDayExercise: 'UPDATE day_exercises SET exercise_id = ?, exercise_order = ? WHERE id = ?',
-  deleteDayExercise: 'DELETE FROM day_exercises WHERE id = ?',
-  getMaxExerciseOrder: 'SELECT MAX(exercise_order) as max_order FROM day_exercises WHERE day_id = ?',
-
-  // ===== SETS =====
-  getAllSets: `
-    SELECT s.*, de.day_id, de.exercise_order, d.day_name, 
+  // ===== WORKOUT SETS (replaces day_exercises + sets) =====
+  
+  // Get all workout sets with full details
+  getAllWorkoutSets: `
+    SELECT ws.*, d.day_name, d.day_order,
            e.name as exercise_name, e.notes as exercise_notes, 
            wg.name as workout_group_name
-    FROM sets s
-    JOIN day_exercises de ON s.day_exercise_id = de.id
-    JOIN days d ON de.day_id = d.id
-    JOIN exercises e ON de.exercise_id = e.id
+    FROM workout_sets ws
+    JOIN days d ON ws.day_id = d.id
+    JOIN exercises e ON ws.exercise_id = e.id
     JOIN workout_groups wg ON e.workout_group_id = wg.id
-    ORDER BY d.day_order, de.exercise_order, s.set_order
+    ORDER BY d.day_order, ws.exercise_order, ws.set_order
   `,
-  getSetsByDay: `
-    SELECT s.*, de.id as day_exercise_id, de.exercise_order,
+  
+  // Get all workout sets for a specific day
+  getWorkoutSetsByDay: `
+    SELECT ws.*,
            e.id as exercise_id, e.name as exercise_name, e.notes as exercise_notes, 
+           wg.name as workout_group_name, wg.id as workout_group_id
+    FROM workout_sets ws
+    JOIN exercises e ON ws.exercise_id = e.id
+    JOIN workout_groups wg ON e.workout_group_id = wg.id
+    WHERE ws.day_id = ?
+    ORDER BY ws.exercise_order, ws.set_order
+  `,
+  
+  // Get all sets for a specific exercise on a specific day
+  getWorkoutSetsByDayAndExercise: `
+    SELECT ws.*, e.name as exercise_name, e.notes as exercise_notes
+    FROM workout_sets ws
+    JOIN exercises e ON ws.exercise_id = e.id
+    WHERE ws.day_id = ? AND ws.exercise_id = ?
+    ORDER BY ws.set_order
+  `,
+  
+  // Get a single workout set by ID
+  getWorkoutSetById: `
+    SELECT ws.*, e.name as exercise_name, e.notes as exercise_notes,
            wg.name as workout_group_name
-    FROM sets s
-    JOIN day_exercises de ON s.day_exercise_id = de.id
-    JOIN exercises e ON de.exercise_id = e.id
+    FROM workout_sets ws
+    JOIN exercises e ON ws.exercise_id = e.id
     JOIN workout_groups wg ON e.workout_group_id = wg.id
-    WHERE de.day_id = ?
-    ORDER BY de.exercise_order, s.set_order
+    WHERE ws.id = ?
   `,
-  getSetsByDayExercise: `
-    SELECT s.*, e.name as exercise_name, e.notes as exercise_notes
-    FROM sets s
-    JOIN day_exercises de ON s.day_exercise_id = de.id
-    JOIN exercises e ON de.exercise_id = e.id
-    WHERE s.day_exercise_id = ?
-    ORDER BY s.set_order
-  `,
-  getSetById: 'SELECT * FROM sets WHERE id = ?',
-  insertSet: 'INSERT INTO sets (day_exercise_id, set_order, reps, weight, rir, notes) VALUES (?, ?, ?, ?, ?, ?)',
-  updateSet: 'UPDATE sets SET set_order = ?, reps = ?, weight = ?, rir = ?, notes = ? WHERE id = ?',
-  deleteSet: 'DELETE FROM sets WHERE id = ?',
-  deleteSetsByDayExercise: 'DELETE FROM sets WHERE day_exercise_id = ?',
-  getMaxSetOrder: 'SELECT MAX(set_order) as max_order FROM sets WHERE day_exercise_id = ?',
-
-  // ===== EXPORT DATA (for CSV) =====
-  getExportData: `
-    SELECT 
-      d.day_name,
-      d.day_order,
-      wg.name as workout_group_name,
-      e.name as exercise_name,
-      e.notes as exercise_notes,
-      de.exercise_order,
-      s.set_order,
-      s.reps,
-      s.rir,
-      s.notes as set_notes
-    FROM sets s
-    JOIN day_exercises de ON s.day_exercise_id = de.id
-    JOIN days d ON de.day_id = d.id
-    JOIN exercises e ON de.exercise_id = e.id
+  
+  // Get distinct exercises used on a day (with their order)
+  getExercisesByDay: `
+    SELECT DISTINCT ws.exercise_id, ws.exercise_order,
+           e.name as exercise_name, e.notes as exercise_notes,
+           wg.name as workout_group_name, wg.id as workout_group_id
+    FROM workout_sets ws
+    JOIN exercises e ON ws.exercise_id = e.id
     JOIN workout_groups wg ON e.workout_group_id = wg.id
-    ORDER BY d.day_order, de.exercise_order, s.set_order
-  `
+    WHERE ws.day_id = ?
+    ORDER BY ws.exercise_order
+  `,
+  
+  // Insert a new workout set
+  insertWorkoutSet: `
+    INSERT INTO workout_sets (day_id, exercise_id, exercise_order, set_order, reps, weight, rir, notes) 
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `,
+  
+  // Update a workout set
+  updateWorkoutSet: `
+    UPDATE workout_sets 
+    SET exercise_order = ?, set_order = ?, reps = ?, weight = ?, rir = ?, notes = ? 
+    WHERE id = ?
+  `,
+  
+  // Delete a workout set
+  deleteWorkoutSet: 'DELETE FROM workout_sets WHERE id = ?',
+  
+  // Delete all sets for a specific exercise on a day
+  deleteWorkoutSetsByDayAndExercise: 'DELETE FROM workout_sets WHERE day_id = ? AND exercise_id = ?',
+  
+  // Delete all sets for a day
+  deleteWorkoutSetsByDay: 'DELETE FROM workout_sets WHERE day_id = ?',
+  
+  // Get max exercise order for a day
+  getMaxExerciseOrder: 'SELECT MAX(exercise_order) as max_order FROM workout_sets WHERE day_id = ?',
+  
+  // Get max set order for a day/exercise combination
+  getMaxSetOrder: 'SELECT MAX(set_order) as max_order FROM workout_sets WHERE day_id = ? AND exercise_id = ?',
+  
+  // Get count of sets for a day/exercise combination
+  getSetCount: 'SELECT COUNT(*) as count FROM workout_sets WHERE day_id = ? AND exercise_id = ?'
 };

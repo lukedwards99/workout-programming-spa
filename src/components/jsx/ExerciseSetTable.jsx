@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Table, Form, Button, Row, Col } from 'react-bootstrap';
 
-function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExerciseId }) {
+function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, exerciseId }) {
   const [showMobileNotes, setShowMobileNotes] = useState(false);
   const [localNotes, setLocalNotes] = useState({});
 
@@ -83,7 +83,7 @@ function ExerciseSetTable({ sets, onUpdateSet, onDeleteSet, onAddSet, dayExercis
                 <Button
                   size="sm"
                   variant="outline-danger"
-                  onClick={() => onDeleteSet(set.id)}
+                  onClick={() => onDeleteSet(set.id, exerciseId)}
                 >
                   Delete
                 </Button>

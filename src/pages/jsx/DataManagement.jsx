@@ -24,6 +24,16 @@ function DataManagement() {
     }
   };
 
+  const handleExportPrettyPrint = async () => {
+    const result = await csvService.downloadPrettyPrintProgram();
+    
+    if (result.success) {
+      showAlert('Workout program exported: ' + result.filename);
+    } else {
+      showAlert(result.error, 'danger');
+    }
+  };
+
   const handlePreview = async () => {
     try {
       const csv = await csvService.exportAllData();
@@ -173,6 +183,14 @@ function DataManagement() {
                 >
                   📦 Download Complete Program
                 </Button>
+
+                <Button 
+                  variant="success" 
+                  size="lg"
+                  onClick={handleExportPrettyPrint}
+                >
+                  📄 Download Readable Program
+                </Button>
                 
                 <Button 
                   variant="outline-secondary"
@@ -192,11 +210,11 @@ function DataManagement() {
               <div className="mt-4">
                 <h6>File Format:</h6>
                 <ul className="small text-muted">
-                  <li><strong>workout-complete-YYYY-MM-DD.csv</strong> - Complete workout program</li>
-                  <li>First rows contain workout groups and exercises</li>
-                  <li>Remaining rows contain your program data (days, sets, reps, RIR)</li>
+                  <li><strong>workout-complete-YYYY-MM-DD.csv</strong> - Complete workout program (for re-importing)</li>
+                  <li><strong>workout-program-YYYY-MM-DD.csv</strong> - Readable program (Day, Exercise, Sets, etc.)</li>
+                  <li>Complete format includes all data needed to restore your program</li>
+                  <li>Readable format is a flat view, great for printing or viewing in spreadsheets</li>
                   <li>Open with Excel, Google Sheets, or any CSV editor</li>
-                  <li>Keep the header row intact when editing</li>
                 </ul>
               </div>
             </Card.Body>

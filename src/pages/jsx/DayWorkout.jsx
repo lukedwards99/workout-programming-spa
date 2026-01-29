@@ -8,8 +8,7 @@ import {
   workoutGroupsApi,
   dayWorkoutGroupsApi,
   exercisesApi,
-  dayExercisesApi,
-  setsApi
+  workoutSetsApi
 } from '../../api/workoutApi';
 import WorkoutGroupSelector from '../../components/jsx/WorkoutGroupSelector';
 import ExerciseAddForm from '../../components/jsx/ExerciseAddForm';
@@ -40,7 +39,7 @@ function DayWorkout() {
     const groupsResponse = await workoutGroupsApi.getAll();
     const dayGroupsResponse = await dayWorkoutGroupsApi.getByDay(parseInt(dayId));
     const exercisesResponse = await exercisesApi.getAll();
-    const dayExercisesResponse = await dayExercisesApi.getByDay(parseInt(dayId));
+    const setsGroupedResponse = await workoutSetsApi.getByDayGrouped(parseInt(dayId));
     
     if (dayResponse.success) {
       setDay(dayResponse.data);
@@ -67,39 +66,20 @@ function DayWorkout() {
       showAlert(exercisesResponse.error, 'danger');
     }
     
-    if (dayExercisesResponse.success) {
-      // Get sets for this day to merge with day exercises
-      const setsResponse = await setsApi.getByDay(parseInt(dayId));
-      const sets = setsResponse.success ? setsResponse.data : [];
-      
-      // Build the day exercises array with sets grouped by day_exercise_id
-      const exercisesWithSets = dayExercisesResponse.data.map(dayEx => {
-        const exerciseSets = sets
-          .filter(set => set.day_exercise_id === dayEx.id)
-          .sort((a, b) => a.set_order - b.set_order)
-          .map(set => ({
-            id: set.id,
-            set_order: set.set_order,
-            reps: set.reps,
-            weight: set.weight,
-            rir: set.rir,
-            notes: set.notes || ''
-          }));
-        
-        return {
-          dayExerciseId: dayEx.id,
-          exerciseId: dayEx.exercise_id,
-          exerciseName: dayEx.exercise_name,
-          workoutGroupName: dayEx.workout_group_name,
-          exerciseNotes: dayEx.exercise_notes || '',
-          exerciseOrder: dayEx.exercise_order,
-          sets: exerciseSets
-        };
-      });
+    if (setsGroupedResponse.success) {
+      // Transform the data to match the expected format
+      const exercisesWithSets = setsGroupedResponse.data.map(group => ({
+        exerciseId: group.exercise_id,
+        exerciseName: group.exercise_name,
+        workoutGroupName: group.workout_group_name,
+        exerciseNotes: group.exercise_notes || '',
+        exerciseOrder: group.exercise_order,
+        sets: group.sets
+      }));
       
       setDayExercises(exercisesWithSets);
     } else {
-      showAlert(dayExercisesResponse.error, 'danger');
+      showAlert(setsGroupedResponse.error, 'danger');
     }
   };
 
@@ -135,24 +115,29 @@ function DayWorkout() {
       return;
     }
     
-    const response = await dayExercisesApi.create({
+    // Create the first set for this exercise (requirement: every exercise needs one set)
+    const response = await workoutSetsApi.create({
       dayId: parseInt(dayId),
-      exerciseId: parseInt(selectedExercise)
+      exerciseId: parseInt(selectedExercise),
+      reps: null,
+      weight: null,
+      rir: null,
+      notes: ''
     });
     
     if (response.success) {
       setShowExerciseAdd(false);
       setSelectedExercise('');
       loadData();
-      showAlert(response.message);
+      showAlert('Exercise added with first set');
     } else {
       showAlert(response.error, 'danger');
     }
   };
 
-  const handleDeleteExercise = async (dayExerciseId, exerciseName) => {
+  const handleDeleteExercise = async (exerciseId, exerciseName) => {
     if (window.confirm(`Remove "${exerciseName}" and all its sets from this day?`)) {
-      const response = await dayExercisesApi.delete(dayExerciseId);
+      const response = await workoutSetsApi.deleteByDayAndExercise(parseInt(dayId), exerciseId);
       
       if (response.success) {
         loadData();
@@ -163,9 +148,10 @@ function DayWorkout() {
     }
   };
 
-  const handleAddSet = async (dayExerciseId) => {
-    const response = await setsApi.create({
-      dayExerciseId: dayExerciseId,
+  const handleAddSet = async (exerciseId) => {
+    const response = await workoutSetsApi.create({
+      dayId: parseInt(dayId),
+      exerciseId: exerciseId,
       reps: null,
       weight: null,
       rir: null,
@@ -196,7 +182,7 @@ function DayWorkout() {
       [field]: value
     };
     
-    const response = await setsApi.update(setId, updates);
+    const response = await workoutSetsApi.update(setId, updates);
     
     if (response.success) {
       loadData();
@@ -205,9 +191,16 @@ function DayWorkout() {
     }
   };
 
-  const handleDeleteSet = async (setId) => {
+  const handleDeleteSet = async (setId, exerciseId) => {
+    // Check if this is the last set for the exercise
+    const exercise = dayExercises.find(ex => ex.exerciseId === exerciseId);
+    if (exercise && exercise.sets.length === 1) {
+      showAlert('Cannot delete the last set. Every exercise must have at least one set. Delete the exercise instead.', 'warning');
+      return;
+    }
+    
     if (window.confirm('Delete this set?')) {
-      const response = await setsApi.delete(setId);
+      const response = await workoutSetsApi.delete(setId);
       
       if (response.success) {
         loadData();
@@ -224,22 +217,39 @@ function DayWorkout() {
     const currentExercise = dayExercises[index];
     const previousExercise = dayExercises[index - 1];
     
-    // Swap the exercise_order values
-    const response1 = await dayExercisesApi.update(currentExercise.dayExerciseId, {
-      exerciseId: currentExercise.exerciseId,
-      exerciseOrder: previousExercise.exerciseOrder
-    });
+    // Update exercise_order for all sets in both exercises
+    const currentSets = currentExercise.sets.map(set => ({ ...set, exerciseOrder: previousExercise.exerciseOrder }));
+    const previousSets = previousExercise.sets.map(set => ({ ...set, exerciseOrder: currentExercise.exerciseOrder }));
     
-    const response2 = await dayExercisesApi.update(previousExercise.dayExerciseId, {
-      exerciseId: previousExercise.exerciseId,
-      exerciseOrder: currentExercise.exerciseOrder
-    });
-    
-    if (response1.success && response2.success) {
+    try {
+      // Update all sets for current exercise
+      for (const set of currentSets) {
+        await workoutSetsApi.update(set.id, {
+          exerciseOrder: previousExercise.exerciseOrder,
+          setOrder: set.set_order,
+          reps: set.reps,
+          weight: set.weight,
+          rir: set.rir,
+          notes: set.notes || ''
+        });
+      }
+      
+      // Update all sets for previous exercise
+      for (const set of previousSets) {
+        await workoutSetsApi.update(set.id, {
+          exerciseOrder: currentExercise.exerciseOrder,
+          setOrder: set.set_order,
+          reps: set.reps,
+          weight: set.weight,
+          rir: set.rir,
+          notes: set.notes || ''
+        });
+      }
+      
       loadData();
       showAlert('Exercise order updated');
-    } else {
-      showAlert(response1.error || response2.error, 'danger');
+    } catch (error) {
+      showAlert('Failed to update exercise order', 'danger');
     }
   };
 
@@ -249,22 +259,39 @@ function DayWorkout() {
     const currentExercise = dayExercises[index];
     const nextExercise = dayExercises[index + 1];
     
-    // Swap the exercise_order values
-    const response1 = await dayExercisesApi.update(currentExercise.dayExerciseId, {
-      exerciseId: currentExercise.exerciseId,
-      exerciseOrder: nextExercise.exerciseOrder
-    });
+    // Update exercise_order for all sets in both exercises
+    const currentSets = currentExercise.sets.map(set => ({ ...set, exerciseOrder: nextExercise.exerciseOrder }));
+    const nextSets = nextExercise.sets.map(set => ({ ...set, exerciseOrder: currentExercise.exerciseOrder }));
     
-    const response2 = await dayExercisesApi.update(nextExercise.dayExerciseId, {
-      exerciseId: nextExercise.exerciseId,
-      exerciseOrder: currentExercise.exerciseOrder
-    });
-    
-    if (response1.success && response2.success) {
+    try {
+      // Update all sets for current exercise
+      for (const set of currentSets) {
+        await workoutSetsApi.update(set.id, {
+          exerciseOrder: nextExercise.exerciseOrder,
+          setOrder: set.set_order,
+          reps: set.reps,
+          weight: set.weight,
+          rir: set.rir,
+          notes: set.notes || ''
+        });
+      }
+      
+      // Update all sets for next exercise
+      for (const set of nextSets) {
+        await workoutSetsApi.update(set.id, {
+          exerciseOrder: currentExercise.exerciseOrder,
+          setOrder: set.set_order,
+          reps: set.reps,
+          weight: set.weight,
+          rir: set.rir,
+          notes: set.notes || ''
+        });
+      }
+      
       loadData();
       showAlert('Exercise order updated');
-    } else {
-      showAlert(response1.error || response2.error, 'danger');
+    } catch (error) {
+      showAlert('Failed to update exercise order', 'danger');
     }
   };
 
@@ -341,7 +368,7 @@ function DayWorkout() {
               ) : (
                 dayExercises.map((dayEx, index) => (
                   <ExerciseCard
-                    key={dayEx.dayExerciseId}
+                    key={dayEx.exerciseId}
                     dayExercise={dayEx}
                     index={index}
                     isFirst={index === 0}

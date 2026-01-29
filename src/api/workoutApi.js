@@ -10,6 +10,10 @@
  * - Input validation
  * - Standardized response format
  * - Future-proof for backend migration
+ * 
+ * New simplified schema:
+ * - workout_sets replaces day_exercises + sets
+ * - Every exercise must have at least one set
  */
 
 import {
@@ -42,23 +46,19 @@ import {
   getDayWorkoutGroups,
   setDayWorkoutGroups,
   
-  // Day Exercises
-  getAllDayExercises,
-  getDayExercisesByDay,
-  getDayExerciseById,
-  createDayExercise,
-  updateDayExercise,
-  deleteDayExercise,
-  
-  // Sets
-  getAllSets,
-  getSetsByDay,
-  getSetsByDayExercise,
-  getSetById,
-  createSet,
-  updateSet,
-  deleteSet,
-  deleteSetsByDayExercise,
+  // Workout Sets (replaces day_exercises + sets)
+  getAllWorkoutSets,
+  getWorkoutSetsByDay,
+  getWorkoutSetsByDayAndExercise,
+  getWorkoutSetById,
+  getExercisesByDay,
+  getWorkoutSetsByDayGrouped,
+  createWorkoutSet,
+  updateWorkoutSet,
+  deleteWorkoutSet,
+  deleteWorkoutSetsByDayAndExercise,
+  deleteWorkoutSetsByDay,
+  getSetCount,
   
   // Data Management
   clearWorkoutData,
@@ -480,113 +480,16 @@ export const dayWorkoutGroupsApi = {
   }
 };
 
-// ===== DAY EXERCISES API =====
+// ===== WORKOUT SETS API (replaces dayExercises + sets) =====
 
-export const dayExercisesApi = {
+export const workoutSetsApi = {
   /**
-   * Get all day exercises
+   * Get all workout sets
    */
   getAll: async () => {
     return handleApiCall(
-      () => getAllDayExercises(),
-      'Failed to fetch day exercises'
-    );
-  },
-
-  /**
-   * Get all exercises for a specific day (with order)
-   */
-  getByDay: async (dayId) => {
-    return handleApiCall(
-      () => getDayExercisesByDay(dayId),
-      'Failed to fetch exercises for day'
-    );
-  },
-
-  /**
-   * Get a specific day exercise by ID
-   */
-  getById: async (id) => {
-    return handleApiCall(
-      () => getDayExerciseById(id),
-      'Failed to fetch day exercise'
-    );
-  },
-
-  /**
-   * Add an exercise to a day
-   */
-  create: async (data) => {
-    try {
-      validateRequired(data.dayId, 'Day');
-      validateRequired(data.exerciseId, 'Exercise');
-      
-      // Verify day exists
-      const day = getDayById(data.dayId);
-      if (!day) {
-        return errorResponse('Day not found', 'VALIDATION_ERROR');
-      }
-      
-      // Verify exercise exists
-      const exercise = getExerciseById(data.exerciseId);
-      if (!exercise) {
-        return errorResponse('Exercise not found', 'VALIDATION_ERROR');
-      }
-      
-      const id = await createDayExercise(
-        data.dayId,
-        data.exerciseId,
-        data.exerciseOrder || null,
-        data.id || null
-      );
-      return successResponse({ id }, 'Exercise added to day successfully');
-    } catch (error) {
-      console.error('Failed to add exercise to day', error);
-      return errorResponse(error, 'VALIDATION_ERROR');
-    }
-  },
-
-  /**
-   * Update a day exercise
-   */
-  update: async (id, data) => {
-    try {
-      validateRequired(data.exerciseId, 'Exercise');
-      validateRequired(data.exerciseOrder, 'Exercise order');
-      validatePositiveNumber(data.exerciseOrder, 'Exercise order');
-      
-      await updateDayExercise(id, data.exerciseId, data.exerciseOrder);
-      return successResponse({ id }, 'Day exercise updated successfully');
-    } catch (error) {
-      console.error('Failed to update day exercise', error);
-      return errorResponse(error);
-    }
-  },
-
-  /**
-   * Delete an exercise from a day (and all its sets)
-   */
-  delete: async (id) => {
-    return handleApiCall(
-      async () => {
-        await deleteDayExercise(id);
-        return { id };
-      },
-      'Failed to remove exercise from day'
-    );
-  }
-};
-
-// ===== SETS API =====
-
-export const setsApi = {
-  /**
-   * Get all sets
-   */
-  getAll: async () => {
-    return handleApiCall(
-      () => getAllSets(),
-      'Failed to fetch sets'
+      () => getAllWorkoutSets(),
+      'Failed to fetch workout sets'
     );
   },
 
@@ -595,154 +498,191 @@ export const setsApi = {
    */
   getByDay: async (dayId) => {
     return handleApiCall(
-      () => getSetsByDay(dayId),
+      () => getWorkoutSetsByDay(dayId),
       'Failed to fetch sets for day'
     );
   },
 
   /**
-   * Get all sets for a specific day exercise
-   */
-  getByDayExercise: async (dayExerciseId) => {
-    return handleApiCall(
-      () => getSetsByDayExercise(dayExerciseId),
-      'Failed to fetch sets for day exercise'
-    );
-  },
-
-  /**
-   * Get sets for a day grouped by day exercise
-   * Returns an array of objects containing day exercise info and its sets, ordered by exercise_order
+   * Get sets for a day grouped by exercise
+   * Returns array of { exercise_id, exercise_name, exercise_order, sets: [...] }
    */
   getByDayGrouped: async (dayId) => {
     return handleApiCall(
-      () => {
-        const sets = getSetsByDay(dayId);
-        
-        // Group sets by day_exercise_id
-        const groupedSets = {};
-        sets.forEach(set => {
-          const dayExerciseId = set.day_exercise_id;
-          
-          if (!groupedSets[dayExerciseId]) {
-            groupedSets[dayExerciseId] = {
-              dayExerciseId: dayExerciseId,
-              exerciseId: set.exercise_id,
-              exerciseName: set.exercise_name,
-              workoutGroupName: set.workout_group_name,
-              exerciseNotes: set.exercise_notes || '',
-              exerciseOrder: set.exercise_order,
-              sets: []
-            };
-          }
-          
-          groupedSets[dayExerciseId].sets.push({
-            id: set.id,
-            set_order: set.set_order,
-            reps: set.reps,
-            rir: set.rir,
-            notes: set.notes || ''
-          });
-        });
-        
-        // Convert to array and sort by exercise_order
-        const groupedArray = Object.values(groupedSets).sort((a, b) => a.exerciseOrder - b.exerciseOrder);
-        return groupedArray;
-      },
+      () => getWorkoutSetsByDayGrouped(dayId),
       'Failed to fetch grouped sets for day'
     );
   },
 
   /**
-   * Create a new set
+   * Get all sets for a specific exercise on a day
+   */
+  getByDayAndExercise: async (dayId, exerciseId) => {
+    return handleApiCall(
+      () => getWorkoutSetsByDayAndExercise(dayId, exerciseId),
+      'Failed to fetch sets for exercise on day'
+    );
+  },
+
+  /**
+   * Get a single workout set by ID
+   */
+  getById: async (id) => {
+    return handleApiCall(
+      () => {
+        const set = getWorkoutSetById(id);
+        if (!set) {
+          throw new Error('Workout set not found');
+        }
+        return set;
+      },
+      'Failed to fetch workout set'
+    );
+  },
+
+  /**
+   * Get distinct exercises used on a day
+   */
+  getExercisesByDay: async (dayId) => {
+    return handleApiCall(
+      () => getExercisesByDay(dayId),
+      'Failed to fetch exercises for day'
+    );
+  },
+
+  /**
+   * Create a new workout set
+   * Note: exerciseOrder and setOrder are auto-calculated if not provided
    */
   create: async (data) => {
     try {
-      validateRequired(data.dayExerciseId, 'Day Exercise');
+      validateRequired(data.dayId, 'Day');
+      validateRequired(data.exerciseId, 'Exercise');
       
+      // Validate numeric fields if provided
       if (data.reps !== null && data.reps !== undefined) {
         validatePositiveNumber(data.reps, 'Reps');
       }
-      
       if (data.weight !== null && data.weight !== undefined) {
-        validatePositiveNumber(data.weight, 'Weight');
+        validateNonNegativeNumber(data.weight, 'Weight');
       }
-      
       if (data.rir !== null && data.rir !== undefined) {
         validateNonNegativeNumber(data.rir, 'RIR');
       }
       
-      // Verify day exercise exists
-      const dayExercise = getDayExerciseById(data.dayExerciseId);
-      if (!dayExercise) {
-        return errorResponse('Day exercise not found', 'VALIDATION_ERROR');
-      }
-      
-      const id = await createSet(
-        data.dayExerciseId,
-        data.reps,
-        data.weight,
-        data.rir,
-        data.notes || '',
+      const id = await createWorkoutSet(
+        data.dayId,
+        data.exerciseId,
+        data.exerciseOrder || null,
         data.setOrder || null,
+        data.reps || null,
+        data.weight || null,
+        data.rir || null,
+        data.notes || '',
         data.id || null
       );
-      return successResponse({ id }, 'Set added successfully');
+      
+      return successResponse({ id }, 'Workout set created successfully');
     } catch (error) {
-      console.error('Failed to create set', error);
+      console.error('Failed to create workout set', error);
       return errorResponse(error, 'VALIDATION_ERROR');
     }
   },
 
   /**
-   * Update an existing set
+   * Update an existing workout set
    */
   update: async (id, data) => {
     try {
-      // Get current set data to preserve unchanged fields
-      const currentSet = getSetById(id);
+      // Get current set to fill in missing values
+      const currentSet = getWorkoutSetById(id);
       if (!currentSet) {
-        return errorResponse('Set not found', 'NOT_FOUND');
+        return errorResponse('Workout set not found', 'NOT_FOUND');
       }
       
-      // Validate if provided
+      // Validate numeric fields if provided
       if (data.reps !== null && data.reps !== undefined) {
         validatePositiveNumber(data.reps, 'Reps');
       }
-      
       if (data.weight !== null && data.weight !== undefined) {
-        validatePositiveNumber(data.weight, 'Weight');
+        validateNonNegativeNumber(data.weight, 'Weight');
       }
-      
       if (data.rir !== null && data.rir !== undefined) {
         validateNonNegativeNumber(data.rir, 'RIR');
       }
       
       // Use current values if not provided
+      const exerciseOrder = data.exerciseOrder !== undefined ? data.exerciseOrder : currentSet.exercise_order;
       const setOrder = data.setOrder !== undefined ? data.setOrder : currentSet.set_order;
       const reps = data.reps !== undefined ? data.reps : currentSet.reps;
       const weight = data.weight !== undefined ? data.weight : currentSet.weight;
       const rir = data.rir !== undefined ? data.rir : currentSet.rir;
       const notes = data.notes !== undefined ? data.notes : currentSet.notes;
       
-      await updateSet(id, setOrder, reps, weight, rir, notes || '');
-      return successResponse({ id }, 'Set updated successfully');
+      await updateWorkoutSet(
+        id,
+        exerciseOrder,
+        setOrder,
+        reps,
+        weight,
+        rir,
+        notes || ''
+      );
+      
+      return successResponse({ id }, 'Workout set updated successfully');
     } catch (error) {
-      console.error('Failed to update set', error);
+      console.error('Failed to update workout set', error);
       return errorResponse(error);
     }
   },
 
   /**
-   * Delete a set
+   * Delete a workout set
    */
   delete: async (id) => {
     return handleApiCall(
       async () => {
-        await deleteSet(id);
+        await deleteWorkoutSet(id);
         return { id };
       },
-      'Failed to delete set'
+      'Failed to delete workout set'
+    );
+  },
+
+  /**
+   * Delete all sets for an exercise on a day
+   * Used when removing an exercise from a day
+   */
+  deleteByDayAndExercise: async (dayId, exerciseId) => {
+    return handleApiCall(
+      async () => {
+        await deleteWorkoutSetsByDayAndExercise(dayId, exerciseId);
+        return { dayId, exerciseId };
+      },
+      'Failed to delete exercise from day'
+    );
+  },
+
+  /**
+   * Delete all sets for a day
+   */
+  deleteByDay: async (dayId) => {
+    return handleApiCall(
+      async () => {
+        await deleteWorkoutSetsByDay(dayId);
+        return { dayId };
+      },
+      'Failed to delete all sets for day'
+    );
+  },
+
+  /**
+   * Get count of sets for a day/exercise combination
+   */
+  getSetCount: async (dayId, exerciseId) => {
+    return handleApiCall(
+      () => ({ count: getSetCount(dayId, exerciseId) }),
+      'Failed to get set count'
     );
   }
 };
@@ -822,8 +762,7 @@ export default {
   exercises: exercisesApi,
   days: daysApi,
   dayWorkoutGroups: dayWorkoutGroupsApi,
-  dayExercises: dayExercisesApi,
-  sets: setsApi,
+  workoutSets: workoutSetsApi,
   data: dataApi,
   program: programApi
 };

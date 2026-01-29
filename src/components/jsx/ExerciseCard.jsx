@@ -58,7 +58,7 @@ function ExerciseCard({
             <Button
               size="sm"
               variant="success"
-              onClick={() => onAddSet(dayExercise.dayExerciseId)}
+              onClick={() => onAddSet(dayExercise.exerciseId)}
               className="flex-fill flex-sm-grow-0"
             >
               + Add Set
@@ -66,7 +66,7 @@ function ExerciseCard({
             <Button
               size="sm"
               variant="outline-danger"
-              onClick={() => onDeleteExercise(dayExercise.dayExerciseId, dayExercise.exerciseName)}
+              onClick={() => onDeleteExercise(dayExercise.exerciseId, dayExercise.exerciseName)}
               className="flex-fill flex-sm-grow-0"
             >
               Remove Exercise
@@ -77,7 +77,7 @@ function ExerciseCard({
       <Card.Body className="p-0">
         <ExerciseSetTable
           sets={dayExercise.sets}
-          dayExerciseId={dayExercise.dayExerciseId}
+          exerciseId={dayExercise.exerciseId}
           onUpdateSet={onUpdateSet}
           onDeleteSet={onDeleteSet}
           onAddSet={onAddSet}

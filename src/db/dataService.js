@@ -6,6 +6,10 @@ import Papa from 'papaparse';
  * Data Service
  * Handles all CRUD operations and data transformations
  * Auto-saves to IndexedDB after every modification
+ * 
+ * New simplified schema:
+ * - workout_sets table combines day_exercises + sets
+ * - Enforces: every exercise must have at least one set
  */
 
 // ===== HELPER FUNCTIONS =====
@@ -248,98 +252,170 @@ export async function removeDayWorkoutGroup(dayId, workoutGroupId) {
   await executeUpdate(queries.deleteDayWorkoutGroup, [dayId, workoutGroupId]);
 }
 
-// ===== DAY EXERCISES =====
+// ===== WORKOUT SETS (replaces day_exercises + sets) =====
 
-export function getAllDayExercises() {
-  return executeQuery(queries.getAllDayExercises);
+/**
+ * Get all workout sets with full details
+ */
+export function getAllWorkoutSets() {
+  return executeQuery(queries.getAllWorkoutSets);
 }
 
-export function getDayExercisesByDay(dayId) {
-  return executeQuery(queries.getDayExercisesByDay, [dayId]);
+/**
+ * Get all workout sets for a specific day
+ */
+export function getWorkoutSetsByDay(dayId) {
+  return executeQuery(queries.getWorkoutSetsByDay, [dayId]);
 }
 
-export function getDayExerciseById(id) {
-  return executeQueryOne(queries.getDayExerciseById, [id]);
+/**
+ * Get all sets for a specific exercise on a specific day
+ */
+export function getWorkoutSetsByDayAndExercise(dayId, exerciseId) {
+  return executeQuery(queries.getWorkoutSetsByDayAndExercise, [dayId, exerciseId]);
 }
 
-export async function createDayExercise(dayId, exerciseId, exerciseOrder = null, id = null) {
-  // Get next exercise order for this day if not provided
+/**
+ * Get a single workout set by ID
+ */
+export function getWorkoutSetById(id) {
+  return executeQueryOne(queries.getWorkoutSetById, [id]);
+}
+
+/**
+ * Get distinct exercises used on a day (with their order)
+ */
+export function getExercisesByDay(dayId) {
+  return executeQuery(queries.getExercisesByDay, [dayId]);
+}
+
+/**
+ * Get workout sets grouped by exercise for a day
+ * Returns array of { exercise_id, exercise_name, exercise_order, sets: [...] }
+ */
+export function getWorkoutSetsByDayGrouped(dayId) {
+  const allSets = getWorkoutSetsByDay(dayId);
+  
+  // Group by exercise
+  const grouped = {};
+  allSets.forEach(set => {
+    const key = `${set.exercise_id}`;
+    if (!grouped[key]) {
+      grouped[key] = {
+        exercise_id: set.exercise_id,
+        exercise_name: set.exercise_name,
+        exercise_notes: set.exercise_notes,
+        exercise_order: set.exercise_order,
+        workout_group_name: set.workout_group_name,
+        workout_group_id: set.workout_group_id,
+        sets: []
+      };
+    }
+    grouped[key].sets.push({
+      id: set.id,
+      set_order: set.set_order,
+      reps: set.reps,
+      weight: set.weight,
+      rir: set.rir,
+      notes: set.notes
+    });
+  });
+  
+  // Convert to array and sort by exercise_order
+  return Object.values(grouped).sort((a, b) => a.exercise_order - b.exercise_order);
+}
+
+/**
+ * Create a new workout set
+ * @param {number} dayId - Day ID
+ * @param {number} exerciseId - Exercise ID
+ * @param {number|null} exerciseOrder - Order of exercise within day (auto-calculated if null)
+ * @param {number|null} setOrder - Order of set within exercise (auto-calculated if null)
+ * @param {number|null} reps - Number of reps
+ * @param {number|null} weight - Weight
+ * @param {number|null} rir - RIR value
+ * @param {string} notes - Notes
+ * @param {number|null} id - Specific ID (for imports)
+ */
+export async function createWorkoutSet(dayId, exerciseId, exerciseOrder = null, setOrder = null, reps = null, weight = null, rir = null, notes = '', id = null) {
+  // Get exercise order if not provided
   if (exerciseOrder === null) {
-    const result = executeQueryOne(queries.getMaxExerciseOrder, [dayId]);
-    exerciseOrder = (result && result.max_order ? result.max_order : 0) + 1;
+    // Check if this exercise already exists on this day
+    const existingSets = getWorkoutSetsByDayAndExercise(dayId, exerciseId);
+    
+    if (existingSets.length > 0) {
+      // Exercise exists, use its order
+      exerciseOrder = existingSets[0].exercise_order;
+    } else {
+      // New exercise, get next order
+      const result = executeQueryOne(queries.getMaxExerciseOrder, [dayId]);
+      exerciseOrder = (result && result.max_order ? result.max_order : 0) + 1;
+    }
   }
   
-  if (id !== null) {
-    // Insert with specific ID
-    return await executeInsert('INSERT INTO day_exercises (id, day_id, exercise_id, exercise_order) VALUES (?, ?, ?, ?)', [id, dayId, exerciseId, exerciseOrder]);
-  }
-  
-  return await executeInsert(queries.insertDayExercise, [dayId, exerciseId, exerciseOrder]);
-}
-
-export async function updateDayExercise(id, exerciseId, exerciseOrder) {
-  await executeUpdate(queries.updateDayExercise, [exerciseId, exerciseOrder, id]);
-}
-
-export async function deleteDayExercise(id) {
-  await executeUpdate(queries.deleteDayExercise, [id]);
-}
-
-// ===== SETS =====
-
-export function getAllSets() {
-  return executeQuery(queries.getAllSets);
-}
-
-export function getSetsByDay(dayId) {
-  return executeQuery(queries.getSetsByDay, [dayId]);
-}
-
-export function getSetsByDayExercise(dayExerciseId) {
-  return executeQuery(queries.getSetsByDayExercise, [dayExerciseId]);
-}
-
-export function getSetById(id) {
-  return executeQueryOne(queries.getSetById, [id]);
-}
-
-export async function createSet(dayExerciseId, reps = null, weight = null, rir = null, notes = '', setOrder = null, id = null) {
-  // Get next set order for this day exercise if not provided
+  // Get set order if not provided
   if (setOrder === null) {
-    const result = executeQueryOne(queries.getMaxSetOrder, [dayExerciseId]);
+    const result = executeQueryOne(queries.getMaxSetOrder, [dayId, exerciseId]);
     setOrder = (result && result.max_order ? result.max_order : 0) + 1;
   }
   
   if (id !== null) {
-    // Insert with specific ID
-    return await executeInsert('INSERT INTO sets (id, day_exercise_id, set_order, reps, weight, rir, notes) VALUES (?, ?, ?, ?, ?, ?, ?)', [id, dayExerciseId, setOrder, reps, weight, rir, notes]);
+    // Insert with specific ID (for imports)
+    return await executeInsert(
+      'INSERT INTO workout_sets (id, day_id, exercise_id, exercise_order, set_order, reps, weight, rir, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [id, dayId, exerciseId, exerciseOrder, setOrder, reps, weight, rir, notes]
+    );
   }
   
-  return await executeInsert(queries.insertSet, [dayExerciseId, setOrder, reps, weight, rir, notes]);
+  return await executeInsert(queries.insertWorkoutSet, [dayId, exerciseId, exerciseOrder, setOrder, reps, weight, rir, notes]);
 }
-
-export async function updateSet(id, setOrder, reps, weight, rir, notes = '') {
-  await executeUpdate(queries.updateSet, [setOrder, reps, weight, rir, notes, id]);
-}
-
-export async function deleteSet(id) {
-  await executeUpdate(queries.deleteSet, [id]);
-}
-
-export async function deleteSetsByDayExercise(dayExerciseId) {
-  await executeUpdate(queries.deleteSetsByDayExercise, [dayExerciseId]);
-}
-
-// ===== CSV EXPORT/IMPORT =====
-// NOTE: CSV functionality has been removed and will be rebuilt in Phase 2 with normalized format
 
 /**
- * Clear all workout data (sets and day workout groups)
+ * Update a workout set
+ */
+export async function updateWorkoutSet(id, exerciseOrder, setOrder, reps, weight, rir, notes = '') {
+  await executeUpdate(queries.updateWorkoutSet, [exerciseOrder, setOrder, reps, weight, rir, notes, id]);
+}
+
+/**
+ * Delete a workout set
+ */
+export async function deleteWorkoutSet(id) {
+  await executeUpdate(queries.deleteWorkoutSet, [id]);
+}
+
+/**
+ * Delete all sets for a specific exercise on a day
+ * Used when removing an exercise from a day
+ */
+export async function deleteWorkoutSetsByDayAndExercise(dayId, exerciseId) {
+  await executeUpdate(queries.deleteWorkoutSetsByDayAndExercise, [dayId, exerciseId]);
+}
+
+/**
+ * Delete all sets for a day
+ */
+export async function deleteWorkoutSetsByDay(dayId) {
+  await executeUpdate(queries.deleteWorkoutSetsByDay, [dayId]);
+}
+
+/**
+ * Get count of sets for a day/exercise combination
+ */
+export function getSetCount(dayId, exerciseId) {
+  const result = executeQueryOne(queries.getSetCount, [dayId, exerciseId]);
+  return result ? result.count : 0;
+}
+
+// ===== DATA MANAGEMENT =====
+
+/**
+ * Clear all workout data (workout_sets and day_workout_groups)
  * Keeps workout groups and exercises intact
  */
 export async function clearWorkoutData() {
   const db = getDatabase();
-  db.run('DELETE FROM sets');
+  db.run('DELETE FROM workout_sets');
   db.run('DELETE FROM day_workout_groups');
   db.run('DELETE FROM days');
   await saveDatabaseToIndexedDB();
