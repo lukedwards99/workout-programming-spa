@@ -24,6 +24,10 @@ function Navigation() {
       <Container>
         <Navbar.Brand as={Link} to="/" onClick={closeMenu}>
           <strong>Complete Workout Programming</strong>
+          <small className="d-block" style={{ fontSize: '0.7rem', color: '#ccc' }}>
+            Version: Alpha 1.0.0 <br />
+            Built: {__BUILD_DATE__}
+          </small>
         </Navbar.Brand>
 
         <Navbar.Toggle 

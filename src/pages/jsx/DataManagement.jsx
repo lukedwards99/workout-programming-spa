@@ -8,7 +8,6 @@ function DataManagement() {
   const [alert, setAlert] = useState(null);
   const [importing, setImporting] = useState(false);
   const [dataFile, setDataFile] = useState(null);
-  const [csvPreview, setCsvPreview] = useState('');
 
   const showAlert = (message, variant = 'success') => {
     setAlert({ message, variant });
@@ -31,19 +30,6 @@ function DataManagement() {
       showAlert('Workout program exported: ' + result.filename);
     } else {
       showAlert(result.error, 'danger');
-    }
-  };
-
-  const handlePreview = async () => {
-    try {
-      const csv = await csvService.exportAllData();
-      const lines = csv.split('\n');
-      const preview = lines.slice(0, 21).join('\n');
-      
-      setCsvPreview(preview);
-      showAlert('Preview loaded (showing first 20 rows)', 'info');
-    } catch (error) {
-      showAlert('Failed to generate preview: ' + error.message, 'danger');
     }
   };
 
@@ -89,7 +75,6 @@ function DataManagement() {
         setDataFile(null);
         // Reset file input element
         document.getElementById('dataFileInput').value = '';
-        setCsvPreview('');
       } else {
         showAlert(result.error, 'danger');
       }
@@ -191,21 +176,7 @@ function DataManagement() {
                 >
                   📄 Download Readable Program
                 </Button>
-                
-                <Button 
-                  variant="outline-secondary"
-                  onClick={handlePreview}
-                >
-                  Preview Data
-                </Button>
               </div>
-
-              {csvPreview && (
-                <div className="mt-3">
-                  <h6>Data Preview (first 20 rows):</h6>
-                  <pre className="csv-preview">{csvPreview}</pre>
-                </div>
-              )}
 
               <div className="mt-4">
                 <h6>File Format:</h6>
