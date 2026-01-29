@@ -156,6 +156,65 @@ export async function updateDayNotes(dayId, notes) {
   await executeUpdate('UPDATE days SET notes = ? WHERE id = ?', [notes, dayId]);
 }
 
+/**
+ * Duplicate a day (including its workout groups and sets)
+ * Appends the new day at the end of the sequence
+ * @param {number} dayId - The day ID to duplicate
+ * @returns {number} The ID of the newly created day
+ */
+export async function duplicateDay(dayId) {
+  const db = getDatabase();
+  
+  // Get the source day
+  const sourceDay = getDayById(dayId);
+  if (!sourceDay) {
+    throw new Error('Day not found');
+  }
+  
+  // Generate unique name by appending " (Copy)" until unique
+  let newDayName = `${sourceDay.day_name} (Copy)`;
+  let existingDays = getAllDays();
+  
+  while (existingDays.some(d => d.day_name.toLowerCase() === newDayName.toLowerCase())) {
+    newDayName = `${newDayName} (Copy)`;
+  }
+  
+  // Create new day at end of sequence
+  const newDayId = await addDay(newDayName, null, sourceDay.notes || '');
+  
+  // Copy day_workout_groups
+  const dayWorkoutGroups = getDayWorkoutGroups(dayId);
+  if (dayWorkoutGroups.length > 0) {
+    const stmt = db.prepare(queries.insertDayWorkoutGroup);
+    dayWorkoutGroups.forEach(dwg => {
+      stmt.run([newDayId, dwg.workout_group_id]);
+    });
+    stmt.free();
+  }
+  
+  // Copy workout_sets
+  const workoutSets = getWorkoutSetsByDay(dayId);
+  if (workoutSets.length > 0) {
+    const stmt = db.prepare(queries.insertWorkoutSet);
+    workoutSets.forEach(set => {
+      stmt.run([
+        newDayId,
+        set.exercise_id,
+        set.exercise_order,
+        set.set_order,
+        set.reps,
+        set.weight,
+        set.rir,
+        set.notes || ''
+      ]);
+    });
+    stmt.free();
+  }
+  
+  await saveDatabaseToIndexedDB();
+  return newDayId;
+}
+
 // ===== WORKOUT GROUPS =====
 
 export function getAllWorkoutGroups() {

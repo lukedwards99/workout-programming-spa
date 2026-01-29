@@ -131,6 +131,17 @@ function WeekView() {
     }
   };
 
+  const handleDuplicateDay = async (day) => {
+    const response = await daysApi.duplicate(day.id);
+    
+    if (response.success) {
+      showAlert(`Day "${day.day_name}" duplicated successfully`);
+      loadData();
+    } else {
+      showAlert(response.error, 'danger');
+    }
+  };
+
   return (
     <Container className="week-view-page py-4">
       <div className="hero-section text-center mb-4">
@@ -199,6 +210,9 @@ function WeekView() {
                     <Dropdown.Menu>
                       <Dropdown.Item onClick={() => handleOpenAddDayAfter(day.id)}>
                         ➕ Add Day After
+                      </Dropdown.Item>
+                      <Dropdown.Item onClick={() => handleDuplicateDay(day)}>
+                        📋 Duplicate Day
                       </Dropdown.Item>
                       <Dropdown.Divider />
                       <Dropdown.Item 

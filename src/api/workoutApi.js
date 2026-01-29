@@ -26,6 +26,7 @@ import {
   removeLastDay,
   deleteDay,
   updateDayNotes,
+  duplicateDay,
   
   // Workout Groups
   getAllWorkoutGroups,
@@ -464,6 +465,22 @@ export const daysApi = {
       return successResponse({ dayId }, 'Day notes updated successfully');
     } catch (error) {
       console.error('Failed to update day notes', error);
+      return errorResponse(error);
+    }
+  },
+
+  /**
+   * Duplicate a day (including workout groups and sets)
+   * Appends the new day at the end of the sequence
+   */
+  duplicate: async (dayId) => {
+    try {
+      validateRequired(dayId, 'Day ID');
+      
+      const newDayId = await duplicateDay(dayId);
+      return successResponse({ id: newDayId }, 'Day duplicated successfully');
+    } catch (error) {
+      console.error('Failed to duplicate day', error);
       return errorResponse(error);
     }
   }
