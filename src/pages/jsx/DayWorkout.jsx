@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Container, Row, Col, Card, Button, Alert 
+  Container, Row, Col, Card, Button, Alert, Form 
 } from 'react-bootstrap';
 import {
   daysApi,
@@ -25,6 +25,8 @@ function DayWorkout() {
   const [allExercises, setAllExercises] = useState([]);
   const [dayExercises, setDayExercises] = useState([]);
   const [alert, setAlert] = useState(null);
+  const [dayNotes, setDayNotes] = useState('');
+  const [notesCollapsed, setNotesCollapsed] = useState(true);
   
   // Form state for adding exercise
   const [showExerciseAdd, setShowExerciseAdd] = useState(false);
@@ -43,6 +45,9 @@ function DayWorkout() {
     
     if (dayResponse.success) {
       setDay(dayResponse.data);
+      setDayNotes(dayResponse.data.notes || '');
+      // Collapse notes section if empty, expand if has content
+      setNotesCollapsed(!dayResponse.data.notes || dayResponse.data.notes.trim() === '');
     } else {
       showAlert(dayResponse.error, 'danger');
     }
@@ -85,6 +90,21 @@ function DayWorkout() {
 
   const showAlert = (message, variant = 'success') => {
     setAlert({ message, variant });
+  };
+
+  const handleNotesBlur = async () => {
+    // Only save if notes have changed
+    if (dayNotes !== (day.notes || '')) {
+      const response = await daysApi.updateNotes(parseInt(dayId), dayNotes);
+      
+      if (response.success) {
+        // Update local day object
+        setDay({ ...day, notes: dayNotes });
+        showAlert('Notes saved', 'success');
+      } else {
+        showAlert(response.error, 'danger');
+      }
+    }
   };
 
   const handleWorkoutGroupToggle = async (groupId) => {
@@ -319,6 +339,38 @@ function DayWorkout() {
           {alert.message}
         </Alert>
       )}
+
+      {/* Day Notes Section */}
+      <Row className="mb-4">
+        <Col>
+          <Card>
+            <Card.Header 
+              className="d-flex justify-content-between align-items-center" 
+              style={{ cursor: 'pointer' }}
+              onClick={() => setNotesCollapsed(!notesCollapsed)}
+            >
+              <h6 className="mb-0">
+                {notesCollapsed ? '▶' : '▼'} Day Notes
+              </h6>
+              <small className="text-muted">
+                {dayNotes.trim() ? `(${dayNotes.length} characters)` : '(Click to add notes)'}
+              </small>
+            </Card.Header>
+            {!notesCollapsed && (
+              <Card.Body>
+                <Form.Control
+                  as="textarea"
+                  rows={3}
+                  placeholder="Add notes for this workout day (e.g., 'Focus on form', 'Deload week', etc.)..."
+                  value={dayNotes}
+                  onChange={(e) => setDayNotes(e.target.value)}
+                  onBlur={handleNotesBlur}
+                />
+              </Card.Body>
+            )}
+          </Card>
+        </Col>
+      </Row>
 
       {/* Workout Groups Selection */}
       <Row className="mb-4">

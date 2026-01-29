@@ -14,7 +14,8 @@ export const schema = `
   CREATE TABLE IF NOT EXISTS days (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     day_name TEXT NOT NULL,
-    day_order INTEGER NOT NULL UNIQUE
+    day_order INTEGER NOT NULL UNIQUE,
+    notes TEXT
   );
 
   CREATE TABLE IF NOT EXISTS workout_groups (

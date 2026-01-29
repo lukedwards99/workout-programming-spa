@@ -25,6 +25,7 @@ import {
   insertDayAfter,
   removeLastDay,
   deleteDay,
+  updateDayNotes,
   
   // Workout Groups
   getAllWorkoutGroups,
@@ -379,7 +380,7 @@ export const daysApi = {
   /**
    * Add a new day
    */
-  add: async (dayName, id = null) => {
+  add: async (dayName, id = null, notes = '') => {
     try {
       validateRequired(dayName, 'Day name');
       
@@ -389,7 +390,7 @@ export const daysApi = {
         throw new Error('A day with this name already exists');
       }
       
-      const newId = await addDay(dayName.trim(), id);
+      const newId = await addDay(dayName.trim(), id, notes);
       return successResponse({ id: newId }, 'Day added successfully');
     } catch (error) {
       console.error('Failed to add day', error);
@@ -400,7 +401,7 @@ export const daysApi = {
   /**
    * Insert a new day after a specific day
    */
-  insertAfter: async (dayName, afterDayId) => {
+  insertAfter: async (dayName, afterDayId, notes = '') => {
     try {
       validateRequired(dayName, 'Day name');
       validateRequired(afterDayId, 'Day ID');
@@ -411,7 +412,7 @@ export const daysApi = {
         return errorResponse('A day with this name already exists', 'VALIDATION_ERROR');
       }
       
-      const id = await insertDayAfter(dayName.trim(), afterDayId);
+      const id = await insertDayAfter(dayName.trim(), afterDayId, notes);
       return successResponse({ id }, 'Day added successfully');
     } catch (error) {
       console.error('Failed to insert day', error);
@@ -448,6 +449,21 @@ export const daysApi = {
       return successResponse(null, 'Day deleted successfully');
     } catch (error) {
       console.error('Failed to delete day', error);
+      return errorResponse(error);
+    }
+  },
+
+  /**
+   * Update notes for a specific day
+   */
+  updateNotes: async (dayId, notes) => {
+    try {
+      validateRequired(dayId, 'Day ID');
+      
+      await updateDayNotes(dayId, notes || '');
+      return successResponse({ dayId }, 'Day notes updated successfully');
+    } catch (error) {
+      console.error('Failed to update day notes', error);
       return errorResponse(error);
     }
   }

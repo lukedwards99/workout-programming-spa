@@ -84,20 +84,20 @@ export function getDaysCount() {
   return result ? result.count : 0;
 }
 
-export async function addDay(dayName, id = null) {
+export async function addDay(dayName, id = null, notes = '') {
   // Get next day order
   const result = executeQueryOne(queries.getMaxDayOrder);
   const nextOrder = (result && result.max_order ? result.max_order : 0) + 1;
   
   if (id !== null) {
     // Insert with specific ID
-    return await executeInsert('INSERT INTO days (id, day_name, day_order) VALUES (?, ?, ?)', [id, dayName, nextOrder]);
+    return await executeInsert('INSERT INTO days (id, day_name, day_order, notes) VALUES (?, ?, ?, ?)', [id, dayName, nextOrder, notes]);
   }
   
-  return await executeInsert(queries.insertDay, [dayName, nextOrder]);
+  return await executeInsert('INSERT INTO days (day_name, day_order, notes) VALUES (?, ?, ?)', [dayName, nextOrder, notes]);
 }
 
-export async function insertDayAfter(dayName, afterDayId) {
+export async function insertDayAfter(dayName, afterDayId, notes = '') {
   // Get the day_order of the day we're inserting after
   const afterDay = getDayById(afterDayId);
   if (!afterDay) {
@@ -113,7 +113,7 @@ export async function insertDayAfter(dayName, afterDayId) {
   }
   
   // Insert the new day
-  return await executeInsert(queries.insertDay, [dayName, insertOrder]);
+  return await executeInsert('INSERT INTO days (day_name, day_order, notes) VALUES (?, ?, ?)', [dayName, insertOrder, notes]);
 }
 
 export async function removeLastDay() {
@@ -150,6 +150,10 @@ export function getNextDayOfWeek(currentDayName) {
   }
   
   return daysOfWeek[(currentIndex + 1) % 7];
+}
+
+export async function updateDayNotes(dayId, notes) {
+  await executeUpdate('UPDATE days SET notes = ? WHERE id = ?', [notes, dayId]);
 }
 
 // ===== WORKOUT GROUPS =====

@@ -96,7 +96,7 @@ export async function exportAllData() {
     if (days.length > 0) {
       csv += '[DAYS]\n';
       csv += Papa.unparse(days, {
-        columns: ['id', 'day_name', 'day_order'],
+        columns: ['id', 'day_name', 'day_order', 'notes'],
         header: true
       });
       csv += '\n\n';
@@ -327,7 +327,7 @@ export async function importAllData(csvString) {
     if (sections.days && sections.days.length > 0) {
       console.log(`Importing ${sections.days.length} days...`);
       for (const row of sections.days) {
-        const response = await daysApi.add(row.day_name, parseInt(row.id));
+        const response = await daysApi.add(row.day_name, parseInt(row.id), row.notes || '');
         if (!response.success) {
           throw new Error(`Failed to import day "${row.day_name}": ${response.error}`);
         }
