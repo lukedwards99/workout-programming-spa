@@ -3,6 +3,8 @@ Cleaning:
 - Remove old import code
 - make components smaller
 - fix 
+- add set types (drop set, warmup set)
+
 
 MVP Features that need added:
 

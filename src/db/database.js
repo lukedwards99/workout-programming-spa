@@ -1,7 +1,7 @@
 import { schema } from './databaseDDL.js';
 
 // Schema version - increment this when making schema changes to force rebuild
-const SCHEMA_VERSION = 4; // Added notes column to days table
+const SCHEMA_VERSION = 5; // Added notes column to days table
 
 let db = null;
 let SQL = null;
@@ -307,8 +307,7 @@ export async function resetDatabase() {
   
   try {
     // Delete all data from tables in reverse dependency order
-    db.run('DELETE FROM sets');
-    db.run('DELETE FROM day_exercises');
+    db.run('DELETE FROM workout_sets');
     db.run('DELETE FROM day_workout_groups');
     db.run('DELETE FROM days');
     db.run('DELETE FROM exercises');
