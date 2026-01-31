@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Navbar, Nav, Container } from 'react-bootstrap';
 import '../css/Navigation.css';
+import packageJson from '../../../package.json';
 
 function Navigation() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -25,7 +26,7 @@ function Navigation() {
         <Navbar.Brand as={Link} to="/" onClick={closeMenu}>
           <strong>Complete Workout Programming</strong>
           <small className="d-block" style={{ fontSize: '0.7rem', color: '#ccc' }}>
-            Version: Alpha 1.0.0 <br />
+            Version: {packageJson.version} <br />
             Built: {__BUILD_DATE__}
           </small>
         </Navbar.Brand>
