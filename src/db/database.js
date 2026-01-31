@@ -1,7 +1,7 @@
 import { schema } from './databaseDDL.js';
 
 // Schema version - increment this when making schema changes to force rebuild
-const SCHEMA_VERSION = 6; // Added notes column to days table
+const SCHEMA_VERSION = 7; // Added notes column to days table
 
 let db = null;
 let SQL = null;
