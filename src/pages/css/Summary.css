@@ -160,6 +160,18 @@
   .mobile-stats-row .small {
     font-size: 0.75rem;
   }
+
+  /* Exercise type breakdown mobile adjustments */
+  .exercise-type-table thead th,
+  .exercise-type-table tbody td {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+
+  .day-appearance-badge .badge {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+  }
 }
 
 @media (max-width: 576px) {
@@ -214,6 +226,58 @@
   text-decoration: underline;
 }
 
+/* Exercise Breakdown by Type Section */
+.workout-group-header {
+  padding: 0.75rem 1rem;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.workout-group-header:hover {
+  background-color: #e9ecef;
+}
+
+.workout-group-header h6 {
+  margin-bottom: 0;
+}
+
+.exercise-type-table {
+  margin-bottom: 0;
+  background-color: white;
+}
+
+.exercise-type-table thead {
+  background-color: #f8f9fa;
+}
+
+.exercise-type-table thead th {
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 0.75rem;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.exercise-type-table tbody td {
+  padding: 0.75rem;
+  vertical-align: middle;
+}
+
+.day-appearances {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.day-appearance-badge .badge {
+  font-weight: 400;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid #dee2e6;
+}
+
 /* Smooth transitions */
 .summary-table tbody tr {
   transition: background-color 0.2s ease;
@@ -221,4 +285,8 @@
 
 .btn-outline-primary {
   transition: all 0.2s ease;
+}
+
+.workout-group-header {
+  transition: background-color 0.2s ease;
 }

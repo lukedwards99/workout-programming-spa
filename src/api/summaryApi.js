@@ -176,5 +176,90 @@ export const summaryApi = {
         exerciseAggregates: []
       };
     }
+  },
+
+  /**
+   * Calculate exercise breakdown by workout group
+   * Shows which days each exercise appears on
+   */
+  calculateExerciseBreakdown: (daysData, selectedDayIds) => {
+    try {
+      const selectedDays = daysData.filter(day => selectedDayIds.includes(day.id));
+      
+      if (selectedDays.length === 0) {
+        return [];
+      }
+      
+      // Build a map of exercises with their day appearances
+      const exerciseMap = new Map();
+      
+      selectedDays.forEach(day => {
+        day.exerciseBreakdown.forEach(exercise => {
+          if (!exerciseMap.has(exercise.exerciseId)) {
+            exerciseMap.set(exercise.exerciseId, {
+              exerciseId: exercise.exerciseId,
+              exerciseName: exercise.exerciseName,
+              workoutGroupName: exercise.workoutGroupName,
+              dayAppearances: [],
+              totalSets: 0,
+              allRirValues: []
+            });
+          }
+          
+          const exData = exerciseMap.get(exercise.exerciseId);
+          exData.dayAppearances.push({
+            dayId: day.id,
+            dayName: day.name,
+            setCount: exercise.setCount,
+            avgRir: exercise.avgRir
+          });
+          exData.totalSets += exercise.setCount;
+          
+          // Collect RIR values for overall average
+          if (exercise.avgRir !== null) {
+            for (let i = 0; i < exercise.setCount; i++) {
+              exData.allRirValues.push(exercise.avgRir);
+            }
+          }
+        });
+      });
+      
+      // Calculate overall stats and group by workout group
+      const exerciseList = Array.from(exerciseMap.values()).map(exercise => {
+        const avgRir = exercise.allRirValues.length > 0
+          ? Number((exercise.allRirValues.reduce((sum, rir) => sum + rir, 0) / exercise.allRirValues.length).toFixed(1))
+          : null;
+        
+        return {
+          exerciseId: exercise.exerciseId,
+          exerciseName: exercise.exerciseName,
+          workoutGroupName: exercise.workoutGroupName,
+          dayAppearances: exercise.dayAppearances.sort((a, b) => a.dayName.localeCompare(b.dayName)),
+          totalSets: exercise.totalSets,
+          avgRir
+        };
+      });
+      
+      // Group by workout group
+      const groupedByWorkoutGroup = exerciseList.reduce((groups, exercise) => {
+        const groupName = exercise.workoutGroupName;
+        if (!groups[groupName]) {
+          groups[groupName] = [];
+        }
+        groups[groupName].push(exercise);
+        return groups;
+      }, {});
+      
+      // Convert to array and sort
+      return Object.entries(groupedByWorkoutGroup)
+        .map(([groupName, exercises]) => ({
+          workoutGroupName: groupName,
+          exercises: exercises.sort((a, b) => a.exerciseName.localeCompare(b.exerciseName))
+        }))
+        .sort((a, b) => a.workoutGroupName.localeCompare(b.workoutGroupName));
+    } catch (error) {
+      console.error('Failed to calculate exercise breakdown', error);
+      return [];
+    }
   }
 };

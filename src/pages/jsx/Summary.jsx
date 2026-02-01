@@ -7,8 +7,10 @@ function Summary() {
   const [daysData, setDaysData] = useState([]);
   const [selectedDays, setSelectedDays] = useState(new Set());
   const [aggregateStats, setAggregateStats] = useState(null);
+  const [exerciseBreakdown, setExerciseBreakdown] = useState([]);
   const [alert, setAlert] = useState(null);
   const [expandedDays, setExpandedDays] = useState(new Set());
+  const [expandedGroups, setExpandedGroups] = useState(new Set());
 
   useEffect(() => {
     loadData();
@@ -22,6 +24,12 @@ function Summary() {
         Array.from(selectedDays)
       );
       setAggregateStats(stats);
+      
+      const breakdown = summaryApi.calculateExerciseBreakdown(
+        daysData,
+        Array.from(selectedDays)
+      );
+      setExerciseBreakdown(breakdown);
     }
   }, [selectedDays, daysData]);
 
@@ -69,6 +77,16 @@ function Summary() {
       newExpanded.add(dayId);
     }
     setExpandedDays(newExpanded);
+  };
+
+  const toggleGroupExpansion = (groupName) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupName)) {
+      newExpanded.delete(groupName);
+    } else {
+      newExpanded.add(groupName);
+    }
+    setExpandedGroups(newExpanded);
   };
 
   if (daysData.length === 0) {
@@ -182,6 +200,96 @@ function Summary() {
               </a>
               <a 
                 href="#" 
+                onClick={(e) => { e.preventDefault(); handleDeselectAll(); }}
+              >
+                Deselect All
+              </a>
+            </div>
+          </div>
+        </Card.Body>
+      </Card>
+
+      {/* Exercise Breakdown by Workout Group */}
+      {exerciseBreakdown.length > 0 && (
+        <Card className="mb-4">
+          <Card.Header>
+            <h5 className="mb-0">Exercise Breakdown by Type</h5>
+            <small className="text-muted">See which days each exercise appears on</small>
+          </Card.Header>
+          <Card.Body>
+            {exerciseBreakdown.map((group, groupIndex) => {
+              const isGroupExpanded = expandedGroups.has(group.workoutGroupName);
+              
+              return (
+                <div key={group.workoutGroupName} className={groupIndex > 0 ? 'mt-4' : ''}>
+                  <div 
+                    className="workout-group-header d-flex justify-content-between align-items-center mb-2"
+                    onClick={() => toggleGroupExpansion(group.workoutGroupName)}
+                    style={{ cursor: 'pointer' }}
+                    role="button"
+                    tabIndex={0}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        toggleGroupExpansion(group.workoutGroupName);
+                      }
+                    }}
+                  >
+                    <h6 className="mb-0">
+                      <Badge bg="primary" className="me-2">{group.workoutGroupName}</Badge>
+                      <span className="text-muted small">
+                        ({group.exercises.length} exercise{group.exercises.length !== 1 ? 's' : ''})
+                      </span>
+                    </h6>
+                    <span className="text-primary fw-bold">
+                      {isGroupExpanded ? '▼' : '▶'}
+                    </span>
+                  </div>
+                  
+                  <Collapse in={isGroupExpanded}>
+                    <div>
+                      <Table responsive hover size="sm" className="exercise-type-table">
+                        <thead>
+                          <tr>
+                            <th>Exercise</th>
+                            <th className="text-center">Total Sets</th>
+                            <th className="text-center">Avg RIR</th>
+                            <th>Days Performed</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.exercises.map(exercise => (
+                            <tr key={exercise.exerciseId}>
+                              <td><strong>{exercise.exerciseName}</strong></td>
+                              <td className="text-center">{exercise.totalSets}</td>
+                              <td className="text-center">
+                                {exercise.avgRir !== null ? exercise.avgRir : 'N/A'}
+                              </td>
+                              <td>
+                                <div className="day-appearances">
+                                  {exercise.dayAppearances.map((day, idx) => (
+                                    <span key={day.dayId} className="day-appearance-badge">
+                                      <Badge bg="light" text="dark" className="me-1 mb-1">
+                                        {day.dayName}: {day.setCount} set{day.setCount !== 1 ? 's' : ''}
+                                        {day.avgRir !== null && ` (RIR ${day.avgRir})`}
+                                      </Badge>
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    </div>
+                  </Collapse>
+                </div>
+              );
+            })}
+          </Card.Body>
+        </Card>
+      )}
+
+      {/*       href="#" 
                 onClick={(e) => { e.preventDefault(); handleDeselectAll(); }}
               >
                 Deselect All
