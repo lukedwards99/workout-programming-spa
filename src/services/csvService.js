@@ -22,7 +22,7 @@ import {
   dayWorkoutGroupsApi,
   workoutSetsApi,
   dataApi
-} from '../api/workoutApi.js';
+} from '../api/index.js';
 
 // ===== EXPORT FUNCTIONS =====
 

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Form, Button, ListGroup, Alert, Badge } from 'react-bootstrap';
-import { 
-  workoutGroupsApi, 
+import {
+  workoutGroupsApi,
   exercisesApi
-} from '../../api/workoutApi';
+} from '../../api';
 import '../css/Setup.css';
 
 function ExerciseSetup() {

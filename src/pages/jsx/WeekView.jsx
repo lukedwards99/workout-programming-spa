@@ -5,7 +5,7 @@ import {
   daysApi,
   dayWorkoutGroupsApi,
   programApi
-} from '../../api/workoutApi';
+} from '../../api';
 import '../css/WeekView.css';
 
 function WeekView() {

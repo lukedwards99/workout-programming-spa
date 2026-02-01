@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Container, Row, Col, Card, Button, Form, Alert } from 'react-bootstrap';
-import { dataApi } from '../../api/workoutApi';
+import { dataApi } from '../../api';
 import * as csvService from '../../services/csvService';
 import '../css/DataManagement.css';
 

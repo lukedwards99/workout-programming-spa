@@ -9,7 +9,7 @@ import {
   dayWorkoutGroupsApi,
   exercisesApi,
   workoutSetsApi
-} from '../../api/workoutApi';
+} from '../../api';
 import WorkoutGroupSelector from '../../components/jsx/WorkoutGroupSelector';
 import ExerciseAddForm from '../../components/jsx/ExerciseAddForm';
 import ExerciseCard from '../../components/jsx/ExerciseCard';
