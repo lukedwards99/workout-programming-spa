@@ -18,3 +18,4 @@ export { dayWorkoutGroupsApi } from './dayWorkoutGroupsApi.js';
 export { workoutSetsApi } from './workoutSetsApi.js';
 export { dataApi } from './dataApi.js';
 export { programApi } from './programApi.js';
+export { summaryApi } from './summaryApi.js';

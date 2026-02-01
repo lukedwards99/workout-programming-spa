@@ -6,6 +6,7 @@ import WeekView from './pages/jsx/WeekView';
 import ExerciseSetup from './pages/jsx/ExerciseSetup';
 import DayWorkout from './pages/jsx/DayWorkout';
 import DataManagement from './pages/jsx/DataManagement';
+import Summary from './pages/jsx/Summary';
 import { initDatabase } from './db/database';
 import './App.css';
 
@@ -65,6 +66,7 @@ function App() {
           <Route path="/setup" element={<ExerciseSetup />} />
           <Route path="/day/:dayId" element={<DayWorkout />} />
           <Route path="/data" element={<DataManagement />} />
+          <Route path="/summary" element={<Summary />} />
         </Routes>
       </main>
       <Footer />

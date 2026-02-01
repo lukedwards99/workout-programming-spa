@@ -56,6 +56,14 @@ function Navigation() {
             </Nav.Link>
             <Nav.Link 
               as={Link}
+              to="/summary" 
+              className={isActive('/summary') ? 'active' : ''}
+              onClick={closeMenu}
+            >
+              Summary
+            </Nav.Link>
+            <Nav.Link 
+              as={Link}
               to="/data" 
               className={isActive('/data') ? 'active' : ''}
               onClick={closeMenu}
