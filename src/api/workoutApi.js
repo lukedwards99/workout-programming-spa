@@ -26,6 +26,7 @@ import {
   removeLastDay,
   deleteDay,
   updateDayNotes,
+  updateDayName,
   duplicateDay,
   
   // Workout Groups
@@ -465,6 +466,28 @@ export const daysApi = {
       return successResponse({ dayId }, 'Day notes updated successfully');
     } catch (error) {
       console.error('Failed to update day notes', error);
+      return errorResponse(error);
+    }
+  },
+
+  /**
+   * Rename a day
+   */
+  rename: async (dayId, newName) => {
+    try {
+      validateRequired(dayId, 'Day ID');
+      validateRequired(newName, 'Day name');
+      
+      // Check for duplicate name (excluding current day)
+      const existingDays = getAllDays();
+      if (existingDays.some(d => d.id !== dayId && d.day_name.toLowerCase() === newName.trim().toLowerCase())) {
+        return errorResponse('A day with this name already exists', 'VALIDATION_ERROR');
+      }
+      
+      await updateDayName(dayId, newName.trim());
+      return successResponse({ dayId }, 'Day renamed successfully');
+    } catch (error) {
+      console.error('Failed to rename day', error);
       return errorResponse(error);
     }
   },

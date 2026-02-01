@@ -156,6 +156,10 @@ export async function updateDayNotes(dayId, notes) {
   await executeUpdate('UPDATE days SET notes = ? WHERE id = ?', [notes, dayId]);
 }
 
+export async function updateDayName(dayId, dayName) {
+  await executeUpdate('UPDATE days SET day_name = ? WHERE id = ?', [dayName, dayId]);
+}
+
 /**
  * Duplicate a day (including its workout groups and sets)
  * Appends the new day at the end of the sequence

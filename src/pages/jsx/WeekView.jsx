@@ -15,6 +15,9 @@ function WeekView() {
   const [showAddDayModal, setShowAddDayModal] = useState(false);
   const [newDayName, setNewDayName] = useState('');
   const [addAfterDayId, setAddAfterDayId] = useState(null);
+  const [showRenameDayModal, setShowRenameDayModal] = useState(false);
+  const [renameDayId, setRenameDayId] = useState(null);
+  const [renameDayName, setRenameDayName] = useState('');
 
   useEffect(() => {
     loadData();
@@ -142,6 +145,29 @@ function WeekView() {
     }
   };
 
+  const handleOpenRenameDay = (day) => {
+    setRenameDayId(day.id);
+    setRenameDayName(day.day_name);
+    setShowRenameDayModal(true);
+  };
+
+  const handleRenameDay = async () => {
+    if (!renameDayName.trim()) {
+      showAlert('Please enter a day name', 'warning');
+      return;
+    }
+
+    const response = await daysApi.rename(renameDayId, renameDayName.trim());
+    
+    if (response.success) {
+      showAlert('Day renamed successfully');
+      setShowRenameDayModal(false);
+      loadData();
+    } else {
+      showAlert(response.error, 'danger');
+    }
+  };
+
   return (
     <Container className="week-view-page py-4">
       <div className="hero-section text-center mb-4">
@@ -208,6 +234,9 @@ function WeekView() {
                       ⋮
                     </Dropdown.Toggle>
                     <Dropdown.Menu>
+                      <Dropdown.Item onClick={() => handleOpenRenameDay(day)}>
+                        ✏️ Rename Day
+                      </Dropdown.Item>
                       <Dropdown.Item onClick={() => handleOpenAddDayAfter(day.id)}>
                         ➕ Add Day After
                       </Dropdown.Item>
@@ -303,6 +332,44 @@ function WeekView() {
           </Button>
           <Button variant="success" onClick={handleAddDay}>
             Add Day
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Rename Day Modal */}
+      <Modal show={showRenameDayModal} onHide={() => setShowRenameDayModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Rename Day</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Form.Group>
+              <Form.Label>Day Name</Form.Label>
+              <Form.Control
+                type="text"
+                value={renameDayName}
+                onChange={(e) => setRenameDayName(e.target.value)}
+                placeholder="e.g., Monday, Day 1, Upper Body"
+                autoFocus
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleRenameDay();
+                  }
+                }}
+              />
+              <Form.Text className="text-muted">
+                Enter a unique name for this day
+              </Form.Text>
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowRenameDayModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={handleRenameDay}>
+            Rename
           </Button>
         </Modal.Footer>
       </Modal>

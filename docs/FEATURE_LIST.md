@@ -2,8 +2,8 @@ Cleaning:
 
 - Remove old import code
 - make components smaller
-- fix 
 - add set types (drop set, warmup set)
+- Add ability to rename days
 
 
 MVP Features that need added:
