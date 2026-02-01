@@ -46,7 +46,6 @@ export const schema = `
     day_id INTEGER NOT NULL,
     exercise_id INTEGER NOT NULL,
     exercise_order INTEGER NOT NULL,
-    set_type INTEGER NULL,
     set_order INTEGER NOT NULL,
     reps INTEGER,
     weight REAL,

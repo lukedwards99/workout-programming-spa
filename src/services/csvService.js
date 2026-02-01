@@ -383,7 +383,14 @@ export async function importAllData(csvString) {
     // 5. Import Workout Sets (depend on days and exercises)
     if (sections.workout_sets && sections.workout_sets.length > 0) {
       console.log(`Importing ${sections.workout_sets.length} workout sets...`);
-      for (const row of sections.workout_sets) {
+      
+      // CRITICAL: Sort workout sets by ID before importing to maintain consistency
+      // This ensures sets are imported in the correct order, preventing ID collisions
+      const sortedWorkoutSets = [...sections.workout_sets].sort((a, b) => {
+        return parseInt(a.id) - parseInt(b.id);
+      });
+      
+      for (const row of sortedWorkoutSets) {
         const response = await workoutSetsApi.create({
           id: parseInt(row.id),
           dayId: parseInt(row.day_id),
