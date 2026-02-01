@@ -10,7 +10,6 @@ function Summary() {
   const [exerciseBreakdown, setExerciseBreakdown] = useState([]);
   const [alert, setAlert] = useState(null);
   const [expandedDays, setExpandedDays] = useState(new Set());
-  const [expandedGroups, setExpandedGroups] = useState(new Set());
 
   useEffect(() => {
     loadData();
@@ -77,16 +76,6 @@ function Summary() {
       newExpanded.add(dayId);
     }
     setExpandedDays(newExpanded);
-  };
-
-  const toggleGroupExpansion = (groupName) => {
-    const newExpanded = new Set(expandedGroups);
-    if (newExpanded.has(groupName)) {
-      newExpanded.delete(groupName);
-    } else {
-      newExpanded.add(groupName);
-    }
-    setExpandedGroups(newExpanded);
   };
 
   if (daysData.length === 0) {
@@ -183,6 +172,69 @@ function Summary() {
         </Card>
       )}
 
+      {/* Workout Group Summary */}
+      {exerciseBreakdown.length > 0 && (
+        <Card className="mb-4">
+          <Card.Header>
+            <h5 className="mb-0">Workout Group Summary</h5>
+            <small className="text-muted">Total volume by workout group type</small>
+          </Card.Header>
+          <Card.Body>
+            <Table responsive hover className="mb-0">
+              <thead>
+                <tr>
+                  <th>Workout Group</th>
+                  <th className="text-center">Exercises</th>
+                  <th className="text-center">Total Sets</th>
+                  <th className="text-center">Avg RIR</th>
+                  <th>Days Performed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {exerciseBreakdown.map(group => {
+                  // Calculate group-level stats
+                  const totalSets = group.exercises.reduce((sum, ex) => sum + ex.totalSets, 0);
+                  const avgRir = group.exercises.reduce((sum, ex) => {
+                    return ex.avgRir !== null ? sum + (ex.avgRir * ex.totalSets) : sum;
+                  }, 0) / totalSets;
+                  
+                  // Get unique days this group appears on
+                  const daysSet = new Set();
+                  group.exercises.forEach(ex => {
+                    ex.dayAppearances.forEach(day => {
+                      daysSet.add(day.dayName);
+                    });
+                  });
+                  const uniqueDays = Array.from(daysSet).sort();
+                  
+                  return (
+                    <tr key={group.workoutGroupName}>
+                      <td>
+                        <Badge bg="primary">{group.workoutGroupName}</Badge>
+                      </td>
+                      <td className="text-center">{group.exercises.length}</td>
+                      <td className="text-center"><strong>{totalSets}</strong></td>
+                      <td className="text-center">
+                        {!isNaN(avgRir) ? avgRir.toFixed(1) : 'N/A'}
+                      </td>
+                      <td>
+                        <div className="day-appearances">
+                          {uniqueDays.map(dayName => (
+                            <Badge key={dayName} bg="light" text="dark" className="me-1 mb-1">
+                              {dayName}
+                            </Badge>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          </Card.Body>
+        </Card>
+      )}
+
       {/* Selection Controls */}
       <Card className="mb-3">
         <Card.Body className="py-2">
@@ -200,96 +252,6 @@ function Summary() {
               </a>
               <a 
                 href="#" 
-                onClick={(e) => { e.preventDefault(); handleDeselectAll(); }}
-              >
-                Deselect All
-              </a>
-            </div>
-          </div>
-        </Card.Body>
-      </Card>
-
-      {/* Exercise Breakdown by Workout Group */}
-      {exerciseBreakdown.length > 0 && (
-        <Card className="mb-4">
-          <Card.Header>
-            <h5 className="mb-0">Exercise Breakdown by Type</h5>
-            <small className="text-muted">See which days each exercise appears on</small>
-          </Card.Header>
-          <Card.Body>
-            {exerciseBreakdown.map((group, groupIndex) => {
-              const isGroupExpanded = expandedGroups.has(group.workoutGroupName);
-              
-              return (
-                <div key={group.workoutGroupName} className={groupIndex > 0 ? 'mt-4' : ''}>
-                  <div 
-                    className="workout-group-header d-flex justify-content-between align-items-center mb-2"
-                    onClick={() => toggleGroupExpansion(group.workoutGroupName)}
-                    style={{ cursor: 'pointer' }}
-                    role="button"
-                    tabIndex={0}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        toggleGroupExpansion(group.workoutGroupName);
-                      }
-                    }}
-                  >
-                    <h6 className="mb-0">
-                      <Badge bg="primary" className="me-2">{group.workoutGroupName}</Badge>
-                      <span className="text-muted small">
-                        ({group.exercises.length} exercise{group.exercises.length !== 1 ? 's' : ''})
-                      </span>
-                    </h6>
-                    <span className="text-primary fw-bold">
-                      {isGroupExpanded ? '▼' : '▶'}
-                    </span>
-                  </div>
-                  
-                  <Collapse in={isGroupExpanded}>
-                    <div>
-                      <Table responsive hover size="sm" className="exercise-type-table">
-                        <thead>
-                          <tr>
-                            <th>Exercise</th>
-                            <th className="text-center">Total Sets</th>
-                            <th className="text-center">Avg RIR</th>
-                            <th>Days Performed</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {group.exercises.map(exercise => (
-                            <tr key={exercise.exerciseId}>
-                              <td><strong>{exercise.exerciseName}</strong></td>
-                              <td className="text-center">{exercise.totalSets}</td>
-                              <td className="text-center">
-                                {exercise.avgRir !== null ? exercise.avgRir : 'N/A'}
-                              </td>
-                              <td>
-                                <div className="day-appearances">
-                                  {exercise.dayAppearances.map((day, idx) => (
-                                    <span key={day.dayId} className="day-appearance-badge">
-                                      <Badge bg="light" text="dark" className="me-1 mb-1">
-                                        {day.dayName}: {day.setCount} set{day.setCount !== 1 ? 's' : ''}
-                                        {day.avgRir !== null && ` (RIR ${day.avgRir})`}
-                                      </Badge>
-                                    </span>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </Table>
-                    </div>
-                  </Collapse>
-                </div>
-              );
-            })}
-          </Card.Body>
-        </Card>
-      )}
-
-      {/*       href="#" 
                 onClick={(e) => { e.preventDefault(); handleDeselectAll(); }}
               >
                 Deselect All
