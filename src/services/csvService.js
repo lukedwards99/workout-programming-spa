@@ -169,7 +169,7 @@ export async function downloadAllData() {
 
 /**
  * Export workout program as pretty-printed, human-readable CSV
- * Format: Day, Exercise, Workout Group, Set #, Reps, Weight, RIR, Notes
+ * Format: Separate tables for each day with day notes and exercise notes key
  * @returns {Promise<string>} Human-readable CSV string
  */
 export async function exportPrettyPrintProgram() {
@@ -182,35 +182,45 @@ export async function exportPrettyPrintProgram() {
       throw new Error('No workout days found');
     }
     
-    // Build flat array of rows
-    const rows = [];
+    let output = '';
     
-    for (const day of days) {
+    for (let i = 0; i < days.length; i++) {
+      const day = days[i];
+      
+      // Day header
+      output += `[DAY: ${day.day_name}]\n`;
+      
+      // Day notes
+      output += `Day Notes: ${day.notes || '(no notes)'}\n\n`;
+      
       // Get exercises and sets for this day, grouped by exercise
       const groupedRes = await workoutSetsApi.getByDayGrouped(day.id);
       const exercisesWithSets = groupedRes.data || [];
       
       if (exercisesWithSets.length === 0) {
-        // Add empty day row
-        rows.push({
-          day: day.day_name,
-          exercise: '(No exercises)',
-          workout_group: '',
-          set_number: '',
-          reps: '',
-          weight: '',
-          rir: '',
-          notes: ''
-        });
+        // No exercises scheduled
+        output += 'No exercises scheduled\n\n';
       } else {
-        // Add rows for each set
+        // Exercise Notes Key
+        output += 'Exercise Notes:\n';
+        
+        // Get full exercise details for notes
+        for (const exerciseData of exercisesWithSets) {
+          const exerciseRes = await exercisesApi.getById(exerciseData.exercise_id);
+          const exercise = exerciseRes.data;
+          const notes = exercise.notes || '(no notes)';
+          output += `- ${exercise.name}: ${notes}\n`;
+        }
+        output += '\n';
+        
+        // Build rows for this day's table
+        const rows = [];
         exercisesWithSets.forEach(exercise => {
           exercise.sets.forEach(set => {
             rows.push({
-              day: day.day_name,
               exercise: exercise.exercise_name,
               workout_group: exercise.workout_group_name,
-              set_number: set.set_order,
+              set: set.set_order,
               reps: set.reps || '',
               weight: set.weight || '',
               rir: set.rir !== null && set.rir !== undefined ? set.rir : '',
@@ -218,16 +228,23 @@ export async function exportPrettyPrintProgram() {
             });
           });
         });
+        
+        // Convert to CSV table
+        const dayTable = Papa.unparse(rows, {
+          columns: ['exercise', 'workout_group', 'set', 'reps', 'weight', 'rir', 'notes'],
+          header: true
+        });
+        
+        output += dayTable + '\n';
+      }
+      
+      // Add separator between days (except for last day)
+      if (i < days.length - 1) {
+        output += '\n';
       }
     }
     
-    // Convert to CSV
-    const csv = Papa.unparse(rows, {
-      columns: ['day', 'exercise', 'workout_group', 'set_number', 'reps', 'weight', 'rir', 'notes'],
-      header: true
-    });
-    
-    return csv;
+    return output;
   } catch (error) {
     console.error('Pretty print export failed:', error);
     throw new Error(`Failed to export pretty print program: ${error.message}`);
