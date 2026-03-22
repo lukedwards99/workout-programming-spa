@@ -69,10 +69,11 @@ export const createDatabaseSQL= `
 `;
 
 export const deleteDatabaseSQL= `
+  DROP TABLE IF EXISTS child_sets;
   DROP TABLE IF EXISTS workout_sets;
-  DROP TABLE IF EXISTS day_workout_groups;
+  DROP TABLE IF EXISTS workout_groups_selection;
   DROP TABLE IF EXISTS exercises;
   DROP TABLE IF EXISTS workout_groups;
-  DROP TABLE IF EXISTS days;
-  DROP TABLE IF EXISTS program;
+  DROP TABLE IF EXISTS workouts;
+  DROP TABLE IF EXISTS mesocycle;
 `;
