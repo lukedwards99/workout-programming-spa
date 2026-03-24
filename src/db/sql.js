@@ -52,7 +52,7 @@ export const createDatabaseSQL= `
 
   CREATE TABLE IF NOT EXISTS workout_sets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    day_id INTEGER NOT NULL,
+    workout_id INTEGER NOT NULL,
     exercise_id INTEGER NOT NULL,
     exercise_order INTEGER NOT NULL,
     set_number INTEGER NOT NULL,
@@ -60,7 +60,7 @@ export const createDatabaseSQL= `
     weight REAL,
     rir INTEGER,
     notes TEXT,
-    FOREIGN KEY (day_id) REFERENCES days(id) ON DELETE CASCADE,
+    FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
     FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
   );
 

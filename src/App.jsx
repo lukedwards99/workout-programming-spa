@@ -11,7 +11,7 @@ function App() {
   return (
     <div className="app">
       <main className="main-content">
-        <Header/>
+        {/* <Header/> */}
         <Routes>
           {/* <Route path="/" element={<WeekView />} />
           <Route path="/setup" element={<ExerciseSetup />} />
