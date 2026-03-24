@@ -851,9 +851,10 @@
         "properties": {
           "program_name": { "type": "string", "example": "Hypertrophy Block 1" },
           "start_date": { "type": "string", "format": "date", "example": "2026-03-24" },
-          "notes": { "type": "string", "nullable": true, "example": "Focus on progressive overload each week" }
+          "notes": { "type": "string", "nullable": true, "example": "Focus on progressive overload each week" },
+          "microcycle_length": { "type": "integer", "example": 7, "description": "Number of days in each microcycle (e.g. 7 for a weekly cycle)" }
         },
-        "required": ["program_name", "start_date"]
+        "required": ["program_name", "start_date", "microcycle_length"]
       },
 
       "Workout": {
