@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import DataImportExportPage from './pages/DataImportExportPage';
 import OverviewPage from './pages/OverviewPage';
+import DevTestPage from './pages/DevTestPage';
 
 function App() {
 
@@ -19,7 +20,8 @@ function App() {
           <Route path="/data" element={<DataManagement />} />
           <Route path="/summary" element={<Summary />} /> */}
           <Route path="/data" element={<DataImportExportPage/>} />
-          <Route path="/" element={<OverviewPage></OverviewPage>} />
+          <Route path="/" element={<OverviewPage/>} />
+          <Route path="/debug" element={<DevTestPage/>} />
         </Routes>
       </main>
     </div>
