@@ -99,7 +99,7 @@ function DevTestPage() {
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleCreate = async (e) => {
+  const handleCreateMesocycle = async (e) => {
     e.preventDefault();
     setFormError(null);
     setFormSuccess(null);
@@ -174,7 +174,7 @@ function DevTestPage() {
               {!dbReady && (
                 <Alert variant="warning" className="py-2">Initialise the database first.</Alert>
               )}
-              <Form onSubmit={handleCreate}>
+              <Form onSubmit={handleCreateMesocycle}>
                 <Form.Group className="mb-3">
                   <Form.Label>Program Name</Form.Label>
                   <Form.Control
