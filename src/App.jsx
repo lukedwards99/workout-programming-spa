@@ -79,7 +79,7 @@ function App() {
           <Route path="/data" element={<DataManagement />} />
           <Route path="/summary" element={<Summary />} /> */}
           <Route path="/data" element={<DataImportExportPage />} />
-          <Route path="/debug" element={<DevTestPage />} />
+          {/* <Route path="/debug" element={<DevTestPage />} /> */}
           <Route path="/" element={<OverviewPage />} />
         </Routes>
       </main>

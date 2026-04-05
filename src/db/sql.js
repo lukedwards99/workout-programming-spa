@@ -1,11 +1,19 @@
 export const createDatabaseSQL= `
 
+  CREATE TABLE IF NOT EXISTS programs(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL UNIQUE,
+    notes TEXT
+  );
+
   CREATE TABLE IF NOT EXISTS mesocycles (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    program_id INTEGER NOT NULL,
     start_date TEXT NOT NULL,
     program_name TEXT NOT NULL,
     microcycle_length INTEGER NOT NULL,
-    notes TEXT
+    notes TEXT,
+    FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE
   );
 
   CREATE TABLE IF NOT EXISTS workouts (
@@ -101,4 +109,5 @@ export const deleteDatabaseSQL= `
   DROP TABLE IF EXISTS exercise_groups;
   DROP TABLE IF EXISTS workouts;
   DROP TABLE IF EXISTS mesocycles;
+  DROP TABLE IF EXISTS programs;
 `;
