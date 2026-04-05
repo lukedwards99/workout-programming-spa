@@ -21,11 +21,13 @@ function App() {
     setDbLoading(true);
     // setDbStatus(null);
     try {
+      console.log("creating database")
       await loadDatabase(SCHEMA_VERSION);
       setDbReady(true);
       loadMesocycles();
       // setDbStatus({ type: 'success', message: `Database v${SCHEMA_VERSION} loaded from IndexedDB.` });
     } catch (e) {
+      console.error('Error loading database:', e);
       setDbStatus({ type: 'danger', message: e.message });
     } finally {
       setDbLoading(false);

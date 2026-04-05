@@ -24,7 +24,7 @@ async function loadSqlJs() {
   return SQL;
 }
 
-function openIdb() {
+function openIndexDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(IDB_DB_NAME, 1);
     request.onupgradeneeded = (e) => {
@@ -67,7 +67,7 @@ export function deleteDatabase(schemaVersion) {
 export async function saveDatabase(schemaVersion) {
   if (!db) throw new Error('No active database to save.');
   const data = db.export();
-  const idb = await openIdb();
+  const idb = await openIndexDB();
   return new Promise((resolve, reject) => {
     const tx = idb.transaction(IDB_STORE_NAME, 'readwrite');
     const store = tx.objectStore(IDB_STORE_NAME);
@@ -83,7 +83,8 @@ export async function saveDatabase(schemaVersion) {
  * @param {number} schemaVersion - Schema version identifier to load.
  */
 export async function loadDatabase(schemaVersion) {
-  const idb = await openIdb();
+  console.debug("inside load database")
+  const idb = await openIndexDB();
   const data = await new Promise((resolve, reject) => {
     const tx = idb.transaction(IDB_STORE_NAME, 'readonly');
     const store = tx.objectStore(IDB_STORE_NAME);
@@ -91,9 +92,17 @@ export async function loadDatabase(schemaVersion) {
     request.onsuccess = (e) => resolve(e.target.result);
     request.onerror = (e) => reject(e.target.error);
   });
-  if (!data) throw new Error(`No saved database found for schema version v${schemaVersion}.`);
-  const sql = await loadSqlJs();
-  if (db) db.close();
-  db = new sql.Database(data);
+  if (!data) { // no saved database for this schema version, create a new one
+    console.warn(`No saved database found for schema version v${schemaVersion}, creating new database.`);
+    return createDatabase(schemaVersion);
+  } else { // found saved database for this schema version, load it
+    console.debug(`Saved database found for schema version v${schemaVersion}, loading from IndexedDB.`);
+    const sql = await loadSqlJs();
+    if (db) db.close();
+    db = new sql.Database(data);
+  }
+    // throw new Error(`No saved database found for schema version v${schemaVersion}.`);
+
+  console.log("completed loading of database")
   return db;
 }
