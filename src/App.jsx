@@ -1,11 +1,9 @@
 import { Routes, Route } from 'react-router-dom';
-import { useEffect, useState, useCallback } from 'react';
-import Header from './components/Header';
+import { useEffect, useState } from 'react';
 import DataImportExportPage from './pages/DataImportExportPage';
 import OverviewPage from './pages/OverviewPage';
-import DevTestPage from './pages/DevTestPage';
+import ProgramPage from './pages/ProgramPage';
 import { loadDatabase } from './db/databaseSetupService';
-import { mesocyclesApi } from './db/databaseAPI';
 
 const SCHEMA_VERSION = 1;
 
@@ -15,7 +13,6 @@ function App() {
   const [dbReady, setDbReady] = useState(false);
   const [dbLoading, setDbLoading] = useState(false);
   const [dbStatus, setDbStatus] = useState(null); // { type: 'success'|'danger', message }
-  const [mesocycles, setMesocycles] = useState([]);
 
   const handleLoadDb = async () => {
     setDbLoading(true);
@@ -24,7 +21,6 @@ function App() {
       console.log("creating database")
       await loadDatabase(SCHEMA_VERSION);
       setDbReady(true);
-      loadMesocycles();
       // setDbStatus({ type: 'success', message: `Database v${SCHEMA_VERSION} loaded from IndexedDB.` });
     } catch (e) {
       console.error('Error loading database:', e);
@@ -34,23 +30,11 @@ function App() {
     }
   };
 
-  const loadMesocycles = useCallback(() => {
-    const response = mesocyclesApi.list();
-    if (response.success) {
-      setMesocycles(response.data);
-      // setListError(null);
-    } else {
-      // setListError(response.error);
-    }
-  }, []);
-
   useEffect(() => {
     if (!dbReady) {
       handleLoadDb();
-      return;
     }
-    loadMesocycles();
-  }, [dbReady, loadMesocycles]);
+  }, [dbReady]);
 
 
   if (dbLoading || !dbReady) {
@@ -79,7 +63,7 @@ function App() {
           <Route path="/data" element={<DataManagement />} />
           <Route path="/summary" element={<Summary />} /> */}
           <Route path="/data" element={<DataImportExportPage />} />
-          {/* <Route path="/debug" element={<DevTestPage />} /> */}
+          <Route path="/programs/:programId" element={<ProgramPage />} />
           <Route path="/" element={<OverviewPage />} />
         </Routes>
       </main>
