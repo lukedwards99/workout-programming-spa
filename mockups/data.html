@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Management — Workout Programming</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
+    --accent: #e94560; --accent2: #533483; --text: #eee;
+    --text-muted: #999; --border: #2a2a4a; --success: #2ecc71;
+    --danger: #e74c3c; --warning: #f39c12; --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  nav .logo { font-weight: 700; font-size: 18px; color: var(--accent); }
+  nav .nav-links { display: flex; gap: 20px; }
+  nav .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; padding: 6px 0; border-bottom: 2px solid transparent; transition: .2s; }
+  nav .nav-links a:hover, nav .nav-links a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  .container { max-width: 700px; margin: 0 auto; padding: 32px 24px; }
+  .page-header { margin-bottom: 24px; }
+  .page-header h1 { font-size: 24px; font-weight: 600; }
+  .page-header p { color: var(--text-muted); font-size: 14px; margin-top: 4px; }
+
+  .btn { padding: 10px 20px; border: none; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500; transition: .15s; display: inline-flex; align-items: center; gap: 8px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #d63852; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-danger { background: var(--danger); color: #fff; }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px; margin-bottom: 24px;
+  }
+  .card h2 { font-size: 18px; margin-bottom: 8px; }
+  .card p { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5; }
+  .card .card-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
+
+  /* ── File upload styling ── */
+  .file-zone {
+    border: 2px dashed var(--border); border-radius: var(--radius);
+    padding: 32px; text-align: center; cursor: pointer; transition: .2s;
+    margin-bottom: 16px;
+  }
+  .file-zone:hover, .file-zone.dragover { border-color: var(--accent); background: rgba(233,69,96,.05); }
+  .file-zone .icon { font-size: 36px; margin-bottom: 8px; opacity: 0.5; }
+  .file-zone .label { font-size: 14px; color: var(--text-muted); }
+  .file-zone .label strong { color: var(--accent); }
+  .file-zone input[type="file"] { display: none; }
+
+  /* ── Status ── */
+  .status-box {
+    padding: 16px; border-radius: var(--radius); margin-top: 16px;
+    font-size: 14px; display: none;
+  }
+  .status-box.success { display: block; background: #0e2f1a; color: var(--success); border: 1px solid #1a4a2a; }
+  .status-box.error { display: block; background: #2f0e0e; color: var(--danger); border: 1px solid #4a1a1a; }
+  .status-box.warning { display: block; background: #2f2200; color: var(--warning); border: 1px solid #4a3600; }
+
+  /* ── Stats ── */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .stat { background: var(--bg); border-radius: var(--radius); padding: 14px; text-align: center; border: 1px solid var(--border); }
+  .stat .val { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .stat .lbl { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  .alert { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 14px; }
+  .alert-success { background: #0e2f1a; color: var(--success); border: 1px solid #1a4a2a; }
+  .alert-danger { background: #2f0e0e; color: var(--danger); border: 1px solid #4a1a1a; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">LiftLog</span>
+  <div class="nav-links">
+    <a href="index.html">Programs</a>
+    <a href="exercises.html">Exercises</a>
+    <a href="data.html" class="active">Data</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Data Management</h1>
+    <p>Export your workout data for backup or import a previously saved database.</p>
+  </div>
+
+  <div id="alert-area"></div>
+
+  <!-- Database Stats -->
+  <div class="card">
+    <h2>Database Summary</h2>
+    <p>Current state of your workout data.</p>
+    <div class="stats-grid">
+      <div class="stat"><div class="val">3</div><div class="lbl">Programs</div></div>
+      <div class="stat"><div class="val">7</div><div class="lbl">Mesocycles</div></div>
+      <div class="stat"><div class="val">24</div><div class="lbl">Workouts</div></div>
+      <div class="stat"><div class="val">6</div><div class="lbl">Exercise Groups</div></div>
+      <div class="stat"><div class="val">32</div><div class="lbl">Exercises</div></div>
+      <div class="stat"><div class="val">~420 KB</div><div class="lbl">Database Size</div></div>
+    </div>
+  </div>
+
+  <!-- Export -->
+  <div class="card">
+    <h2>Export Database</h2>
+    <p>Download your entire database as a binary <code>.sqlite</code> file. You can re-import this file later or transfer it to another device. This file is not human-readable — it contains the raw SQLite database.</p>
+    <div class="card-actions">
+      <button class="btn btn-primary" onclick="exportDatabase()">
+        &#x2193; Download Backup
+      </button>
+    </div>
+  </div>
+
+  <!-- Import -->
+  <div class="card">
+    <h2>Import Database</h2>
+    <p>Upload a previously exported <code>.sqlite</code> file to restore your data. <strong>Warning: this will replace all current data.</strong></p>
+
+    <div class="file-zone" id="file-zone" onclick="document.getElementById('file-input').click()">
+      <div class="icon">&#x1F4C2;</div>
+      <div class="label">Drop a <code>.sqlite</code> file here or <strong>click to browse</strong></div>
+      <input type="file" id="file-input" accept=".sqlite" onchange="handleFileSelect(event)">
+    </div>
+
+    <div class="status-box" id="import-status"></div>
+
+    <div id="confirm-import" style="display:none; margin-top: 12px;">
+      <div class="status-box warning" style="display:block">
+        Are you sure you want to replace all current data with the imported file? This cannot be undone.
+      </div>
+      <div style="display:flex; gap:10px; margin-top:12px;">
+        <button class="btn btn-danger" onclick="confirmImport()">Yes, Replace My Data</button>
+        <button class="btn btn-outline" onclick="cancelImport()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Future: server sync -->
+  <hr class="divider">
+  <div class="card" style="opacity:0.5">
+    <h2>Cloud Backup <span style="font-size:12px;color:var(--warning);margin-left:8px">Coming Soon</span></h2>
+    <p>Automatically sync your workout data to a secure cloud server. Access your data from any device.</p>
+    <div class="card-actions">
+      <button class="btn btn-outline" disabled>Connect Account</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let pendingFile = null;
+
+function exportDatabase() {
+  // In real app: const blob = new Blob([db.export()], { type: 'application/octet-stream' });
+  // For mockup, create a dummy blob
+  const dummyData = new Uint8Array([83,81,76,105,116,101,32,102,111,114,109,97,116,32,51,0]); // "SQLite format 3\0"
+  const blob = new Blob([dummyData], { type: 'application/octet-stream' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'workout-data-backup-' + new Date().toISOString().split('T')[0] + '.sqlite';
+  a.click();
+  URL.revokeObjectURL(url);
+  showAlert('success', 'Database exported successfully. File downloaded.');
+}
+
+function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('import-status');
+
+  // Validate file extension
+  if (!file.name.endsWith('.sqlite')) {
+    status.className = 'status-box error';
+    status.textContent = 'Invalid file type. Please select a .sqlite file.';
+    return;
+  }
+
+  // Read the file (mock — in real app we'd validate SQLite header)
+  const reader = new FileReader();
+  reader.onload = function() {
+    const arr = new Uint8Array(reader.result);
+    const header = new TextDecoder().decode(arr.slice(0, 16));
+    if (!header.startsWith('SQLite format 3')) {
+      status.className = 'status-box error';
+      status.textContent = 'Not a valid SQLite database file.';
+      return;
+    }
+
+    pendingFile = arr;
+    status.className = 'status-box success';
+    status.textContent = `Valid SQLite database detected. File size: ${(arr.length / 1024).toFixed(1)} KB.`;
+    document.getElementById('confirm-import').style.display = 'block';
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function confirmImport() {
+  if (!pendingFile) return;
+  // In real app: load the database, run validation, save to IndexedDB
+  showAlert('success', `Database imported successfully (${(pendingFile.length/1024).toFixed(1)} KB). Data has been replaced.`);
+  cancelImport();
+}
+
+function cancelImport() {
+  pendingFile = null;
+  document.getElementById('import-status').className = 'status-box';
+  document.getElementById('import-status').textContent = '';
+  document.getElementById('confirm-import').style.display = 'none';
+  document.getElementById('file-input').value = '';
+}
+
+function showAlert(type, msg) {
+  const area = document.getElementById('alert-area');
+  area.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => area.innerHTML = '', 5000);
+}
+
+// Drag and drop support
+const zone = document.getElementById('file-zone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+zone.addEventListener('drop', e => {
+  e.preventDefault();
+  zone.classList.remove('dragover');
+  document.getElementById('file-input').files = e.dataTransfer.files;
+  handleFileSelect({ target: { files: e.dataTransfer.files } });
+});
+</script>
+</body>
+</html>

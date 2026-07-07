@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mesocycle — Workout Programming</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
+    --accent: #e94560; --accent2: #533483; --text: #eee;
+    --text-muted: #999; --border: #2a2a4a; --success: #2ecc71;
+    --danger: #e74c3c; --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  nav .logo { font-weight: 700; font-size: 18px; color: var(--accent); }
+  nav .nav-links { display: flex; gap: 20px; }
+  nav .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; padding: 6px 0; border-bottom: 2px solid transparent; transition: .2s; }
+  nav .nav-links a:hover, nav .nav-links a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+  .breadcrumb { font-size: 14px; margin-bottom: 16px; color: var(--text-muted); }
+  .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .breadcrumb span { margin: 0 6px; }
+
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .page-header h1 { font-size: 24px; font-weight: 600; }
+
+  .btn { padding: 8px 16px; border: none; border-radius: var(--radius); cursor: pointer; font-size: 13px; font-weight: 500; transition: .15s; display: inline-flex; align-items: center; gap: 4px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #d63852; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+
+  /* ── Calendar Grid ── */
+  .week-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .week-label { font-size: 16px; font-weight: 600; color: var(--text-muted); }
+  .week-label strong { color: var(--text); }
+  .week-nav { display: flex; gap: 8px; }
+
+  .day-grid { display: grid; gap: 12px; margin-bottom: 24px; }
+  .day-cell {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 16px; min-height: 120px;
+    position: relative; transition: .15s;
+  }
+  .day-cell:hover { border-color: var(--accent); }
+  .day-cell.drag-over { border-color: var(--success); background: rgba(46,204,113,.05); }
+  .day-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: .5px; display: flex; align-items: center; justify-content: space-between; }
+  .workout-chip {
+    display: block; padding: 8px 12px; border-radius: 6px;
+    background: var(--bg); border: 1px solid var(--border); margin-bottom: 6px;
+    cursor: pointer; transition: .15s; text-decoration: none; color: var(--text);
+    font-size: 14px;
+  }
+  .workout-chip:hover { border-color: var(--accent); background: rgba(233,69,96,.08); }
+  .workout-chip .drag-handle { margin-right: 6px; color: var(--text-muted); cursor: grab; }
+  .day-cell .add-btn { display: block; width: 100%; padding: 8px; background: transparent; border: 1px dashed var(--border); border-radius: 6px; color: var(--text-muted); cursor: pointer; font-size: 13px; margin-top: 6px; transition: .15s; }
+  .day-cell .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; justify-content: center; align-items: center; }
+  .modal.show { display: flex; }
+  .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; width: 420px; max-width: 90vw; }
+  .modal-box h2 { font-size: 20px; margin-bottom: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+  .form-group input { width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+  .form-group input:focus { outline: none; border-color: var(--accent); }
+  .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+  .alert { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 14px; }
+  .alert-success { background: #0e2f1a; color: var(--success); border: 1px solid #1a4a2a; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">LiftLog</span>
+  <div class="nav-links">
+    <a href="index.html">Programs</a>
+    <a href="exercises.html">Exercises</a>
+    <a href="data.html">Data</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="breadcrumb">
+    <a href="index.html">Programs</a><span>/</span>
+    <a href="program.html">Push/Pull/Legs 2025</a><span>/</span>
+    <strong>Block 1 — Hypertrophy</strong>
+  </div>
+
+  <div class="page-header">
+    <h1>Block 1 — Hypertrophy</h1>
+  </div>
+  <p style="color:var(--text-muted); font-size:14px; margin-bottom:24px;">
+    Started Mar 10, 2025 &nbsp;·&nbsp; 7-day microcycle
+  </p>
+
+  <div id="alert-area"></div>
+
+  <!-- Week navigation -->
+  <div class="week-header">
+    <div class="week-label">Week <strong id="week-num">1</strong> of 4</div>
+    <div class="week-nav">
+      <button class="btn btn-outline btn-sm" id="prev-week" onclick="changeWeek(-1)" disabled>&larr; Prev</button>
+      <button class="btn btn-outline btn-sm" id="next-week" onclick="changeWeek(1)">Next &rarr;</button>
+    </div>
+  </div>
+
+  <!-- Day grid — rendered dynamically -->
+  <div class="day-grid" id="day-grid" style="grid-template-columns:repeat(7,1fr);">
+    <!-- filled by JS -->
+  </div>
+</div>
+
+<!-- Add Workout Modal -->
+<div class="modal" id="add-modal">
+  <div class="modal-box">
+    <h2 id="modal-title">Add Workout</h2>
+    <form id="add-form" onsubmit="handleAddWorkout(event)">
+      <input type="hidden" id="add-day-offset">
+      <div class="form-group">
+        <label for="wo-name">Workout Name</label>
+        <input type="text" id="wo-name" placeholder="e.g. Push Day A" required autocomplete="off">
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-outline" onclick="hideAddModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let microcycleLength = 7;
+let currentWeek = 1;
+const totalWeeks = 4;
+
+let workouts = [
+  { id: 1, name: 'Push A',    dayOffset: 0 },
+  { id: 2, name: 'Pull A',    dayOffset: 1 },
+  { id: 3, name: 'Legs A',    dayOffset: 2 },
+  { id: 4, name: 'Push B',    dayOffset: 3 },
+  { id: 5, name: 'Pull B',    dayOffset: 4 },
+  { id: 6, name: 'Legs B',    dayOffset: 5 },
+  { id: 7, name: 'Cardio / Abs', dayOffset: 6 },
+  { id: 8, name: 'Extra Arms', dayOffset: 0 },
+];
+let nextId = 9;
+
+function esc(s) { return s.replace(/</g,'&lt;'); }
+
+function getDayName(offset) {
+  return ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'][offset] || `Day ${offset + 1}`;
+}
+
+function render() {
+  const grid = document.getElementById('day-grid');
+  grid.style.gridTemplateColumns = `repeat(${microcycleLength}, 1fr)`;
+
+  let html = '';
+  for (let i = 0; i < microcycleLength; i++) {
+    const dayWorkouts = workouts.filter(w => w.dayOffset === i);
+    html += `
+      <div class="day-cell" data-day="${i}"
+           ondragover="event.preventDefault(); this.classList.add('drag-over')"
+           ondragleave="this.classList.remove('drag-over')"
+           ondrop="handleDrop(event, ${i})">
+        <div class="day-label">${getDayName(i)} <span style="font-weight:400">Day ${i+1}</span></div>
+        ${dayWorkouts.map(w => `
+          <a href="workout.html?id=${w.id}" class="workout-chip" draggable="true" ondragstart="handleDragStart(event, ${w.id})">
+            <span class="drag-handle">&#x2630;</span>${esc(w.name)}
+            <button style="float:right;background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0;line-height:1"
+                    onclick="event.preventDefault(); event.stopPropagation(); deleteWorkout(${w.id})" title="Delete">&times;</button>
+          </a>
+        `).join('')}
+        <button class="add-btn" onclick="showAddModal(${i})">+ Add workout</button>
+      </div>`;
+  }
+  grid.innerHTML = html;
+
+  // Week nav
+  document.getElementById('week-num').textContent = currentWeek;
+  document.getElementById('prev-week').disabled = currentWeek === 1;
+  document.getElementById('next-week').disabled = currentWeek === totalWeeks;
+}
+
+function changeWeek(dir) {
+  const next = currentWeek + dir;
+  if (next < 1 || next > totalWeeks) return;
+  currentWeek = next;
+  render();
+}
+
+// ── Drag & drop ──
+let dragId = null;
+function handleDragStart(e, id) { dragId = id; }
+
+function handleDrop(e, newOffset) {
+  e.currentTarget.classList.remove('drag-over');
+  if (dragId === null) return;
+  const w = workouts.find(x => x.id === dragId);
+  if (w) w.dayOffset = newOffset;
+  dragId = null;
+  render();
+}
+
+// ── Add modal ──
+function showAddModal(dayOffset) {
+  document.getElementById('add-day-offset').value = dayOffset;
+  document.getElementById('wo-name').value = '';
+  document.getElementById('add-modal').classList.add('show');
+}
+function hideAddModal() { document.getElementById('add-modal').classList.remove('show'); }
+
+function handleAddWorkout(e) {
+  e.preventDefault();
+  const dayOffset = parseInt(document.getElementById('add-day-offset').value);
+  const name = document.getElementById('wo-name').value.trim();
+  if (!name) return;
+  workouts.push({ id: nextId++, name, dayOffset });
+  hideAddModal();
+  showAlert('success', `"${esc(name)}" added to ${getDayName(dayOffset)}.`);
+  render();
+}
+
+function deleteWorkout(id) {
+  const w = workouts.find(x => x.id === id);
+  if (!confirm(`Delete "${w.name}"?`)) return;
+  workouts = workouts.filter(x => x.id !== id);
+  showAlert('success', `"${esc(w.name)}" deleted.`);
+  render();
+}
+
+function showAlert(type, msg) {
+  const area = document.getElementById('alert-area');
+  area.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => area.innerHTML = '', 4000);
+}
+
+render();
+</script>
+</body>
+</html>

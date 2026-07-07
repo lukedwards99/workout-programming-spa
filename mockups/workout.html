@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workout — Workout Programming</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
+    --accent: #e94560; --accent2: #533483; --text: #eee;
+    --text-muted: #999; --border: #2a2a4a; --success: #2ecc71;
+    --danger: #e74c3c; --warning: #f39c12; --info: #3498db; --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  nav .logo { font-weight: 700; font-size: 18px; color: var(--accent); }
+  nav .nav-links { display: flex; gap: 20px; }
+  nav .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; padding: 6px 0; border-bottom: 2px solid transparent; transition: .2s; }
+  nav .nav-links a:hover, nav .nav-links a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+
+  .breadcrumb { font-size: 14px; margin-bottom: 16px; color: var(--text-muted); }
+  .breadcrumb a { color: var(--text-muted); text-decoration: none; }
+  .breadcrumb a:hover { color: var(--accent); }
+  .breadcrumb span { margin: 0 6px; }
+
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .page-header h1 { font-size: 24px; font-weight: 600; }
+
+  .btn { padding: 8px 16px; border: none; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500; transition: .15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #d63852; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 4px 10px; font-size: 12px; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-xs { padding: 2px 8px; font-size: 11px; }
+
+  /* ── Exercise block ── */
+  .exercise-block {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); margin-bottom: 16px; overflow: hidden;
+  }
+  .exercise-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 18px; background: var(--surface2); cursor: pointer;
+  }
+  .exercise-header h3 { font-size: 16px; font-weight: 600; }
+  .exercise-header .meta { font-size: 12px; color: var(--text-muted); }
+  .exercise-header .actions { display: flex; gap: 6px; }
+
+  .exercise-body { padding: 0 18px 14px; }
+
+  /* ── Set table ── */
+  .set-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+  .set-table th, .set-table td { text-align: center; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .set-table th { color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; }
+  .set-table th:first-child, .set-table td:first-child { text-align: left; }
+  .set-table th:last-child, .set-table td:last-child { text-align: right; }
+  .set-table input, .set-table select {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); padding: 4px 6px; font-size: 13px; text-align: center; width: 70px;
+  }
+  .set-table select { width: auto; }
+  .set-table .notes-input { width: 120px; text-align: left; }
+
+  .badge-warmup { background: #1a3a6e; color: #4a9eff; padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .badge-normal { background: #1a4a2a; color: var(--success); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .badge-dropset { background: #4a3a1a; color: var(--warning); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+  .badge-failure { background: #4a1a2a; color: var(--danger); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+
+  /* ── Totals bar ── */
+  .totals-bar {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 16px 20px; display: flex; gap: 32px; margin-top: 24px;
+  }
+  .total-item { text-align: center; }
+  .total-item .val { font-size: 20px; font-weight: 700; color: var(--accent); }
+  .total-item .lbl { font-size: 12px; color: var(--text-muted); }
+
+  .add-exercise-bar { display: flex; gap: 8px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 12px; color: var(--text-muted); }
+  .field select, .field input { padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+  .field select:focus, .field input:focus { outline: none; border-color: var(--accent); }
+
+  .alert { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 14px; }
+  .alert-success { background: #0e2f1a; color: var(--success); border: 1px solid #1a4a2a; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">LiftLog</span>
+  <div class="nav-links">
+    <a href="index.html">Programs</a>
+    <a href="exercises.html">Exercises</a>
+    <a href="data.html">Data</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="breadcrumb">
+    <a href="index.html">Programs</a><span>/</span>
+    <a href="program.html">Push/Pull/Legs 2025</a><span>/</span>
+    <a href="mesocycle.html">Block 1 — Hypertrophy</a><span>/</span>
+    <strong>Push A</strong>
+  </div>
+
+  <div class="page-header">
+    <h1>Push A</h1>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" onclick="copyWorkout()">&#x2398; Copy Workout</button>
+    </div>
+  </div>
+  <p style="color:var(--text-muted);font-size:14px;margin-bottom:20px;">Monday — Week 1 of 4</p>
+
+  <div id="alert-area"></div>
+
+  <!-- Add exercise bar -->
+  <div class="add-exercise-bar">
+    <div class="field" style="flex:2">
+      <label>Add Exercise</label>
+      <select id="exercise-select">
+        <option value="">-- Select exercise --</option>
+        <option value="barbell-bench">Barbell Bench Press</option>
+        <option value="db-press">Dumbbell Shoulder Press</option>
+        <option value="incline-bench">Incline Bench Press</option>
+        <option value="lateral-raise">Lateral Raise</option>
+        <option value="tricep-pushdown">Tricep Pushdown</option>
+        <option value="db-fly">Dumbbell Fly</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>Variation (optional)</label>
+      <select id="variation-select">
+        <option value="">-- None --</option>
+        <option value="close-grip">Close Grip</option>
+        <option value="wide-grip">Wide Grip</option>
+        <option value="pause-rep">Pause Reps</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="addExercise()">+ Add</button>
+  </div>
+
+  <!-- Exercise blocks -->
+  <div id="exercises-container">
+    <!-- filled by JS -->
+  </div>
+
+  <!-- Totals -->
+  <div class="totals-bar" id="totals-bar">
+    <div class="total-item"><div class="val" id="total-exercises">3</div><div class="lbl">Exercises</div></div>
+    <div class="total-item"><div class="val" id="total-sets">10</div><div class="lbl">Working Sets</div></div>
+    <div class="total-item"><div class="val" id="total-volume">4,850</div><div class="lbl">Total Volume (lbs)</div></div>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let exercises = [
+  {
+    id: 1, name: 'Barbell Bench Press', variation: 'Close Grip', order: 1,
+    sets: [
+      { setNumber: 1, type: 'warmup', reps: 10, weight: 45,  rir: null, notes: 'Bar only' },
+      { setNumber: 2, type: 'warmup', reps: 8,  weight: 95,  rir: null, notes: '' },
+      { setNumber: 3, type: 'normal', reps: 8,  weight: 155, rir: 2,   notes: '' },
+      { setNumber: 4, type: 'normal', reps: 8,  weight: 155, rir: 1,   notes: '' },
+      { setNumber: 5, type: 'normal', reps: 7,  weight: 155, rir: 0,   notes: 'Felt heavy' },
+    ]
+  },
+  {
+    id: 2, name: 'Dumbbell Shoulder Press', variation: '', order: 2,
+    sets: [
+      { setNumber: 1, type: 'normal', reps: 10, weight: 45, rir: 3, notes: '' },
+      { setNumber: 2, type: 'normal', reps: 9,  weight: 45, rir: 2, notes: '' },
+      { setNumber: 3, type: 'dropset', reps:12, weight: 30, rir: 0,notes: 'Dropped to 30s' },
+    ]
+  },
+  {
+    id: 3, name: 'Tricep Pushdown', variation: '', order: 3,
+    sets: [
+      { setNumber: 1, type: 'normal', reps: 15, weight: 40, rir: 2, notes: '' },
+      { setNumber: 2, type: 'failure',reps: 12, weight: 40, rir: 0, notes: 'Form broke down' },
+    ]
+  },
+];
+let nextExId = 4;
+
+function getBadge(type) {
+  const map = { warmup:'badge-warmup', normal:'badge-normal', dropset:'badge-dropset', failure:'badge-failure' };
+  return map[type] || 'badge-normal';
+}
+
+function render() {
+  const container = document.getElementById('exercises-container');
+  container.innerHTML = exercises.sort((a,b)=>a.order-b.order).map(ex => `
+    <div class="exercise-block">
+      <div class="exercise-header">
+        <div>
+          <h3>${esc(ex.name)} ${ex.variation ? `<span style="color:var(--text-muted);font-weight:400">— ${esc(ex.variation)}</span>` : ''}</h3>
+          <div class="meta">${ex.sets.filter(s=>s.type!=='warmup').length} working sets</div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-outline btn-sm" onclick="addSet(${ex.id})">+ Set</button>
+          <button class="btn btn-danger btn-sm" onclick="removeExercise(${ex.id})">&times;</button>
+        </div>
+      </div>
+      <div class="exercise-body">
+        <table class="set-table">
+          <thead>
+            <tr>
+              <th>#</th><th>Type</th><th>Reps</th><th>Weight (lbs)</th><th>RIR</th><th>Notes</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${ex.sets.map((s,i) => `
+              <tr>
+                <td>${s.setNumber}</td>
+                <td><span class="${getBadge(s.type)}">${s.type}</span></td>
+                <td><input type="number" value="${s.reps ?? ''}" onchange="updateSet(${ex.id},${i},'reps',this.value)" placeholder="—"></td>
+                <td><input type="number" value="${s.weight ?? ''}" onchange="updateSet(${ex.id},${i},'weight',this.value)" placeholder="—" step="any"></td>
+                <td><input type="number" value="${s.rir ?? ''}" onchange="updateSet(${ex.id},${i},'rir',this.value)" placeholder="—"></td>
+                <td><input class="notes-input" value="${esc(s.notes)}" onchange="updateSet(${ex.id},${i},'notes',this.value)" placeholder="—"></td>
+                <td><button class="btn btn-danger btn-xs" onclick="removeSet(${ex.id},${i})">&times;</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+        <div style="margin-top:8px;">
+          <select onchange="addSetWithType(${ex.id}, this.value); this.value='';" style="background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);padding:4px 8px;font-size:12px;">
+            <option value="">+ Add set (type)...</option>
+            <option value="warmup">Warmup</option>
+            <option value="normal">Normal</option>
+            <option value="dropset">Drop Set</option>
+            <option value="failure">Failure</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  updateTotals();
+}
+
+function esc(s) { return String(s).replace(/</g,'&lt;'); }
+
+function addExercise() {
+  const select = document.getElementById('exercise-select');
+  const name = select.value;
+  if (!name) return;
+  const varSelect = document.getElementById('variation-select');
+  const variation = varSelect.options[varSelect.selectedIndex]?.text || '';
+  const order = Math.max(0, ...exercises.map(e=>e.order)) + 1;
+  exercises.push({ id: nextExId++, name: select.options[select.selectedIndex].text, variation, order, sets: [] });
+  select.value = '';
+  varSelect.value = '';
+  showAlert('success', `"${esc(name)}" added.`);
+  render();
+}
+
+function addSet(exId) { addSetWithType(exId, 'normal'); }
+
+function addSetWithType(exId, type) {
+  if (!type) return;
+  const ex = exercises.find(e => e.id === exId);
+  const nextNum = ex.sets.length + 1;
+  ex.sets.push({ setNumber: nextNum, type, reps: null, weight: null, rir: null, notes: '' });
+  render();
+}
+
+function removeSet(exId, idx) {
+  const ex = exercises.find(e => e.id === exId);
+  ex.sets.splice(idx, 1);
+  ex.sets.forEach((s,i) => s.setNumber = i+1);
+  render();
+}
+
+function updateSet(exId, idx, field, val) {
+  const ex = exercises.find(e => e.id === exId);
+  if (field === 'reps' || field === 'weight' || field === 'rir') {
+    ex.sets[idx][field] = val === '' ? null : Number(val);
+  } else {
+    ex.sets[idx][field] = val;
+  }
+  updateTotals();
+}
+
+function removeExercise(exId) {
+  const ex = exercises.find(e => e.id === exId);
+  if (!confirm(`Remove "${ex.name}" from this workout?`)) return;
+  exercises = exercises.filter(e => e.id !== exId);
+  showAlert('success', `"${esc(ex.name)}" removed.`);
+  render();
+}
+
+function updateTotals() {
+  let totalEx = exercises.length;
+  let totalSets = exercises.reduce((sum, ex) => sum + ex.sets.filter(s => s.type !== 'warmup').length, 0);
+  let totalVol = exercises.reduce((sum, ex) =>
+    sum + ex.sets.filter(s => s.type !== 'warmup').reduce((s2,s) => s2 + ((s.reps||0)*(s.weight||0)), 0), 0
+  );
+  document.getElementById('total-exercises').textContent = totalEx;
+  document.getElementById('total-sets').textContent = totalSets;
+  document.getElementById('total-volume').textContent = totalVol.toLocaleString();
+}
+
+function copyWorkout() {
+  alert('Workout copied to next available slot. (Mock-up)');
+}
+
+function showAlert(type, msg) {
+  const area = document.getElementById('alert-area');
+  area.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => area.innerHTML = '', 4000);
+}
+
+render();
+</script>
+</body>
+</html>

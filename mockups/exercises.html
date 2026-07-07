@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Exercise Library — Workout Programming</title>
+<style>
+  :root {
+    --bg: #1a1a2e; --surface: #16213e; --surface2: #0f3460;
+    --accent: #e94560; --accent2: #533483; --text: #eee;
+    --text-muted: #999; --border: #2a2a4a; --success: #2ecc71;
+    --danger: #e74c3c; --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  nav { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10; }
+  nav .logo { font-weight: 700; font-size: 18px; color: var(--accent); }
+  nav .nav-links { display: flex; gap: 20px; }
+  nav .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; padding: 6px 0; border-bottom: 2px solid transparent; transition: .2s; }
+  nav .nav-links a:hover, nav .nav-links a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .page-header h1 { font-size: 24px; font-weight: 600; }
+
+  .btn { padding: 8px 16px; border: none; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500; transition: .15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #d63852; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 5px 12px; font-size: 13px; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-xs { padding: 2px 8px; font-size: 11px; }
+
+  /* ── Two-panel layout ── */
+  .layout { display: flex; gap: 24px; }
+  .sidebar { width: 240px; flex-shrink: 0; }
+  .main { flex: 1; min-width: 0; }
+
+  /* ── Group list ── */
+  .group-list { list-style: none; }
+  .group-list li { padding: 10px 14px; border-radius: var(--radius); cursor: pointer; font-size: 14px; margin-bottom: 2px; transition: .15s; display: flex; justify-content: space-between; align-items: center; }
+  .group-list li:hover { background: var(--surface); }
+  .group-list li.active { background: var(--surface2); color: var(--accent); font-weight: 600; }
+  .group-list li .count { font-size: 12px; color: var(--text-muted); background: var(--bg); padding: 2px 8px; border-radius: 10px; }
+  .group-list li.active .count { background: var(--accent); color: #fff; }
+  .add-group-form { display: flex; gap: 6px; margin-top: 12px; }
+  .add-group-form input { flex: 1; padding: 7px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 13px; }
+  .add-group-form input:focus { outline: none; border-color: var(--accent); }
+
+  /* ── Search ── */
+  .search-bar { margin-bottom: 16px; }
+  .search-bar input { width: 100%; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-size: 14px; }
+  .search-bar input:focus { outline: none; border-color: var(--accent); }
+
+  /* ── Exercise list ── */
+  .ex-list { display: flex; flex-direction: column; gap: 8px; }
+  .ex-item {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 14px 18px; cursor: pointer; transition: .15s;
+  }
+  .ex-item:hover { border-color: var(--accent); }
+  .ex-item .ex-header { display: flex; justify-content: space-between; align-items: center; }
+  .ex-item .ex-header h4 { font-size: 15px; margin-bottom: 2px; }
+  .ex-item .ex-meta { font-size: 12px; color: var(--text-muted); }
+  .ex-item .ex-actions { display: flex; gap: 6px; }
+  .ex-item .ex-detail { display: none; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .ex-item.open .ex-detail { display: block; }
+
+  /* ── Variations ── */
+  .var-list { list-style: none; }
+  .var-list li { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+  .var-list li .primary-tag { font-size: 10px; padding: 1px 6px; border-radius: 8px; background: var(--accent); color: #fff; margin-left: 6px; }
+  .add-var-form { display: flex; gap: 6px; margin-top: 8px; }
+  .add-var-form input { flex: 1; padding: 6px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px; }
+  .add-var-form input:focus { outline: none; border-color: var(--accent); }
+
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 100; justify-content: center; align-items: center; }
+  .modal.show { display: flex; }
+  .modal-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 24px; width: 460px; max-width: 90vw; }
+  .modal-box h2 { font-size: 20px; margin-bottom: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+  .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; font-family: inherit; }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { outline: none; border-color: var(--accent); }
+  .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+  .alert { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 14px; }
+  .alert-success { background: #0e2f1a; color: var(--success); border: 1px solid #1a4a2a; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">LiftLog</span>
+  <div class="nav-links">
+    <a href="index.html">Programs</a>
+    <a href="exercises.html" class="active">Exercises</a>
+    <a href="data.html">Data</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Exercise Library</h1>
+    <button class="btn btn-primary" onclick="showExerciseModal('add')">+ Add Exercise</button>
+  </div>
+
+  <div id="alert-area"></div>
+
+  <div class="layout">
+    <!-- Sidebar: Groups -->
+    <div class="sidebar">
+      <ul class="group-list" id="group-list">
+        <!-- filled by JS -->
+      </ul>
+      <div class="add-group-form">
+        <input type="text" id="new-group-name" placeholder="New group name..." autocomplete="off">
+        <button class="btn btn-primary btn-sm" onclick="addGroup()">+</button>
+      </div>
+    </div>
+
+    <!-- Main: Exercises -->
+    <div class="main">
+      <div class="search-bar">
+        <input type="text" id="search-input" placeholder="Search exercises..." oninput="render()" autocomplete="off">
+      </div>
+      <div class="ex-list" id="ex-list">
+        <!-- filled by JS -->
+      </div>
+      <div id="empty-ex" style="text-align:center;padding:40px;color:var(--text-muted);display:none">No exercises in this group yet.</div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Exercise Modal -->
+<div class="modal" id="ex-modal">
+  <div class="modal-box">
+    <h2 id="ex-modal-title">Add Exercise</h2>
+    <form id="ex-form" onsubmit="handleExSubmit(event)">
+      <input type="hidden" id="ex-edit-id">
+      <div class="form-group">
+        <label>Muscle Group</label>
+        <select id="ex-group" required></select>
+      </div>
+      <div class="form-group">
+        <label>Exercise Name</label>
+        <input type="text" id="ex-name" placeholder="e.g. Barbell Bench Press" required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Tutorial URL (optional)</label>
+        <input type="text" id="ex-url" placeholder="https://youtube.com/..." autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Notes (optional)</label>
+        <textarea id="ex-notes" placeholder="Form cues, tips..." autocomplete="off"></textarea>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-outline" onclick="hideModal('ex-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Add/Edit Variation Modal -->
+<div class="modal" id="var-modal">
+  <div class="modal-box">
+    <h2 id="var-modal-title">Add Variation</h2>
+    <form id="var-form" onsubmit="handleVarSubmit(event)">
+      <input type="hidden" id="var-edit-id">
+      <input type="hidden" id="var-exercise-id">
+      <div class="form-group">
+        <label>Variation Name</label>
+        <input type="text" id="var-name" placeholder="e.g. Close-Grip Bench Press" required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Tutorial URL (optional)</label>
+        <input type="text" id="var-url" placeholder="https://..." autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label><input type="checkbox" id="var-primary"> Set as primary variation</label>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-outline" onclick="hideModal('var-modal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let groups = [
+  { id: 1, name: 'Chest' },
+  { id: 2, name: 'Back' },
+  { id: 3, name: 'Legs' },
+  { id: 4, name: 'Shoulders' },
+  { id: 5, name: 'Arms' },
+  { id: 6, name: 'Core' },
+];
+let nextGroupId = 7;
+
+let exercises = [
+  { id: 1, groupId: 1, name: 'Barbell Bench Press',    url: '', notes: 'Flat bench. Retract scapulae.', variations: [
+    { id: 1, name: 'Close-Grip Bench',  isPrimary: true,  url: '' },
+    { id: 2, name: 'Pause Bench',       isPrimary: false, url: '' },
+  ]},
+  { id: 2, groupId: 1, name: 'Incline Dumbbell Press', url: '', notes: '30° incline.', variations: [] },
+  { id: 3, groupId: 2, name: 'Barbell Row',            url: '', notes: '', variations: [] },
+  { id: 4, groupId: 2, name: 'Pull-Up',                url: '', notes: '', variations: [
+    { id: 3, name: 'Wide-Grip Pull-Up',  isPrimary: true, url: '' },
+  ]},
+  { id: 5, groupId: 3, name: 'Barbell Squat',          url: '', notes: 'High bar.', variations: [] },
+  { id: 6, groupId: 3, name: 'Romanian Deadlift',      url: '', notes: '', variations: [] },
+  { id: 7, groupId: 4, name: 'Lateral Raise',          url: '', notes: '', variations: [] },
+  { id: 8, groupId: 5, name: 'Tricep Pushdown',        url: '', notes: '', variations: [] },
+  { id: 9, groupId: 5, name: 'Barbell Curl',           url: '', notes: '', variations: [] },
+  { id:10, groupId: 6, name: 'Cable Crunch',           url: '', notes: '', variations: [] },
+];
+let nextExId = 11;
+let nextVarId = 4;
+
+let selectedGroup = null; // null = "All"
+
+function esc(s) { return String(s).replace(/</g,'&lt;'); }
+
+// ── Render ──
+function render() {
+  renderGroups();
+  renderExercises();
+}
+
+function renderGroups() {
+  const ul = document.getElementById('group-list');
+  let html = `<li onclick="selectGroup(null)" class="${selectedGroup === null ? 'active' : ''}">
+    All Exercises <span class="count">${exercises.length}</span>
+  </li>`;
+  groups.forEach(g => {
+    const count = exercises.filter(e => e.groupId === g.id).length;
+    html += `<li onclick="selectGroup(${g.id})" class="${selectedGroup === g.id ? 'active' : ''}">
+      <span>${esc(g.name)}</span> <span class="count">${count}</span>
+    </li>`;
+  });
+  ul.innerHTML = html;
+
+  // Populate group select in modal
+  const sel = document.getElementById('ex-group');
+  sel.innerHTML = groups.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+}
+
+function renderExercises() {
+  const query = document.getElementById('search-input').value.toLowerCase();
+  const container = document.getElementById('ex-list');
+  const emptyEl = document.getElementById('empty-ex');
+
+  let filtered = exercises;
+  if (selectedGroup !== null) filtered = filtered.filter(e => e.groupId === selectedGroup);
+  if (query) filtered = filtered.filter(e => e.name.toLowerCase().includes(query));
+
+  if (filtered.length === 0) {
+    container.innerHTML = '';
+    emptyEl.style.display = 'block';
+  } else {
+    emptyEl.style.display = 'none';
+    container.innerHTML = filtered.map(e => {
+      const group = groups.find(g => g.id === e.groupId);
+      return `
+        <div class="ex-item" id="ex-item-${e.id}">
+          <div class="ex-header" onclick="toggleExDetail(${e.id})">
+            <div>
+              <h4>${esc(e.name)}</h4>
+              <div class="ex-meta">${group ? esc(group.name) : 'Unknown'} &middot; ${e.variations.length} variation${e.variations.length !== 1 ? 's' : ''} ${e.notes ? ' &middot; ' + esc(e.notes) : ''}</div>
+            </div>
+            <div class="ex-actions">
+              <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); showExerciseModal('edit',${e.id})">Edit</button>
+              <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteExercise(${e.id})">Del</button>
+            </div>
+          </div>
+          <div class="ex-detail">
+            ${e.url ? `<div style="font-size:12px;margin-bottom:8px"><a href="${esc(e.url)}" target="_blank" style="color:var(--info)">${esc(e.url)}</a></div>` : ''}
+            <strong style="font-size:12px;color:var(--text-muted)">Variations</strong>
+            <ul class="var-list">
+              ${e.variations.map(v => `
+                <li>
+                  <span>${esc(v.name)}${v.isPrimary ? '<span class="primary-tag">primary</span>' : ''}</span>
+                  <button class="btn btn-xs btn-danger" onclick="event.stopPropagation(); deleteVariation(${e.id},${v.id})">&times;</button>
+                </li>
+              `).join('')}
+            </ul>
+            <div class="add-var-form">
+              <input type="text" id="var-input-${e.id}" placeholder="Variation name..." autocomplete="off">
+              <button class="btn btn-primary btn-xs" onclick="event.stopPropagation(); addVariation(${e.id})">+</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+}
+
+function selectGroup(id) { selectedGroup = id; render(); }
+
+function toggleExDetail(id) {
+  const el = document.getElementById('ex-item-' + id);
+  el.classList.toggle('open');
+}
+
+// ── Groups ──
+function addGroup() {
+  const input = document.getElementById('new-group-name');
+  const name = input.value.trim();
+  if (!name) return;
+  groups.push({ id: nextGroupId++, name });
+  input.value = '';
+  showAlert('success', `Group "${esc(name)}" created.`);
+  render();
+}
+
+// ── Exercises ──
+function showExerciseModal(mode, id) {
+  document.getElementById('ex-edit-id').value = '';
+  document.getElementById('ex-form').reset();
+  document.getElementById('ex-modal-title').textContent = 'Add Exercise';
+
+  if (mode === 'edit' && id) {
+    const e = exercises.find(x => x.id === id);
+    document.getElementById('ex-modal-title').textContent = 'Edit Exercise';
+    document.getElementById('ex-edit-id').value = e.id;
+    document.getElementById('ex-group').value = e.groupId;
+    document.getElementById('ex-name').value = e.name;
+    document.getElementById('ex-url').value = e.url;
+    document.getElementById('ex-notes').value = e.notes;
+  }
+  renderGroups(); // refresh group select
+  document.getElementById('ex-modal').classList.add('show');
+}
+
+function handleExSubmit(e) {
+  e.preventDefault();
+  const editId = document.getElementById('ex-edit-id').value;
+  const groupId = parseInt(document.getElementById('ex-group').value);
+  const name = document.getElementById('ex-name').value.trim();
+  const url = document.getElementById('ex-url').value.trim();
+  const notes = document.getElementById('ex-notes').value.trim();
+
+  if (editId) {
+    const ex = exercises.find(x => x.id === Number(editId));
+    ex.groupId = groupId; ex.name = name; ex.url = url; ex.notes = notes;
+    showAlert('success', `"${esc(name)}" updated.`);
+  } else {
+    exercises.push({ id: nextExId++, groupId, name, url, notes, variations: [] });
+    showAlert('success', `"${esc(name)}" created.`);
+  }
+  hideModal('ex-modal');
+  render();
+}
+
+function deleteExercise(id) {
+  const e = exercises.find(x => x.id === id);
+  if (!confirm(`Delete "${e.name}"?`)) return;
+  exercises = exercises.filter(x => x.id !== id);
+  showAlert('success', `"${esc(e.name)}" deleted.`);
+  render();
+}
+
+// ── Variations ──
+function addVariation(exId) {
+  const input = document.getElementById('var-input-' + exId);
+  const name = input.value.trim();
+  if (!name) return;
+  const ex = exercises.find(e => e.id === exId);
+  ex.variations.push({ id: nextVarId++, name, isPrimary: ex.variations.length === 0, url: '' });
+  input.value = '';
+  showAlert('success', `Variation "${esc(name)}" added.`);
+  render();
+}
+
+function deleteVariation(exId, varId) {
+  const ex = exercises.find(e => e.id === exId);
+  const v = ex.variations.find(x => x.id === varId);
+  if (!confirm(`Delete variation "${v.name}"?`)) return;
+  ex.variations = ex.variations.filter(x => x.id !== varId);
+  showAlert('success', `Variation "${esc(v.name)}" deleted.`);
+  render();
+}
+
+// ── Modal helpers ──
+function hideModal(id) { document.getElementById(id).classList.remove('show'); }
+
+function showAlert(type, msg) {
+  const area = document.getElementById('alert-area');
+  area.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => area.innerHTML = '', 4000);
+}
+
+render();
+</script>
+</body>
+</html>
