@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: '/workout-programming-spa/',
+  base: '/',
   define: {
     __BUILD_DATE__: JSON.stringify(new Date().toLocaleString('en-US', {
       year: 'numeric',
@@ -16,9 +16,6 @@ export default defineConfig({
     }))
   },
   server: {
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin',
-      'Cross-Origin-Embedder-Policy': 'require-corp'
-    }
+    headers: {}
   }
 })

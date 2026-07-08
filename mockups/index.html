@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home — Workout Programming</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #533483;
+    --text: #eee;
+    --text-muted: #999;
+    --border: #2a2a4a;
+    --success: #2ecc71;
+    --warning: #f39c12;
+    --danger: #e74c3c;
+    --radius: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  /* ── Nav ── */
+  nav {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px; height: 56px; background: var(--surface);
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 10;
+  }
+  nav .logo { font-weight: 700; font-size: 18px; color: var(--accent); }
+  nav .nav-links { display: flex; gap: 20px; }
+  nav .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 14px; padding: 6px 0; border-bottom: 2px solid transparent; transition: .2s; }
+  nav .nav-links a:hover, nav .nav-links a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  /* ── Layout ── */
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  .page-header h1 { font-size: 24px; font-weight: 600; }
+
+  /* ── Buttons ── */
+  .btn { padding: 8px 16px; border: none; border-radius: var(--radius); cursor: pointer; font-size: 14px; font-weight: 500; transition: .15s; display: inline-flex; align-items: center; gap: 6px; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: #d63852; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-sm { padding: 5px 12px; font-size: 13px; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-danger:hover { background: #c0392b; }
+  .btn-success { background: var(--success); color: #fff; }
+
+  /* ── Cards ── */
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px; transition: .2s;
+  }
+  .card:hover { border-color: var(--accent); }
+  .card h3 { font-size: 18px; margin-bottom: 6px; }
+  .card .meta { font-size: 13px; color: var(--text-muted); margin-bottom: 12px; }
+  .card .notes { font-size: 14px; color: var(--text-muted); margin-bottom: 16px; }
+  .card .actions { display: flex; gap: 8px; }
+
+  /* ── Modal / Form overlay ── */
+  .overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    z-index: 100; justify-content: center; align-items: center;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 24px; width: 440px; max-width: 90vw;
+  }
+  .modal h2 { font-size: 20px; margin-bottom: 16px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 13px; color: var(--text-muted); margin-bottom: 4px; }
+  .form-group input, .form-group textarea {
+    width: 100%; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-size: 14px; font-family: inherit;
+  }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+  .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
+  .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
+
+  /* ── Empty state ── */
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+  .empty-state p { margin-bottom: 20px; }
+
+  /* ── Alerts ── */
+  .alert { padding: 12px 16px; border-radius: var(--radius); margin-bottom: 16px; font-size: 14px; }
+  .alert-success { background: #0e2f1a; color: var(--success); border: 1px solid #1a4a2a; }
+  .alert-danger { background: #2f0e0e; color: var(--danger); border: 1px solid #4a1a1a; }
+
+  /* ── Inline edit ── */
+  .inline-edit input { padding: 4px 8px; background: var(--bg); border: 1px solid var(--accent); color: var(--text); border-radius: 4px; font-size: 14px; width: 100%; }
+</style>
+</head>
+<body>
+
+<nav>
+  <span class="logo">LiftLog</span>
+  <div class="nav-links">
+    <a href="index.html" class="active">Programs</a>
+    <a href="exercises.html">Exercises</a>
+    <a href="data.html">Data</a>
+  </div>
+</nav>
+
+<div class="container">
+  <div class="page-header">
+    <h1>Programs</h1>
+    <button class="btn btn-primary" onclick="showModal('add')">+ New Program</button>
+  </div>
+
+  <div id="alert-area"></div>
+
+  <!-- Program Cards -->
+  <div id="programs-list" class="card-grid">
+    <!-- Filled by JS -->
+  </div>
+
+  <div id="empty-state" class="empty-state" style="display:none">
+    <div class="icon">&#x1F4CB;</div>
+    <p>No programs yet. Create your first training program to get started.</p>
+    <button class="btn btn-primary" onclick="showModal('add')">+ New Program</button>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">New Program</h2>
+    <form id="program-form" onsubmit="handleSubmit(event)">
+      <input type="hidden" id="edit-id">
+      <div class="form-group">
+        <label for="prog-name">Name</label>
+        <input type="text" id="prog-name" placeholder="e.g. Push/Pull/Legs 2025" required autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label for="prog-notes">Notes (optional)</label>
+        <textarea id="prog-notes" placeholder="Any notes about this program..."></textarea>
+      </div>
+      <div class="btn-row">
+        <button type="button" class="btn btn-outline" onclick="hideModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ── State ──
+let programs = [
+  { id: 1, name: 'Push/Pull/Legs 2025', notes: '6-day rotation with deload every 6th week', mesoCount: 3 },
+  { id: 2, name: '5/3/1 BBB',         notes: 'Wendler Boring But Big template',         mesoCount: 2 },
+  { id: 3, name: 'Upper/Lower Split', notes: '',                                         mesoCount: 1 },
+];
+let nextId = 4;
+
+// ── Render ──
+function render() {
+  const list = document.getElementById('programs-list');
+  const empty = document.getElementById('empty-state');
+  if (programs.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    list.innerHTML = programs.map(p => `
+      <div class="card">
+        <h3>${esc(p.name)}</h3>
+        <div class="meta">${p.mesoCount} mesocycle${p.mesoCount !== 1 ? 's' : ''}</div>
+        ${p.notes ? `<div class="notes">${esc(p.notes)}</div>` : `<div class="notes" style="opacity:.4">No notes</div>`}
+        <div class="actions">
+          <a href="program.html?id=${p.id}" class="btn btn-outline btn-sm">View</a>
+          <button class="btn btn-outline btn-sm" onclick="editProgram(${p.id})">Edit</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteProgram(${p.id})">Delete</button>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function esc(s) { return s.replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── CRUD ──
+function showModal(mode, id) {
+  const m = document.getElementById('modal');
+  const title = document.getElementById('modal-title');
+  const form = document.getElementById('program-form');
+  form.reset();
+  document.getElementById('edit-id').value = '';
+
+  if (mode === 'add') {
+    title.textContent = 'New Program';
+  } else {
+    title.textContent = 'Edit Program';
+    const p = programs.find(x => x.id === id);
+    document.getElementById('edit-id').value = p.id;
+    document.getElementById('prog-name').value = p.name;
+    document.getElementById('prog-notes').value = p.notes;
+  }
+  m.classList.add('show');
+}
+
+function hideModal() { document.getElementById('modal').classList.remove('show'); }
+
+function handleSubmit(e) {
+  e.preventDefault();
+  const editId = document.getElementById('edit-id').value;
+  const name = document.getElementById('prog-name').value.trim();
+  const notes = document.getElementById('prog-notes').value.trim();
+
+  if (editId) {
+    const p = programs.find(x => x.id === Number(editId));
+    p.name = name; p.notes = notes;
+    showAlert('success', `"${esc(name)}" updated.`);
+  } else {
+    programs.push({ id: nextId++, name, notes, mesoCount: 0 });
+    showAlert('success', `"${esc(name)}" created.`);
+  }
+  hideModal();
+  render();
+}
+
+function editProgram(id) { showModal('edit', id); }
+
+function deleteProgram(id) {
+  const p = programs.find(x => x.id === id);
+  if (!confirm(`Delete "${p.name}"? This will also delete all mesocycles and workout data inside it.`)) return;
+  programs = programs.filter(x => x.id !== id);
+  showAlert('success', `"${esc(p.name)}" deleted.`);
+  render();
+}
+
+function showAlert(type, msg) {
+  const area = document.getElementById('alert-area');
+  area.innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+  setTimeout(() => { area.innerHTML = ''; }, 4000);
+}
+
+// ── Init ──
+render();
+</script>
+</body>
+</html>

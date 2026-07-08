@@ -1,77 +1,55 @@
+import { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { useEffect, useState } from 'react';
-import Navigation from './components/jsx/Navigation';
-import Footer from './components/jsx/Footer';
-import WeekView from './pages/jsx/WeekView';
-import ExerciseSetup from './pages/jsx/ExerciseSetup';
-import DayWorkout from './pages/jsx/DayWorkout';
-import DataManagement from './pages/jsx/DataManagement';
-import Summary from './pages/jsx/Summary';
-import { initDatabase } from './db/database';
-import './App.css';
+import { initDatabase } from './db/databaseService';
+import Navigation from './components/Navigation';
+import HomePage from './pages/HomePage';
+import ProgramPage from './pages/ProgramPage';
+import ProgramMesocyclesTab from './pages/ProgramMesocyclesTab';
+import ProgramExercisesPage from './pages/ProgramExercisesPage';
+import ProgramDataPage from './pages/ProgramDataPage';
+import MesocyclePage from './pages/MesocyclePage';
+import WorkoutPage from './pages/WorkoutPage';
 
-function App() {
-  const [dbInitialized, setDbInitialized] = useState(false);
-  const [dbError, setDbError] = useState(null);
+export default function App() {
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const initDb = async () => {
-      try {
-        await initDatabase();
-        setDbInitialized(true);
-      } catch (error) {
-        console.error('Failed to initialize database:', error);
-        setDbError(error.message);
-      }
-    };
-
-    initDb();
+    initDatabase()
+      .then(() => setReady(true))
+      .catch((e) => setError(e.message));
   }, []);
 
-  if (dbError) {
+  if (error) {
     return (
-      <div className="app">
-        <div className="container mt-5">
-          <div className="alert alert-danger">
-            <h4>Database Error</h4>
-            <p>Failed to initialize the database: {dbError}</p>
-            <p>Please refresh the page to try again.</p>
-          </div>
+      <div className="loading-screen">
+        <div>
+          <p style={{ color: 'var(--danger)' }}>Failed to initialize database:</p>
+          <p>{error}</p>
         </div>
       </div>
     );
   }
 
-  if (!dbInitialized) {
-    return (
-      <div className="app">
-        <div className="container mt-5">
-          <div className="text-center">
-            <div className="spinner-border text-primary" role="status">
-              <span className="visually-hidden">Loading...</span>
-            </div>
-            <p className="mt-3">Initializing database...</p>
-          </div>
-        </div>
-      </div>
-    );
+  if (!ready) {
+    return <div className="loading-screen">Loading database...</div>;
   }
 
   return (
     <div className="app">
       <Navigation />
-      <main className="main-content">
+      <div className="container">
         <Routes>
-          <Route path="/" element={<WeekView />} />
-          <Route path="/setup" element={<ExerciseSetup />} />
-          <Route path="/day/:dayId" element={<DayWorkout />} />
-          <Route path="/data" element={<DataManagement />} />
-          <Route path="/summary" element={<Summary />} />
+          <Route path="/" element={<HomePage />} />
+          <Route path="/programs/:programId" element={<ProgramPage />}>
+            <Route index element={<ProgramMesocyclesTab />} />
+            <Route path="exercises" element={<ProgramExercisesPage />} />
+            <Route path="data" element={<ProgramDataPage />} />
+          </Route>
+          <Route path="/mesocycles/:mesocycleId" element={<MesocyclePage />} />
+          <Route path="/workouts/:workoutId" element={<WorkoutPage />} />
         </Routes>
-      </main>
-      <Footer />
+      </div>
     </div>
   );
 }
-
-export default App;
