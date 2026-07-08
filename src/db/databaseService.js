@@ -16,7 +16,7 @@ async function loadSqlJs() {
   if (SQL) return SQL;
   const initSqlJs = (await import('sql.js')).default;
   SQL = await initSqlJs({
-    locateFile: (file) => `${import.meta.env.BASE_URL}${file}`,
+    locateFile: () => `${import.meta.env.BASE_URL}sql-wasm.wasm`,
   });
   return SQL;
 }
