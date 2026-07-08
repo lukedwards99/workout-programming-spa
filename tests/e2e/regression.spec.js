@@ -6,6 +6,7 @@ import {
   addExerciseViaUI, addSetViaUI,
 } from './setup';
 import fs from 'fs';
+import initSqlJs from 'sql.js';
 
 test.describe('Regression Tests', () => {
   test.describe('P1-1: Set field persistence after edit', () => {
@@ -215,6 +216,143 @@ test.describe('Regression Tests', () => {
       // Still 1 exercise
       await navigateTo(page, `/programs/${programId}/exercises`);
       await expect(page.locator('.ex-item').filter({ hasText: 'Bench Press' })).toHaveCount(1);
+    });
+  });
+
+  test.describe('P1-5: Variation-aware set renumbering', () => {
+    test('deleting a set from one variation block does not affect another', async ({ page }) => {
+      await clearDatabase(page);
+      const programId = await seedProgramViaUI(page, 'VarRenumber');
+
+      await navigateTo(page, `/programs/${programId}/exercises`);
+      await addExerciseGroupViaUI(page, 'Chest');
+      await addExerciseToLibraryViaUI(page, 'Chest', 'Bench Press');
+
+      await page.locator('.ex-item-header').click();
+      await page.waitForTimeout(300);
+      await page.locator('.ex-item-detail input').fill('Close Grip');
+      await page.locator('.ex-item-detail button:has-text("+")').click();
+      await page.waitForTimeout(400);
+
+      await navigateTo(page, `/programs/${programId}`);
+      await addMesocycleViaUI(page, 'Block 1', 7);
+      await viewMesocycle(page, 'Block 1');
+      await addWorkoutViaUI(page, 0, 'Push Day');
+      await openWorkout(page, 'Push Day');
+
+      // Add Bench Press with Close Grip
+      await page.click('button:has-text("+ Add Exercise")');
+      await page.waitForSelector('.modal-box');
+      await page.locator('.modal-box select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-box select').last().selectOption({ label: 'Close Grip' });
+      await page.locator('.modal-box button:has-text("Add")').click();
+      await page.waitForTimeout(500);
+
+      // Add Bench Press without variation
+      await page.click('button:has-text("+ Add Exercise")');
+      await page.waitForSelector('.modal-box');
+      await page.locator('.modal-box select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-box button:has-text("Add")').click();
+      await page.waitForTimeout(500);
+
+      // Add sets to both blocks
+      const blocks = page.locator('.exercise-block');
+      await expect(blocks).toHaveCount(2);
+
+      // Add 2 more sets to first block (Close Grip)
+      await blocks.nth(0).locator('button:has-text("+ Set")').click();
+      await page.waitForTimeout(300);
+      await blocks.nth(0).locator('button:has-text("+ Set")').click();
+      await page.waitForTimeout(300);
+
+      // Add 1 more set to second block (no variation)
+      await blocks.nth(1).locator('button:has-text("+ Set")').click();
+      await page.waitForTimeout(300);
+
+      // Delete set #2 from first block
+      await blocks.nth(0).locator('.set-table tbody tr').nth(1).locator('button.btn-danger.btn-xs').click();
+      await page.waitForTimeout(500);
+
+      // First block should have sets #1, #2 (was 3 rows, deleted middle, renumbered to 2)
+      const rowsA = blocks.nth(0).locator('.set-table tbody tr');
+      await expect(rowsA).toHaveCount(2);
+      await expect(rowsA.nth(0).locator('td').first()).toHaveText('1');
+      await expect(rowsA.nth(1).locator('td').first()).toHaveText('2');
+
+      // Second block should still have independent set numbers #1, #2
+      const rowsB = blocks.nth(1).locator('.set-table tbody tr');
+      await expect(rowsB).toHaveCount(2);
+      await expect(rowsB.nth(0).locator('td').first()).toHaveText('1');
+      await expect(rowsB.nth(1).locator('td').first()).toHaveText('2');
+    });
+  });
+
+  test.describe('P2-2: Malformed import preserves existing data', () => {
+    test('importing a fake SQLite file with missing tables fails gracefully', async ({ page }) => {
+      // Create a minimal SQLite file with schema_version but no app tables
+      const SQL = await initSqlJs();
+      const badDb = new SQL.Database();
+      badDb.run('CREATE TABLE schema_version (version INTEGER)');
+      badDb.run('INSERT INTO schema_version (version) VALUES (2)');
+      const fakeBuffer = Buffer.from(badDb.export());
+      badDb.close();
+
+      await clearDatabase(page);
+      const programId = await seedProgramViaUI(page, 'Validation Program');
+      await addMesocycleViaUI(page, 'Real Block');
+
+      // Verify real data exists
+      await navigateTo(page, `/programs/${programId}`);
+      await expect(page.locator('td:has-text("Real Block")')).toBeVisible();
+
+      // Navigate to data tab to trigger full import
+      await navigateTo(page, `/programs/${programId}/data`);
+
+      // Trigger full import with the malformed file
+      const fileChooserPromise = page.waitForEvent('filechooser');
+      await page.click('text=Restore Full Backup');
+      const fc = await fileChooserPromise;
+      await fc.setFiles({ name: 'fake.db', mimeType: 'application/octet-stream', buffer: fakeBuffer });
+      await page.waitForTimeout(1000);
+
+      // Should show error alert — import was rejected
+      await expect(page.locator('.alert-danger')).toBeVisible();
+
+      // Real data should still be intact
+      await navigateTo(page, `/programs/${programId}`);
+      await expect(page.locator('td:has-text("Real Block")')).toBeVisible();
+    });
+  });
+
+  test.describe('P2-3: Duplicate exercise block prevention', () => {
+    test('cannot add the same exercise+variation combo twice', async ({ page }) => {
+      await clearDatabase(page);
+      const programId = await seedProgramViaUI(page, 'Dup Prevent');
+
+      await navigateTo(page, `/programs/${programId}/exercises`);
+      await addExerciseGroupViaUI(page, 'Chest');
+      await addExerciseToLibraryViaUI(page, 'Chest', 'Bench Press');
+
+      await navigateTo(page, `/programs/${programId}`);
+      await addMesocycleViaUI(page, 'Block 1', 7);
+      await viewMesocycle(page, 'Block 1');
+      await addWorkoutViaUI(page, 0, 'Push Day');
+      await openWorkout(page, 'Push Day');
+
+      // Add Bench Press
+      await addExerciseViaUI(page, 'Bench Press');
+      await expect(page.locator('.exercise-block')).toHaveCount(1);
+
+      // Try adding same exercise again
+      await page.click('button:has-text("+ Add Exercise")');
+      await page.waitForSelector('.modal-box');
+      await page.locator('.modal-box select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-box button:has-text("Add")').click();
+      await page.waitForTimeout(500);
+
+      // Should show warning and still have only 1 block
+      await expect(page.locator('.alert-warn')).toBeVisible();
+      await expect(page.locator('.exercise-block')).toHaveCount(1);
     });
   });
 });

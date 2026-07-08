@@ -2,11 +2,12 @@
 
 Review date: 2026-07-08
 
-Scope: fresh-build review of the current codebase only. No comparison was made against any prior branch.
+Scope: fresh-build review of the current codebase, followed by a latest-commit review of `9ac8db4` (`fix: address all code review findings...`).
 
 Verification:
 - `npm run build` passed.
-- `npm run test:e2e` passed after allowing Playwright to start the local Vite server: 58 passed, 1 skipped.
+- Initial fresh-build review: `npm run test:e2e` passed after allowing Playwright to start the local Vite server: 58 passed, 1 skipped.
+- Latest commit review: `npm run test:e2e` passed after allowing Playwright to start the local Vite server: 64 passed, 1 skipped.
 
 ## Priority Legend
 
@@ -16,6 +17,75 @@ Verification:
 - P3: Lower-risk improvement.
 
 ## Findings
+
+## Latest Commit Findings
+
+These are the remaining findings from the follow-up review of commit `9ac8db4`.
+
+### P1 - Variation-specific set deletion still renumbers across every variation block
+
+References:
+- `src/pages/WorkoutPage.jsx:102`
+- `src/api/workoutSetsApi.js:53`
+
+The latest commit made workout blocks variation-aware, but `handleDeleteSet` still calls `workoutSetsApi.renumber(id, set.exercise_id)`, and `renumber` scopes only by `workout_id + exercise_id`. If the same exercise is present in multiple blocks, such as "Bench Press", "Bench Press - Close Grip", and "Bench Press - Wide Grip", deleting a set from one block will renumber sets across all of those blocks together.
+
+That leaves per-block set numbering incorrect and can make two separate variation blocks appear to share a single set sequence.
+
+Recommendation:
+- Update `renumber` to accept `exerciseVariationId` and scope by `exercise_variation_id = ?` or `exercise_variation_id IS NULL`.
+- Pass the deleted set's `exercise_variation_id` from `handleDeleteSet`.
+- Add a regression test with the same exercise in two variation blocks, multiple sets in each, then delete from one block and assert both blocks still have independent `1, 2, ...` numbering.
+
+### P2 - Failed full database import can restore a closed database handle
+
+References:
+- `src/db/databaseService.js:189`
+- `src/db/databaseService.js:191`
+- `src/db/databaseService.js:192`
+- `src/db/databaseService.js:226`
+
+The import path saves `oldDb`, assigns `db = newDb`, then immediately closes `oldDb` before migration and `saveToIndexedDB()` have completed. If a later step throws, the catch block assigns `db = oldDb`, but that handle has already been closed.
+
+The user-facing error says the database is unchanged, but the app can be left pointing at a closed in-memory database until reload.
+
+Recommendation:
+- Keep `oldDb` open until the new database has passed validation, any migration, and the IndexedDB save.
+- Only close `oldDb` after the new DB is fully committed.
+- If import fails, close `newDb`, restore the still-open `oldDb`, and preserve the original error or include it in the thrown message.
+
+### P2 - Full database import still accepts malformed schema-versioned SQLite files
+
+References:
+- `src/db/databaseService.js:177`
+- `src/db/databaseService.js:184`
+- `src/db/databaseService.js:226`
+
+The import flow now rejects future schema versions, which is good, but it still treats any SQLite file with a compatible `schema_version` row as valid app data. A file with `schema_version = 2` but missing required tables or columns can be assigned to `db`, saved to IndexedDB, and then fail later on normal app screens.
+
+Recommendation:
+- Before assigning or saving the imported database, validate required tables and columns for the supported schema.
+- At minimum, check `programs`, `mesocycles`, `workouts`, `exercise_groups`, `exercises`, `exercise_variations`, and `workout_sets` plus the columns the API reads/writes.
+- Add a test that imports a SQLite file with `schema_version = 2` but missing a required table and asserts the existing app data remains usable.
+
+### P2 - Duplicate exercise/variation workout blocks still collide
+
+References:
+- `src/api/workoutsApi.js:33`
+- `src/api/workoutsApi.js:64`
+- `src/pages/WorkoutPage.jsx:172`
+
+Variation-aware grouping now uses `blockId: ${exercise_id}-${block_variation_id}`. This handles one no-variation block and one block per variation, but adding the same exercise with the same variation twice still creates duplicate blocks with the same `blockId`. Each duplicate block then queries the same combined set list, and React receives duplicate keys.
+
+Recommendation:
+- Decide whether duplicate `(exercise_id, exercise_variation_id)` blocks are allowed.
+- If duplicates are not allowed, prevent adding an exercise/variation combination that already exists in the workout and surface a friendly message.
+- If duplicates are allowed, introduce a real workout-exercise/workout-block entity or another stable block identity instead of deriving identity from only exercise and variation.
+- Add a regression test for attempting to add the same exercise/variation twice.
+
+## Original Fresh-Build Findings
+
+These findings were identified in the initial fresh-build review. The latest commit addressed many of them, but they are preserved here for historical context and to show the original recommendation trail.
 
 ### P1 - Editing a set can overwrite required set fields or fail the update
 

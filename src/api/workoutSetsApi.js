@@ -50,10 +50,16 @@ export const workoutSetsApi = {
     }
   },
   // Renumber sets for an exercise
-  renumber(workoutId, exerciseId) {
+  renumber(workoutId, exerciseId, exerciseVariationId = null) {
+    const clause = exerciseVariationId
+      ? 'AND exercise_variation_id = ?'
+      : 'AND exercise_variation_id IS NULL';
+    const params = exerciseVariationId
+      ? [workoutId, exerciseId, exerciseVariationId]
+      : [workoutId, exerciseId];
     const sets = queryAll(
-      'SELECT id FROM workout_sets WHERE workout_id = ? AND exercise_id = ? ORDER BY set_number',
-      [workoutId, exerciseId]
+      `SELECT id FROM workout_sets WHERE workout_id = ? AND exercise_id = ? ${clause} ORDER BY set_number`,
+      params
     );
     sets.forEach((s, i) => {
       execSQL('UPDATE workout_sets SET set_number = ? WHERE id = ?', [i + 1, s.id]);

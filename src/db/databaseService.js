@@ -186,57 +186,81 @@ async function importDatabase(file) {
           reject(new Error(`Database version ${version} is newer than the supported version ${CURRENT_SCHEMA}. Please update the app.`));
           return;
         }
-        const oldDb = db;
-        try {
-          db = newDb;
-          if (oldDb) oldDb.close();
-          // Run migrations for older versions if needed
-          if (version < CURRENT_SCHEMA) {
-            if (version <= 1) {
-              db.run(`DROP TABLE IF EXISTS workout_sets`);
-              db.run(`DROP TABLE IF EXISTS exercise_variations`);
-              db.run(`DROP TABLE IF EXISTS exercises`);
-              db.run(`DROP TABLE IF EXISTS exercise_groups`);
-              db.run(`CREATE TABLE IF NOT EXISTS exercise_groups (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, program_id INTEGER NOT NULL,
-                name TEXT NOT NULL, notes TEXT,
-                FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE,
-                UNIQUE(program_id, name));
-                CREATE TABLE IF NOT EXISTS exercises (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, exercise_group_id INTEGER NOT NULL,
-                name TEXT NOT NULL, tutorial_url TEXT, notes TEXT,
-                FOREIGN KEY (exercise_group_id) REFERENCES exercise_groups(id) ON DELETE CASCADE);
-                CREATE TABLE IF NOT EXISTS exercise_variations (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, exercise_id INTEGER NOT NULL,
-                name TEXT NOT NULL, is_primary INTEGER NOT NULL DEFAULT 0,
-                tutorial_url TEXT, notes TEXT,
-                FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE);
-                CREATE TABLE IF NOT EXISTS workout_sets (
-                id INTEGER PRIMARY KEY AUTOINCREMENT, workout_id INTEGER NOT NULL,
-                exercise_id INTEGER NOT NULL, exercise_variation_id INTEGER,
-                exercise_order INTEGER NOT NULL, set_number INTEGER NOT NULL,
-                set_type TEXT NOT NULL DEFAULT 'normal', reps INTEGER,
-                weight REAL, rir INTEGER, notes TEXT,
-                FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
-                FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE,
-                FOREIGN KEY (exercise_variation_id) REFERENCES exercise_variations(id) ON DELETE SET NULL);`);
-              db.run(`INSERT OR REPLACE INTO schema_version (version) VALUES (${CURRENT_SCHEMA});`);
-            }
-          }
-          await saveToIndexedDB();
-          resolve();
-        } catch (err) {
-          db = oldDb;
+        if (!validateTableStructure(newDb)) {
           newDb.close();
-          reject(new Error('Import failed after validation. Database unchanged.'));
+          reject(new Error('Imported database is missing required tables/columns and cannot be used.'));
+          return;
         }
+        // Run migrations for older versions
+        if (version < CURRENT_SCHEMA) {
+          if (version <= 1) {
+            newDb.run(`DROP TABLE IF EXISTS workout_sets`);
+            newDb.run(`DROP TABLE IF EXISTS exercise_variations`);
+            newDb.run(`DROP TABLE IF EXISTS exercises`);
+            newDb.run(`DROP TABLE IF EXISTS exercise_groups`);
+            newDb.run(`CREATE TABLE IF NOT EXISTS exercise_groups (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, program_id INTEGER NOT NULL,
+              name TEXT NOT NULL, notes TEXT,
+              FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE,
+              UNIQUE(program_id, name));
+              CREATE TABLE IF NOT EXISTS exercises (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, exercise_group_id INTEGER NOT NULL,
+              name TEXT NOT NULL, tutorial_url TEXT, notes TEXT,
+              FOREIGN KEY (exercise_group_id) REFERENCES exercise_groups(id) ON DELETE CASCADE);
+              CREATE TABLE IF NOT EXISTS exercise_variations (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, exercise_id INTEGER NOT NULL,
+              name TEXT NOT NULL, is_primary INTEGER NOT NULL DEFAULT 0,
+              tutorial_url TEXT, notes TEXT,
+              FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE);
+              CREATE TABLE IF NOT EXISTS workout_sets (
+              id INTEGER PRIMARY KEY AUTOINCREMENT, workout_id INTEGER NOT NULL,
+              exercise_id INTEGER NOT NULL, exercise_variation_id INTEGER,
+              exercise_order INTEGER NOT NULL, set_number INTEGER NOT NULL,
+              set_type TEXT NOT NULL DEFAULT 'normal', reps INTEGER,
+              weight REAL, rir INTEGER, notes TEXT,
+              FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
+              FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE,
+              FOREIGN KEY (exercise_variation_id) REFERENCES exercise_variations(id) ON DELETE SET NULL);`);
+            newDb.run(`INSERT OR REPLACE INTO schema_version (version) VALUES (${CURRENT_SCHEMA});`);
+          }
+        }
+        const oldDb = db;
+        db = newDb;
+        await saveToIndexedDB();
+        if (oldDb) oldDb.close();
+        resolve();
       } catch (err) {
-        reject(err);
+        reject(new Error(`Import failed: ${err.message || err}. Original database unchanged.`));
       }
     };
     reader.onerror = () => reject(new Error('Failed to read file.'));
     reader.readAsArrayBuffer(file);
   });
+}
+
+function validateTableStructure(database) {
+  const requiredTables = {
+    programs: ['id', 'name', 'created_at', 'notes'],
+    mesocycles: ['id', 'program_id', 'name', 'length_days', 'notes', 'created_at'],
+    workouts: ['id', 'mesocycle_id', 'name', 'day_offset', 'notes', 'sort_order'],
+    exercise_groups: ['id', 'program_id', 'name', 'notes'],
+    exercises: ['id', 'exercise_group_id', 'name', 'tutorial_url', 'notes'],
+    exercise_variations: ['id', 'exercise_id', 'name', 'is_primary', 'tutorial_url', 'notes'],
+    workout_sets: ['id', 'workout_id', 'exercise_id', 'exercise_variation_id', 'exercise_order', 'set_number', 'set_type', 'reps', 'weight', 'rir', 'notes'],
+  };
+  for (const [table, columns] of Object.entries(requiredTables)) {
+    try {
+      const info = database.exec(`PRAGMA table_info(${table})`);
+      if (!info.length || !info[0].values.length) return false;
+      const existingColumns = info[0].values.map((r) => r[1]);
+      for (const col of columns) {
+        if (!existingColumns.includes(col)) return false;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return true;
 }
 
 async function deleteAllData() {

@@ -54,12 +54,19 @@ export default function WorkoutPage() {
 
   const handleAddExercise = () => {
     if (!addExId) return;
+    const exId = Number(addExId);
+    const varId = addVarId ? Number(addVarId) : null;
+    const dup = exerciseBlocks.find((b) => b.exercise_id === exId && (b.variation_id ?? null) === (varId ?? null));
+    if (dup) {
+      flash('warn', `"${allExercises.find((e) => e.id === exId).name}" is already in this workout${varId ? ' with that variation' : ''}.`);
+      return;
+    }
     const exOrder = workoutSetsApi.getMaxExerciseOrder(id) + 1;
-    const ex = allExercises.find((e) => e.id === Number(addExId));
+    const ex = allExercises.find((e) => e.id === exId);
     workoutSetsApi.create({
       workoutId: id,
-      exerciseId: Number(addExId),
-      exerciseVariationId: addVarId ? Number(addVarId) : null,
+      exerciseId: exId,
+      exerciseVariationId: varId,
       exerciseOrder: exOrder,
       setNumber: 1,
       setType: 'normal',
@@ -103,7 +110,7 @@ export default function WorkoutPage() {
     const set = workoutSetsApi.get(setId);
     if (set) {
       workoutSetsApi.delete(setId);
-      workoutSetsApi.renumber(id, set.exercise_id);
+      workoutSetsApi.renumber(id, set.exercise_id, set.exercise_variation_id ?? null);
     }
     load();
   };
