@@ -196,6 +196,31 @@ export default function ProgramDataPage() {
     load();
   };
 
+  const DEFAULT_EXERCISES = [
+    { group: 'Chest', exercises: ['Bench Press', 'Incline Dumbbell Press', 'Dumbbell Flyes', 'Cable Crossover', 'Push Ups'] },
+    { group: 'Back', exercises: ['Pull Ups', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Face Pulls'] },
+    { group: 'Shoulders', exercises: ['Overhead Press', 'Lateral Raise', 'Rear Delt Fly', 'Arnold Press'] },
+    { group: 'Arms', exercises: ['Barbell Curl', 'Hammer Curl', 'Tricep Pushdown', 'Skullcrusher', 'Preacher Curl'] },
+    { group: 'Legs', exercises: ['Barbell Squat', 'Deadlift', 'Leg Press', 'Romanian Deadlift', 'Calf Raise', 'Bulgarian Split Squat'] },
+    { group: 'Core', exercises: ['Plank', 'Hanging Leg Raise', 'Cable Crunch', 'Ab Wheel Rollout'] },
+  ];
+
+  const handleSeedDefaults = () => {
+    if (!window.confirm(`Seed default exercise library into "${program.name}"? Existing exercises will not be duplicated.`)) return;
+    let addedCount = 0;
+    for (const { group, exercises } of DEFAULT_EXERCISES) {
+      const grp = exerciseGroupsApi.findOrCreate(pid, group);
+      for (const name of exercises) {
+        const existing = exercisesApi.list(pid, grp.id).find((e) => e.name === name);
+        if (existing) continue;
+        exercisesApi.create({ groupId: grp.id, name });
+        addedCount++;
+      }
+    }
+    flash('success', `${addedCount} exercises seeded into "${program.name}".`);
+    load();
+  };
+
   return (
     <>
       <div className="page-header">
@@ -256,6 +281,7 @@ export default function ProgramDataPage() {
         <div style={{ display: 'flex', gap: 10 }}>
           <button className="btn btn-outline" onClick={handleFullExport}>&#x2193; Download Full Backup</button>
           <button className="btn btn-outline" onClick={handleFullImport}>&#x2191; Restore Full Backup</button>
+          <button className="btn btn-outline" onClick={handleSeedDefaults}>Seed Default Exercises</button>
           <button className="btn btn-danger btn-sm" onClick={handleDeleteAll}>Delete All Data</button>
         </div>
       </div>

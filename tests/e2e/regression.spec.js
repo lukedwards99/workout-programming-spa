@@ -404,4 +404,34 @@ test.describe('Regression Tests', () => {
       await expect(page.locator('.ex-item:has-text("Bench Press")')).toBeVisible();
     });
   });
+
+  test.describe('P3-2: Seed default exercises', () => {
+    test('seed populates default exercise library without duplicates', async ({ page }) => {
+      await clearDatabase(page);
+      const programId = await seedProgramViaUI(page, 'Seed Test');
+
+      await navigateTo(page, `/programs/${programId}/data`);
+
+      // Confirm dialog and click seed
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.click('button:has-text("Seed Default Exercises")');
+      await page.waitForTimeout(1000);
+
+      // Navigate to exercises tab and verify groups were created
+      await navigateTo(page, `/programs/${programId}/exercises`);
+      await expect(page.locator('.group-item:has-text("Chest")')).toBeVisible();
+      await expect(page.locator('.ex-item:has-text("Bench Press")')).toBeVisible();
+      await expect(page.locator('.group-item:has-text("Legs")')).toBeVisible();
+      await expect(page.locator('.ex-item:has-text("Barbell Squat")')).toBeVisible();
+
+      // Seed again — should not duplicate
+      await navigateTo(page, `/programs/${programId}/data`);
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.click('button:has-text("Seed Default Exercises")');
+      await page.waitForTimeout(1000);
+
+      await navigateTo(page, `/programs/${programId}/exercises`);
+      await expect(page.locator('.ex-item:has-text("Bench Press")')).toHaveCount(1);
+    });
+  });
 });
