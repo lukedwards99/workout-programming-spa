@@ -4,6 +4,7 @@ import { initDatabase } from './db/databaseService';
 import Navigation from './components/Navigation';
 import HomePage from './pages/HomePage';
 import ProgramPage from './pages/ProgramPage';
+import ProgramMesocyclesTab from './pages/ProgramMesocyclesTab';
 import ProgramExercisesPage from './pages/ProgramExercisesPage';
 import ProgramDataPage from './pages/ProgramDataPage';
 import MesocyclePage from './pages/MesocyclePage';
@@ -40,9 +41,11 @@ export default function App() {
       <div className="container">
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/programs/:programId" element={<ProgramPage />} />
-          <Route path="/programs/:programId/exercises" element={<ProgramExercisesPage />} />
-          <Route path="/programs/:programId/data" element={<ProgramDataPage />} />
+          <Route path="/programs/:programId" element={<ProgramPage />}>
+            <Route index element={<ProgramMesocyclesTab />} />
+            <Route path="exercises" element={<ProgramExercisesPage />} />
+            <Route path="data" element={<ProgramDataPage />} />
+          </Route>
           <Route path="/mesocycles/:mesocycleId" element={<MesocyclePage />} />
           <Route path="/workouts/:workoutId" element={<WorkoutPage />} />
         </Routes>

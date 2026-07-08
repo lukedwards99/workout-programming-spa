@@ -2,7 +2,7 @@ import { createDatabaseSQL } from './ddl';
 
 const IDB_NAME = 'workout-programming-v3';
 const IDB_STORE = 'databases';
-const CURRENT_SCHEMA = 1;
+const CURRENT_SCHEMA = 2;
 
 let SQL = null;
 let db = null;

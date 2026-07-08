@@ -23,7 +23,6 @@ test.describe('Copy Exercises Between Programs', () => {
     await page.click('button:has-text("Copy from Program")');
     await page.waitForSelector('.modal-box');
     await page.locator('.modal-box select').selectOption('Program A');
-    await page.click('button:has-text("Load Exercises")');
     await page.waitForTimeout(1000);
 
     const checkboxes = page.locator('.modal-box input[type="checkbox"]');

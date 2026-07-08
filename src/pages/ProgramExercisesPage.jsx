@@ -147,11 +147,6 @@ export default function ProgramExercisesPage() {
     setSelectedExIds(new Set());
   };
 
-  const loadSourceProgram = () => {
-    if (!copySourceProgramId) return;
-    setCopySourceData(copyApi.getSourceExercises(Number(copySourceProgramId)));
-  };
-
   const toggleExSelect = (exId) => {
     const next = new Set(selectedExIds);
     if (next.has(exId)) next.delete(exId); else next.add(exId);
@@ -341,12 +336,21 @@ export default function ProgramExercisesPage() {
             <h2>Copy Exercises from Another Program</h2>
             <div className="form-group">
               <label>Source Program</label>
-              <select value={copySourceProgramId} onChange={(e) => { setCopySourceProgramId(e.target.value); setCopySourceData([]); setSelectedExIds(new Set()); }}>
+              <select value={copySourceProgramId} onChange={(e) => {
+                const val = e.target.value;
+                setCopySourceProgramId(val);
+                if (val) {
+                  setCopySourceData(copyApi.getSourceExercises(Number(val)));
+                  setSelectedExIds(new Set());
+                } else {
+                  setCopySourceData([]);
+                  setSelectedExIds(new Set());
+                }
+              }}>
                 <option value="">-- Select program --</option>
                 {allPrograms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
             </div>
-            <button className="btn btn-outline btn-sm" onClick={loadSourceProgram} disabled={!copySourceProgramId} style={{ marginBottom: 12 }}>Load Exercises</button>
 
             {copySourceData.length > 0 && (
               <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
