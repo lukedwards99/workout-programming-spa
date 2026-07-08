@@ -275,7 +275,7 @@ export default function ProgramDataPage() {
       <hr className="divider" />
 
       {/* Full Database Backup */}
-      <div className="data-card" style={{ opacity: 0.7 }}>
+      <div className="data-card">
         <h2>Full Database Backup</h2>
         <p>Backup or restore your entire database including all programs and workout data. This exports as a <code>.sqlite</code> binary file.</p>
         <div style={{ display: 'flex', gap: 10 }}>
