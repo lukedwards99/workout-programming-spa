@@ -258,6 +258,16 @@ tr:hover { background: rgba(255,255,255,.02); }
 
 .divider { border: none; border-top: 1px solid var(--border); margin: 24px 0; }
 
+/* ── Program Tabs ── */
+.program-tabs { display: flex; gap: 2px; margin-bottom: 24px; border-bottom: 1px solid var(--border); }
+.program-tabs a, .program-tabs button {
+  padding: 10px 20px; border: none; background: none; color: var(--text-muted);
+  font-size: 14px; font-weight: 500; cursor: pointer; transition: .15s;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; text-decoration: none;
+}
+.program-tabs a:hover, .program-tabs button:hover { color: var(--text); }
+.program-tabs a.active, .program-tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+
 .add-row { display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap; }
 
 /* row actions */

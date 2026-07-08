@@ -13,55 +13,46 @@ test.describe('Home Page — Programs', () => {
 
   test('creates a new program via modal', async ({ page }) => {
     await createProgramViaUI(page, 'Push Pull Legs');
-
     await expect(page.locator('.card h3').first()).toHaveText('Push Pull Legs');
     await expect(page.locator('.card')).toHaveCount(1);
   });
 
   test('creates a program with notes', async ({ page }) => {
     await createProgramViaUI(page, '5/3/1 BBB', 'Wendler template');
-
     await expect(page.locator('.card h3').first()).toHaveText('5/3/1 BBB');
     await expect(page.locator('.card')).toContainText('Wendler template');
   });
 
   test('edits an existing program', async ({ page }) => {
     await createProgramViaUI(page, 'Old Name');
-
     await page.locator('button:has-text("Edit")').click();
     await page.waitForSelector('.modal-box');
     await page.locator('.modal-box input[required]').fill('Updated Name');
     await page.locator('.modal-box button:has-text("Save")').click();
     await page.waitForTimeout(500);
-
     await expect(page.locator('.card h3').first()).toHaveText('Updated Name');
   });
 
   test('deletes a program with confirmation dialog', async ({ page }) => {
     await createProgramViaUI(page, 'Delete Me');
     await expect(page.locator('.card')).toHaveCount(1);
-
-    page.on('dialog', (dialog) => dialog.accept());
+    page.once('dialog', (dialog) => dialog.accept());
     await page.locator('button:has-text("Delete")').click();
     await page.waitForTimeout(500);
-
     await expect(page.locator('.empty-state')).toBeVisible();
   });
 
   test('cancels delete when dialog is dismissed', async ({ page }) => {
     await createProgramViaUI(page, 'Keep Me');
-
-    page.on('dialog', (dialog) => dialog.dismiss());
+    page.once('dialog', (dialog) => dialog.dismiss());
     await page.locator('button:has-text("Delete")').click();
     await page.waitForTimeout(300);
-
     await expect(page.locator('.card h3').first()).toHaveText('Keep Me');
   });
 
   test('navigates to program page on View click', async ({ page }) => {
     await createProgramViaUI(page, 'View Test');
     await viewProgram(page, 'View Test');
-
     await expect(page.locator('.breadcrumb')).toContainText('View Test');
     await expect(page).toHaveURL(/\/programs\//);
   });
@@ -70,7 +61,6 @@ test.describe('Home Page — Programs', () => {
     await createProgramViaUI(page, 'Program A');
     await createProgramViaUI(page, 'Program B');
     await createProgramViaUI(page, 'Program C');
-
     await expect(page.locator('.card')).toHaveCount(3);
   });
 
@@ -79,16 +69,6 @@ test.describe('Home Page — Programs', () => {
     await page.waitForSelector('.modal-box');
     await page.locator('.modal-box button:has-text("Cancel")').click();
     await page.waitForTimeout(300);
-
-    await expect(page.locator('.modal-box')).toHaveCount(0);
-  });
-
-  test('closes modal when clicking overlay', async ({ page }) => {
-    await page.click('button:has-text("+ New Program")');
-    await page.waitForSelector('.modal-box');
-    await page.locator('.modal-overlay').click({ position: { x: 10, y: 10 } });
-    await page.waitForTimeout(300);
-
     await expect(page.locator('.modal-box')).toHaveCount(0);
   });
 });

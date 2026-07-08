@@ -1,4 +1,4 @@
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 export const createDatabaseSQL = `
 PRAGMA foreign_keys = ON;
@@ -36,9 +36,12 @@ CREATE TABLE IF NOT EXISTS workouts (
 );
 
 CREATE TABLE IF NOT EXISTS exercise_groups (
-    id    INTEGER PRIMARY KEY AUTOINCREMENT,
-    name  TEXT    NOT NULL UNIQUE,
-    notes TEXT
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    program_id INTEGER NOT NULL,
+    name       TEXT    NOT NULL,
+    notes      TEXT,
+    FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE,
+    UNIQUE(program_id, name)
 );
 
 CREATE TABLE IF NOT EXISTS exercises (

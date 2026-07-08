@@ -1,47 +1,59 @@
 /**
- * Reset all app data by using the app's own "Delete All Data" UI
- * (avoids IndexedDB access issues with COEP headers).
+ * Reset all app data via the "Delete All Data" UI button.
  */
 export async function clearDatabase(page) {
-  // Navigate to data page and use Delete All Data button
-  await page.goto('/data');
-  await page.waitForSelector('.nav-bar', { timeout: 15000 });
-  await page.waitForTimeout(800);
-
-  const deleteBtn = page.locator('button:has-text("Delete All Data")');
-  if (await deleteBtn.isVisible()) {
-    page.once('dialog', (dialog) => dialog.accept());
-    await deleteBtn.click();
-    await page.waitForTimeout(800);
-  }
-
-  // Navigate home and wait for app to settle
   await page.goto('/');
   await page.waitForSelector('.nav-bar', { timeout: 15000 });
   await page.waitForTimeout(500);
+
+  // Create a temp program if none exist, then use its data page to delete all
+  const cards = page.locator('.card');
+  const cardCount = await cards.count();
+
+  if (cardCount > 0) {
+    // Navigate to first program's data tab
+    await cards.first().locator('a:has-text("View")').click();
+    await page.waitForSelector('.breadcrumb', { timeout: 5000 });
+  } else {
+    // Create a temp program
+    await page.click('button:has-text("+ New Program")');
+    await page.waitForSelector('.modal-box');
+    await page.locator('.modal-box input[required]').fill('__temp__');
+    await page.locator('.modal-box button:has-text("Save")').click();
+    await page.waitForTimeout(500);
+    const card = page.locator('.card').first();
+    await card.locator('a:has-text("View")').click();
+    await page.waitForSelector('.breadcrumb', { timeout: 5000 });
+  }
+
+  // Go to Data tab
+  await page.locator('.program-tabs a:has-text("Data")').click();
+  await page.waitForSelector('button:has-text("Delete All Data")', { timeout: 5000 });
+  await page.waitForTimeout(300);
+
+  // Click Delete All Data
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.click('button:has-text("Delete All Data")');
+  await page.waitForTimeout(800);
+
+  // Go home
+  await page.goto('/');
+  await page.waitForSelector('.nav-bar', { timeout: 10000 });
+  await page.waitForTimeout(500);
 }
 
-/**
- * Wait for the app with sql.js to fully initialize.
- */
 export async function waitForApp(page) {
   await page.goto('/');
   await page.waitForSelector('.nav-bar', { timeout: 15000 });
   await page.waitForTimeout(500);
 }
 
-/**
- * Navigate to a path and wait for the page to load.
- */
 export async function navigateTo(page, path) {
   await page.goto(path);
   await page.waitForSelector('.nav-bar', { timeout: 10000 });
   await page.waitForTimeout(300);
 }
 
-/**
- * Fill and submit the "New Program" modal.
- */
 export async function createProgramViaUI(page, name, notes = '') {
   await page.click('button:has-text("+ New Program")');
   await page.waitForSelector('.modal-box');
@@ -53,18 +65,23 @@ export async function createProgramViaUI(page, name, notes = '') {
   await page.waitForTimeout(500);
 }
 
-/**
- * Click "View" on the program card and wait for the program page.
- */
 export async function viewProgram(page, name) {
   const card = page.locator('.card', { hasText: name });
   await card.locator('a:has-text("View")').click();
   await page.waitForSelector('.breadcrumb', { timeout: 5000 });
 }
 
-/**
- * Add a mesocycle via the inline form on ProgramPage.
- */
+export async function seedProgramViaUI(page, name, notes = '', opts = {}) {
+  await createProgramViaUI(page, name, notes);
+  if (!opts.skipNav) {
+    await viewProgram(page, name);
+    await page.waitForTimeout(500);
+  }
+  const url = page.url();
+  const match = url.match(/\/programs\/(\d+)/);
+  return match ? Number(match[1]) : null;
+}
+
 export async function addMesocycleViaUI(page, name, length = 7, startDate = null) {
   await page.locator('input[placeholder*="4-Week"]').fill(name);
   await page.locator('input[type="number"]').fill(String(length));
@@ -75,18 +92,12 @@ export async function addMesocycleViaUI(page, name, length = 7, startDate = null
   await page.waitForTimeout(500);
 }
 
-/**
- * Click "View" on a mesocycle row and wait for the calendar page.
- */
 export async function viewMesocycle(page, name) {
   const row = page.locator('tr', { hasText: name });
   await row.locator('a:has-text("View")').click();
   await page.waitForSelector('.day-grid', { timeout: 5000 });
 }
 
-/**
- * Add a workout to a day cell on the MesocyclePage.
- */
 export async function addWorkoutViaUI(page, dayIndex, name) {
   const cells = page.locator('.day-cell');
   await cells.nth(dayIndex).locator('button:has-text("+ Add workout")').click();
@@ -96,17 +107,11 @@ export async function addWorkoutViaUI(page, dayIndex, name) {
   await page.waitForTimeout(500);
 }
 
-/**
- * Click a workout chip to navigate to the WorkoutPage.
- */
 export async function openWorkout(page, name) {
   await page.locator('.workout-chip', { hasText: name }).click();
   await page.waitForSelector('.exercise-block, .empty-state', { timeout: 5000 });
 }
 
-/**
- * Add an exercise to a workout.
- */
 export async function addExerciseViaUI(page, exerciseName, variationName = null) {
   await page.click('button:has-text("+ Add Exercise")');
   await page.waitForSelector('.modal-box');
@@ -118,29 +123,36 @@ export async function addExerciseViaUI(page, exerciseName, variationName = null)
   await page.waitForTimeout(500);
 }
 
-/**
- * Add a set to an exercise block of a given type.
- */
 export async function addSetViaUI(page, type = 'normal') {
   const select = page.locator('.exercise-block select').last();
   await select.selectOption(type);
   await page.waitForTimeout(300);
 }
 
-/**
- * Fill out a set row (reps, weight, RIR).
- */
 export async function fillSetRow(page, exerciseIndex, setIndex, { reps, weight, rir }) {
   const rows = page.locator('.exercise-block').nth(exerciseIndex).locator('.set-table tbody tr');
   const row = rows.nth(setIndex);
-  if (reps !== undefined) {
-    await row.locator('input').nth(0).fill(String(reps));
-  }
-  if (weight !== undefined) {
-    await row.locator('input').nth(1).fill(String(weight));
-  }
-  if (rir !== undefined) {
-    await row.locator('input').nth(2).fill(String(rir));
-  }
+  if (reps !== undefined) await row.locator('input').nth(0).fill(String(reps));
+  if (weight !== undefined) await row.locator('input').nth(1).fill(String(weight));
+  if (rir !== undefined) await row.locator('input').nth(2).fill(String(rir));
   await page.waitForTimeout(300);
+}
+
+export async function addExerciseGroupViaUI(page, name, notes = '') {
+  await page.locator('.lib-sidebar button:has-text("+ New Group")').click();
+  await page.waitForSelector('.modal-box');
+  await page.locator('.modal-box input[required]').fill(name);
+  if (notes) await page.locator('.modal-box textarea').fill(notes);
+  await page.locator('.modal-box button:has-text("Save")').click();
+  await page.waitForTimeout(400);
+}
+
+export async function addExerciseToLibraryViaUI(page, groupName, exerciseName, notes = '', tutorialUrl = '') {
+  await page.click('button:has-text("+ Add Exercise")');
+  await page.waitForSelector('.modal-box');
+  await page.locator('.modal-box select').selectOption(groupName);
+  await page.locator('.modal-box input[required]').fill(exerciseName);
+  if (notes) await page.locator('.modal-box textarea').fill(notes);
+  await page.locator('.modal-box button:has-text("Save")').click();
+  await page.waitForTimeout(400);
 }

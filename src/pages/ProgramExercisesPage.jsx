@@ -1,17 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { programsApi } from '../api/programsApi';
 import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exercisesApi } from '../api/exercisesApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
+import { copyApi } from '../api/copyApi';
 
-export default function ExerciseLibraryPage() {
+export default function ProgramExercisesPage() {
+  const { programId } = useParams();
+  const pid = Number(programId);
+  const [program, setProgram] = useState(null);
   const [groups, setGroups] = useState([]);
   const [selectedGroup, setSelectedGroup] = useState(null);
   const [exercises, setExercises] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [alert, setAlert] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [varInputs, setVarInputs] = useState({});
 
-  // Group modals
+  // Group modal
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [groupForm, setGroupForm] = useState({ name: '', notes: '' });
   const [editingGroupId, setEditingGroupId] = useState(null);
@@ -21,15 +28,23 @@ export default function ExerciseLibraryPage() {
   const [exForm, setExForm] = useState({ groupId: '', name: '', tutorialUrl: '', notes: '' });
   const [editingExId, setEditingExId] = useState(null);
 
-  // Variation inline add
-  const [varInputs, setVarInputs] = useState({});
+  // Copy modal
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copySourceProgramId, setCopySourceProgramId] = useState('');
+  const [copySourceData, setCopySourceData] = useState([]);
+  const [selectedExIds, setSelectedExIds] = useState(new Set());
 
   const load = useCallback(() => {
-    setGroups(exerciseGroupsApi.list());
-    setExercises(exercisesApi.list(selectedGroup));
-  }, [selectedGroup]);
+    const p = programsApi.get(pid);
+    if (!p) return;
+    setProgram(p);
+    setGroups(exerciseGroupsApi.list(pid));
+    setExercises(exercisesApi.list(pid, selectedGroup));
+  }, [pid, selectedGroup]);
 
   useEffect(() => { load(); }, [load]);
+
+  if (!program) return <div className="empty-state"><p>Program not found.</p></div>;
 
   const flash = (type, msg) => {
     setAlert({ type, msg });
@@ -43,7 +58,7 @@ export default function ExerciseLibraryPage() {
       exerciseGroupsApi.update(editingGroupId, groupForm);
       flash('success', `"${groupForm.name}" updated.`);
     } else {
-      exerciseGroupsApi.create(groupForm);
+      exerciseGroupsApi.create({ programId: pid, name: groupForm.name, notes: groupForm.notes });
       flash('success', `"${groupForm.name}" created.`);
     }
     setShowGroupModal(false);
@@ -124,7 +139,37 @@ export default function ExerciseLibraryPage() {
     load();
   };
 
-  // ── Filter ──
+  // ── Copy ──
+  const openCopyModal = () => {
+    setShowCopyModal(true);
+    setCopySourceProgramId('');
+    setCopySourceData([]);
+    setSelectedExIds(new Set());
+  };
+
+  const loadSourceProgram = () => {
+    if (!copySourceProgramId) return;
+    setCopySourceData(copyApi.getSourceExercises(Number(copySourceProgramId)));
+  };
+
+  const toggleExSelect = (exId) => {
+    const next = new Set(selectedExIds);
+    if (next.has(exId)) next.delete(exId); else next.add(exId);
+    setSelectedExIds(next);
+  };
+
+  const handleCopy = () => {
+    if (selectedExIds.size === 0) return;
+    copyApi.copyExercises(Number(copySourceProgramId), pid, [...selectedExIds]);
+    flash('success', `Copied ${selectedExIds.size} exercise(s).`);
+    setShowCopyModal(false);
+    load();
+  };
+
+  // All other programs for the copy picker
+  const allPrograms = programsApi.list().filter((p) => p.id !== pid);
+
+  // Filter
   let filtered = exercises;
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
@@ -135,7 +180,12 @@ export default function ExerciseLibraryPage() {
     <>
       <div className="page-header">
         <h1>Exercise Library</h1>
-        <button className="btn btn-primary" onClick={openAddEx}>+ Add Exercise</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {allPrograms.length > 0 && (
+            <button className="btn btn-outline" onClick={openCopyModal}>Copy from Program</button>
+          )}
+          <button className="btn btn-primary" onClick={openAddEx}>+ Add Exercise</button>
+        </div>
       </div>
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
@@ -147,7 +197,7 @@ export default function ExerciseLibraryPage() {
             onClick={() => setSelectedGroup(null)}
           >
             <span>All Exercises</span>
-            <span className="group-count">{exercisesApi.list(null).length}</span>
+            <span className="group-count">{exercisesApi.list(pid, null).length}</span>
           </div>
           {groups.map((g) => (
             <div
@@ -259,6 +309,7 @@ export default function ExerciseLibraryPage() {
               <div className="form-group">
                 <label>Muscle Group</label>
                 <select value={exForm.groupId} onChange={(e) => setExForm({ ...exForm, groupId: Number(e.target.value) })} required>
+                  <option value="">-- Select --</option>
                   {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               </div>
@@ -279,6 +330,51 @@ export default function ExerciseLibraryPage() {
                 <button type="submit" className="btn btn-primary">Save</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Copy Modal */}
+      {showCopyModal && (
+        <div className="modal-overlay" onClick={() => setShowCopyModal(false)}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 520 }}>
+            <h2>Copy Exercises from Another Program</h2>
+            <div className="form-group">
+              <label>Source Program</label>
+              <select value={copySourceProgramId} onChange={(e) => { setCopySourceProgramId(e.target.value); setCopySourceData([]); setSelectedExIds(new Set()); }}>
+                <option value="">-- Select program --</option>
+                {allPrograms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+            </div>
+            <button className="btn btn-outline btn-sm" onClick={loadSourceProgram} disabled={!copySourceProgramId} style={{ marginBottom: 12 }}>Load Exercises</button>
+
+            {copySourceData.length > 0 && (
+              <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
+                {copySourceData.map(({ group, exercises }) => (
+                  <div key={group.id} style={{ marginBottom: 12 }}>
+                    <strong style={{ fontSize: 13, color: 'var(--text-muted)' }}>{group.name}</strong>
+                    {exercises.map((ex) => (
+                      <label key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 14, cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedExIds.has(ex.id)}
+                          onChange={() => toggleExSelect(ex.id)}
+                        />
+                        {ex.name}
+                        {ex.notes && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({ex.notes})</span>}
+                      </label>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <button type="button" className="btn btn-outline" onClick={() => setShowCopyModal(false)}>Cancel</button>
+              <button type="button" className="btn btn-primary" onClick={handleCopy} disabled={selectedExIds.size === 0}>
+                Copy Selected ({selectedExIds.size})
+              </button>
+            </div>
           </div>
         </div>
       )}

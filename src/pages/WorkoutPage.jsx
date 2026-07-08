@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { workoutsApi } from '../api/workoutsApi';
+import { mesocyclesApi } from '../api/mesocyclesApi';
 import { exercisesApi } from '../api/exercisesApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
 import { workoutSetsApi } from '../api/workoutSetsApi';
@@ -30,7 +31,8 @@ export default function WorkoutPage() {
     if (!w) return;
     setWorkout(w);
     setExerciseBlocks(workoutsApi.getExercisesWithSets(id));
-    setAllExercises(exercisesApi.list(null));
+    const meso = mesocyclesApi.get(w.mesocycle_id);
+    setAllExercises(meso ? exercisesApi.list(meso.program_id, null) : []);
   }, [id]);
 
   useEffect(() => { load(); }, [load]);

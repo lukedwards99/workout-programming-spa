@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useLocation, Link, NavLink } from 'react-router-dom';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 
@@ -83,7 +83,13 @@ export default function ProgramPage() {
       <div className="page-header">
         <h1>{program.name}</h1>
       </div>
-      {program.notes && <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>{program.notes}</p>}
+      {program.notes && <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>{program.notes}</p>}
+
+      <div className="program-tabs">
+        <NavLink to={`/programs/${program.id}`} end>Mesocycles</NavLink>
+        <NavLink to={`/programs/${program.id}/exercises`}>Exercises</NavLink>
+        <NavLink to={`/programs/${program.id}/data`}>Data</NavLink>
+      </div>
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 

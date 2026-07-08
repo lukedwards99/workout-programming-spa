@@ -67,7 +67,56 @@ async function initDatabase() {
     const ver = db.exec('SELECT MAX(version) FROM schema_version');
     const current = ver.length > 0 && ver[0].values.length > 0 ? ver[0].values[0][0] : 0;
     if (current < CURRENT_SCHEMA) {
-      // Future: run migrations here
+      if (current === 0 || current === 1) {
+        db.run(`DROP TABLE IF EXISTS workout_sets`);
+        db.run(`DROP TABLE IF EXISTS exercise_variations`);
+        db.run(`DROP TABLE IF EXISTS exercises`);
+        db.run(`DROP TABLE IF EXISTS exercise_groups`);
+        db.run(`
+          CREATE TABLE IF NOT EXISTS exercise_groups (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            program_id INTEGER NOT NULL,
+            name       TEXT    NOT NULL,
+            notes      TEXT,
+            FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE,
+            UNIQUE(program_id, name)
+          );
+          CREATE TABLE IF NOT EXISTS exercises (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            exercise_group_id INTEGER NOT NULL,
+            name              TEXT    NOT NULL,
+            tutorial_url      TEXT,
+            notes             TEXT,
+            FOREIGN KEY (exercise_group_id) REFERENCES exercise_groups(id) ON DELETE CASCADE
+          );
+          CREATE TABLE IF NOT EXISTS exercise_variations (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            exercise_id  INTEGER NOT NULL,
+            name         TEXT    NOT NULL,
+            is_primary   INTEGER NOT NULL DEFAULT 0,
+            tutorial_url TEXT,
+            notes        TEXT,
+            FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE
+          );
+          CREATE TABLE IF NOT EXISTS workout_sets (
+            id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+            workout_id            INTEGER NOT NULL,
+            exercise_id           INTEGER NOT NULL,
+            exercise_variation_id INTEGER,
+            exercise_order        INTEGER NOT NULL,
+            set_number            INTEGER NOT NULL,
+            set_type              TEXT    NOT NULL DEFAULT 'normal',
+            reps                  INTEGER,
+            weight                REAL,
+            rir                   INTEGER,
+            notes                 TEXT,
+            FOREIGN KEY (workout_id)            REFERENCES workouts(id)             ON DELETE CASCADE,
+            FOREIGN KEY (exercise_id)           REFERENCES exercises(id)            ON DELETE CASCADE,
+            FOREIGN KEY (exercise_variation_id) REFERENCES exercise_variations(id)  ON DELETE SET NULL
+          );
+        `);
+        db.run(`INSERT OR REPLACE INTO schema_version (version) VALUES (${CURRENT_SCHEMA});`);
+      }
     }
   } else {
     db = new sql.Database();
