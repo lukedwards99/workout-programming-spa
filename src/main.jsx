@@ -6,6 +6,16 @@ import './App.css';
 
 const basename = import.meta.env.MODE === 'production' ? '/workout-programming-spa' : undefined;
 
+const sessionRedirectKey = 'gh-redirect';
+
+(function restoreRedirect() {
+  const redirect = sessionStorage.getItem(sessionRedirectKey);
+  if (redirect) {
+    sessionStorage.removeItem(sessionRedirectKey);
+    window.history.replaceState(null, '', redirect);
+  }
+})();
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter basename={basename}>

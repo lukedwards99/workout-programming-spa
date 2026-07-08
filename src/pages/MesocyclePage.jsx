@@ -59,7 +59,13 @@ export default function MesocyclePage() {
     setShowModal(true);
   };
 
-  const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const startDate = new Date(mesocycle.start_date + 'T00:00:00');
+
+  const dayName = (offset) => {
+    const d = new Date(startDate);
+    d.setDate(d.getDate() + offset);
+    return d.toLocaleDateString('en-US', { weekday: 'long' });
+  };
 
   return (
     <>
@@ -73,7 +79,7 @@ export default function MesocyclePage() {
         <h1>{mesocycle.name}</h1>
       </div>
       <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
-        Started {new Date(mesocycle.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} &middot; {mesocycle.microcycle_length}-day microcycle
+        Started {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} &middot; {mesocycle.microcycle_length}-day mesocycle
       </p>
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
@@ -84,7 +90,7 @@ export default function MesocyclePage() {
           return (
             <div className="day-cell" key={i}>
               <div className="day-label">
-                <span>{dayNames[i % 7]}</span>
+                <span>{dayName(i)}</span>
                 <span>Day {i + 1}</span>
               </div>
               {dayWorkouts.map((w) => (
@@ -114,7 +120,7 @@ export default function MesocyclePage() {
                 <label>Workout Name</label>
                 <input
                   value={woName} onChange={(e) => setWoName(e.target.value)}
-                  placeholder={`e.g. ${dayNames[addDay % 7]} Workout`}
+                  placeholder={`e.g. ${dayName(addDay)} Workout`}
                   required autoFocus
                 />
               </div>
