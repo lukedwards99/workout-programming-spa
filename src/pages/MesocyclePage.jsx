@@ -78,7 +78,7 @@ export default function MesocyclePage() {
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
-      <div className="day-grid" style={{ gridTemplateColumns: `repeat(${mesocycle.microcycle_length}, 1fr)` }}>
+      <div className="day-grid">
         {Array.from({ length: mesocycle.microcycle_length }, (_, i) => {
           const dayWorkouts = workouts.filter((w) => w.day_offset === i);
           return (

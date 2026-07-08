@@ -155,7 +155,7 @@ tr:hover { background: rgba(255,255,255,.02); }
 .week-label { font-size: 16px; font-weight: 600; color: var(--text-muted); }
 .week-label strong { color: var(--text); }
 
-.day-grid { display: grid; gap: 12px; margin-bottom: 24px; }
+.day-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 24px; }
 .day-cell {
   background: var(--surface); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 16px; min-height: 120px;

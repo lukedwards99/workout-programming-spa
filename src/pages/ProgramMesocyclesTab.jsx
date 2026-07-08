@@ -85,7 +85,7 @@ export default function ProgramMesocyclesTab() {
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Length (days)</label>
-          <input type="number" value={form.microcycleLength} onChange={(e) => setForm({ ...form, microcycleLength: Number(e.target.value) })} min={1} max={14} style={{ width: 80 }} />
+          <input type="number" value={form.microcycleLength} onChange={(e) => setForm({ ...form, microcycleLength: Number(e.target.value) })} min={1} max={120} style={{ width: 80 }} />
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Start Date</label>
@@ -136,7 +136,7 @@ export default function ProgramMesocyclesTab() {
               </div>
               <div className="form-group">
                 <label>Microcycle Length</label>
-                <input type="number" value={editForm.microcycleLength} onChange={(e) => setEditForm({ ...editForm, microcycleLength: Number(e.target.value) })} min={1} max={14} />
+                <input type="number" value={editForm.microcycleLength} onChange={(e) => setEditForm({ ...editForm, microcycleLength: Number(e.target.value) })} min={1} max={120} />
               </div>
               <div className="form-group">
                 <label>Start Date</label>
