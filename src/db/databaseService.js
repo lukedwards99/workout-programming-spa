@@ -35,8 +35,8 @@ function openIndexedDB() {
   });
 }
 
-async function saveToIndexedDB() {
-  const data = getDb().export();
+async function saveToIndexedDB(database) {
+  const data = (database || getDb()).export();
   const idb = await openIndexedDB();
   return new Promise((resolve, reject) => {
     const tx = idb.transaction(IDB_STORE, 'readwrite');
@@ -186,12 +186,7 @@ async function importDatabase(file) {
           reject(new Error(`Database version ${version} is newer than the supported version ${CURRENT_SCHEMA}. Please update the app.`));
           return;
         }
-        if (!validateTableStructure(newDb)) {
-          newDb.close();
-          reject(new Error('Imported database is missing required tables/columns and cannot be used.'));
-          return;
-        }
-        // Run migrations for older versions
+        // Run migrations on the imported DB before validation
         if (version < CURRENT_SCHEMA) {
           if (version <= 1) {
             newDb.run(`DROP TABLE IF EXISTS workout_sets`);
@@ -224,9 +219,16 @@ async function importDatabase(file) {
             newDb.run(`INSERT OR REPLACE INTO schema_version (version) VALUES (${CURRENT_SCHEMA});`);
           }
         }
+        // Validate post-migration structure
+        if (!validateTableStructure(newDb)) {
+          newDb.close();
+          reject(new Error('Imported database is missing required tables/columns and cannot be used.'));
+          return;
+        }
+        // Save to IndexedDB before committing the in-memory swap
+        await saveToIndexedDB(newDb);
         const oldDb = db;
         db = newDb;
-        await saveToIndexedDB();
         if (oldDb) oldDb.close();
         resolve();
       } catch (err) {
@@ -241,7 +243,7 @@ async function importDatabase(file) {
 function validateTableStructure(database) {
   const requiredTables = {
     programs: ['id', 'name', 'created_at', 'notes'],
-    mesocycles: ['id', 'program_id', 'name', 'length_days', 'notes', 'created_at'],
+    mesocycles: ['id', 'program_id', 'name', 'microcycle_length', 'start_date', 'notes', 'sort_order'],
     workouts: ['id', 'mesocycle_id', 'name', 'day_offset', 'notes', 'sort_order'],
     exercise_groups: ['id', 'program_id', 'name', 'notes'],
     exercises: ['id', 'exercise_group_id', 'name', 'tutorial_url', 'notes'],

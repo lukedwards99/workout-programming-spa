@@ -355,4 +355,53 @@ test.describe('Regression Tests', () => {
       await expect(page.locator('.exercise-block')).toHaveCount(1);
     });
   });
+
+  test.describe('P2-4: Valid full backup restore', () => {
+    test('export then import restores data correctly', async ({ page }) => {
+      await clearDatabase(page);
+      const programId = await seedProgramViaUI(page, 'Backup Test');
+      await addMesocycleViaUI(page, 'Block Alpha');
+
+      await navigateTo(page, `/programs/${programId}/exercises`);
+      await addExerciseGroupViaUI(page, 'Chest');
+      await addExerciseToLibraryViaUI(page, 'Chest', 'Bench Press');
+
+      // Export full .sqlite backup
+      await navigateTo(page, `/programs/${programId}/data`);
+      const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        page.click('button:has-text("Download Full Backup")'),
+      ]);
+      const tempPath = await download.path();
+      const buffer = fs.readFileSync(tempPath);
+
+      // Delete all data
+      page.once('dialog', (dialog) => dialog.accept());
+      await page.click('button:has-text("Delete All Data")');
+      await page.waitForTimeout(500);
+
+      // Verify data is gone
+      await navigateTo(page, '/');
+      await expect(page.locator('.empty-state p')).toBeVisible();
+
+      // Create a fresh program so the app is initialized
+      const newProgramId = await seedProgramViaUI(page, 'Restore Program');
+
+      // Import the backup
+      await navigateTo(page, `/programs/${newProgramId}/data`);
+      const fileChooserPromise = page.waitForEvent('filechooser');
+      await page.click('text=Restore Full Backup');
+      const fc = await fileChooserPromise;
+      await fc.setFiles({ name: 'backup.sqlite', mimeType: 'application/octet-stream', buffer });
+      await page.waitForTimeout(1000);
+
+      // Verify restored data
+      await navigateTo(page, `/programs/${programId}`);
+      await expect(page.locator('td:has-text("Block Alpha")')).toBeVisible();
+
+      // Verify restored exercises
+      await navigateTo(page, `/programs/${programId}/exercises`);
+      await expect(page.locator('.ex-item:has-text("Bench Press")')).toBeVisible();
+    });
+  });
 });
