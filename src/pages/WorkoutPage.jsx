@@ -71,13 +71,13 @@ export default function WorkoutPage() {
     load();
   };
 
-  const handleAddSet = (exId, type) => {
-    const block = exerciseBlocks.find((b) => b.exercise_id === exId);
+  const handleAddSet = (blockId, type) => {
+    const block = exerciseBlocks.find((b) => b.blockId === blockId);
     const setNum = block ? block.sets.length + 1 : 1;
     workoutSetsApi.create({
       workoutId: id,
-      exerciseId: exId,
-      exerciseVariationId: null,
+      exerciseId: block ? block.exercise_id : 0,
+      exerciseVariationId: block ? block.variation_id : null,
       exerciseOrder: block ? block.exercise_order : 1,
       setNumber: setNum,
       setType: type || 'normal',
@@ -86,21 +86,32 @@ export default function WorkoutPage() {
   };
 
   const handleUpdateSet = (setId, field, value) => {
+    const numericFields = ['reps', 'weight', 'rir', 'set_number'];
     const s = {};
-    s[field] = value === '' ? null : value;
+    if (value === '') {
+      s[field] = null;
+    } else if (numericFields.includes(field)) {
+      s[field] = Number(value);
+    } else {
+      s[field] = value;
+    }
     workoutSetsApi.update(setId, s);
     load();
   };
 
   const handleDeleteSet = (setId) => {
-    workoutSetsApi.delete(setId);
+    const set = workoutSetsApi.get(setId);
+    if (set) {
+      workoutSetsApi.delete(setId);
+      workoutSetsApi.renumber(id, set.exercise_id);
+    }
     load();
   };
 
-  const handleRemoveExercise = (exId) => {
-    const block = exerciseBlocks.find((b) => b.exercise_id === exId);
-    if (!window.confirm(`Remove "${block.exercise_name}" from this workout?`)) return;
-    workoutSetsApi.deleteByExercise(id, exId);
+  const handleRemoveExercise = (blockId) => {
+    const block = exerciseBlocks.find((b) => b.blockId === blockId);
+    if (!block || !window.confirm(`Remove "${block.exercise_name}" from this workout?`)) return;
+    workoutSetsApi.deleteByExercise(id, block.exercise_id, block.variation_id || null);
     flash('success', `"${block.exercise_name}" removed.`);
     load();
   };
@@ -158,7 +169,7 @@ export default function WorkoutPage() {
         <div className="empty-state"><p>No exercises yet. Click "+ Add Exercise" to get started.</p></div>
       ) : (
         exerciseBlocks.sort((a, b) => a.exercise_order - b.exercise_order).map((block) => (
-          <div className="exercise-block" key={block.exercise_id}>
+          <div className="exercise-block" key={block.blockId}>
             <div className="exercise-header">
               <div>
                 <h3>
@@ -168,8 +179,8 @@ export default function WorkoutPage() {
                 <div className="meta">{block.sets.filter((s) => s.set_type !== 'warmup').length} working sets</div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button className="btn btn-outline btn-sm" onClick={() => handleAddSet(block.exercise_id, 'normal')}>+ Set</button>
-                <button className="btn btn-danger btn-sm" onClick={() => handleRemoveExercise(block.exercise_id)}>&times;</button>
+                <button className="btn btn-outline btn-sm" onClick={() => handleAddSet(block.blockId, 'normal')}>+ Set</button>
+                <button className="btn btn-danger btn-sm" onClick={() => handleRemoveExercise(block.blockId)}>&times;</button>
               </div>
             </div>
             <div className="exercise-body">
@@ -215,7 +226,7 @@ export default function WorkoutPage() {
               </table>
               <div style={{ marginTop: 8 }}>
                 <select
-                  onChange={(e) => { if (e.target.value) { handleAddSet(block.exercise_id, e.target.value); e.target.value = ''; } }}
+                  onChange={(e) => { if (e.target.value) { handleAddSet(block.blockId, e.target.value); e.target.value = ''; } }}
                   style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', padding: '4px 8px', fontSize: 12 }}
                 >
                   <option value="">+ Add set (type)...</option>

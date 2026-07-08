@@ -106,6 +106,24 @@ export default function ProgramDataPage() {
 
       for (const ex of data.exercises) {
         const group = exerciseGroupsApi.findOrCreate(pid, ex.groupName);
+        // Skip if exercise with same name already exists in this group
+        const existing = exercisesApi.list(pid, group.id).find((e) => e.name === ex.name);
+        if (existing) {
+          // Add variations if new
+          for (const v of (ex.variations || [])) {
+            const existingVars = exerciseVariationsApi.list(existing.id);
+            if (!existingVars.find((ev) => ev.name === v.name)) {
+              exerciseVariationsApi.create({
+                exerciseId: existing.id,
+                name: v.name,
+                isPrimary: v.isPrimary,
+                tutorialUrl: v.tutorialUrl,
+                notes: v.notes,
+              });
+            }
+          }
+          continue;
+        }
         const newEx = exercisesApi.create({
           groupId: group.id,
           name: ex.name,

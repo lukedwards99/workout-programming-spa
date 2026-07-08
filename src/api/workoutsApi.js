@@ -33,6 +33,7 @@ export const workoutsApi = {
       `SELECT DISTINCT
          e.id AS exercise_id, e.name AS exercise_name, e.notes AS exercise_notes,
          ev.id AS variation_id, ev.name AS variation_name,
+         COALESCE(ws.exercise_variation_id, 0) AS block_variation_id,
          ws.exercise_order
        FROM workout_sets ws
        JOIN exercises e ON ws.exercise_id = e.id
@@ -43,17 +44,24 @@ export const workoutsApi = {
     );
 
     return rows.map((row) => {
+      const variationId = row.variation_id || null;
+      const clause = variationId
+        ? 'AND ws.exercise_variation_id = ?'
+        : 'AND ws.exercise_variation_id IS NULL';
+      const params = variationId
+        ? [workoutId, row.exercise_id, variationId]
+        : [workoutId, row.exercise_id];
       const sets = queryAll(
         `SELECT ws.*, e.name AS exercise_name,
                 ev.name AS variation_name
          FROM workout_sets ws
          JOIN exercises e ON ws.exercise_id = e.id
          LEFT JOIN exercise_variations ev ON ws.exercise_variation_id = ev.id
-         WHERE ws.workout_id = ? AND ws.exercise_id = ?
+         WHERE ws.workout_id = ? AND ws.exercise_id = ? ${clause}
          ORDER BY ws.set_number`,
-        [workoutId, row.exercise_id]
+        params
       );
-      return { ...row, sets };
+      return { ...row, blockId: `${row.exercise_id}-${row.block_variation_id}`, sets };
     });
   },
 };

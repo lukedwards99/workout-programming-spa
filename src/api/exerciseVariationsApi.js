@@ -11,6 +11,9 @@ export const exerciseVariationsApi = {
     return queryOne('SELECT * FROM exercise_variations WHERE id = ?', [id]);
   },
   create({ exerciseId, name, isPrimary, tutorialUrl, notes }) {
+    if (isPrimary) {
+      execSQL('UPDATE exercise_variations SET is_primary = 0 WHERE exercise_id = ?', [exerciseId]);
+    }
     execSQL(
       'INSERT INTO exercise_variations (exercise_id, name, is_primary, tutorial_url, notes) VALUES (?, ?, ?, ?, ?)',
       [exerciseId, name, isPrimary ? 1 : 0, tutorialUrl || null, notes || null]
@@ -18,6 +21,10 @@ export const exerciseVariationsApi = {
     return this.get(lastInsertRowId());
   },
   update(id, { name, isPrimary, tutorialUrl, notes }) {
+    if (isPrimary) {
+      const v = this.get(id);
+      if (v) execSQL('UPDATE exercise_variations SET is_primary = 0 WHERE exercise_id = ?', [v.exercise_id]);
+    }
     execSQL(
       'UPDATE exercise_variations SET name = ?, is_primary = ?, tutorial_url = ?, notes = ? WHERE id = ?',
       [name, isPrimary ? 1 : 0, tutorialUrl || null, notes || null, id]

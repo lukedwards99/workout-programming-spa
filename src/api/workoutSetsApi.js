@@ -23,21 +23,31 @@ export const workoutSetsApi = {
     );
     return this.get(lastInsertRowId());
   },
-  update(id, { setNumber, setType, reps, weight, rir, notes }) {
+  update(id, changes) {
+    const existing = queryOne('SELECT * FROM workout_sets WHERE id = ?', [id]);
+    if (!existing) return null;
+    const row = { ...existing, ...changes };
     execSQL(
       'UPDATE workout_sets SET set_number = ?, set_type = ?, reps = ?, weight = ?, rir = ?, notes = ? WHERE id = ?',
-      [setNumber, setType, reps ?? null, weight ?? null, rir ?? null, notes || null, id]
+      [row.set_number, row.set_type, row.reps ?? null, row.weight ?? null, row.rir ?? null, row.notes || null, id]
     );
     return this.get(id);
   },
   delete(id) {
     execSQL('DELETE FROM workout_sets WHERE id = ?', [id]);
   },
-  deleteByExercise(workoutId, exerciseId) {
-    execSQL(
-      'DELETE FROM workout_sets WHERE workout_id = ? AND exercise_id = ?',
-      [workoutId, exerciseId]
-    );
+  deleteByExercise(workoutId, exerciseId, exerciseVariationId = null) {
+    if (exerciseVariationId) {
+      execSQL(
+        'DELETE FROM workout_sets WHERE workout_id = ? AND exercise_id = ? AND exercise_variation_id = ?',
+        [workoutId, exerciseId, exerciseVariationId]
+      );
+    } else {
+      execSQL(
+        'DELETE FROM workout_sets WHERE workout_id = ? AND exercise_id = ? AND exercise_variation_id IS NULL',
+        [workoutId, exerciseId]
+      );
+    }
   },
   // Renumber sets for an exercise
   renumber(workoutId, exerciseId) {

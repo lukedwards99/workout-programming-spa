@@ -16,7 +16,7 @@ async function loadSqlJs() {
   if (SQL) return SQL;
   const initSqlJs = (await import('sql.js')).default;
   SQL = await initSqlJs({
-    locateFile: (file) => `https://sql.js.org/dist/${file}`,
+    locateFile: (file) => `/${file}`,
   });
   return SQL;
 }
@@ -64,6 +64,7 @@ async function initDatabase() {
 
   if (saved) {
     db = new sql.Database(saved);
+    db.run('PRAGMA foreign_keys = ON');
     const ver = db.exec('SELECT MAX(version) FROM schema_version');
     const current = ver.length > 0 && ver[0].values.length > 0 ? ver[0].values[0][0] : 0;
     if (current < CURRENT_SCHEMA) {
@@ -121,8 +122,20 @@ async function initDatabase() {
   } else {
     db = new sql.Database();
     db.run(createDatabaseSQL);
+    db.run('PRAGMA foreign_keys = ON');
     await saveToIndexedDB();
   }
+
+  // Flush saves when page is hidden/unloaded
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      saveNow().catch(() => {});
+    }
+  });
+  window.addEventListener('pagehide', () => {
+    saveNow().catch(() => {});
+  });
+
   return db;
 }
 
@@ -160,6 +173,7 @@ async function importDatabase(file) {
           return;
         }
         const newDb = new sql.Database(arr);
+        newDb.run('PRAGMA foreign_keys = ON');
         const ver = newDb.exec('SELECT MAX(version) FROM schema_version');
         const version = ver.length > 0 && ver[0].values.length > 0 ? ver[0].values[0][0] : null;
         if (version === null) {
@@ -167,10 +181,55 @@ async function importDatabase(file) {
           reject(new Error('File does not contain workout app data.'));
           return;
         }
-        if (db) db.close();
-        db = newDb;
-        await saveToIndexedDB();
-        resolve();
+        if (version > CURRENT_SCHEMA) {
+          newDb.close();
+          reject(new Error(`Database version ${version} is newer than the supported version ${CURRENT_SCHEMA}. Please update the app.`));
+          return;
+        }
+        const oldDb = db;
+        try {
+          db = newDb;
+          if (oldDb) oldDb.close();
+          // Run migrations for older versions if needed
+          if (version < CURRENT_SCHEMA) {
+            if (version <= 1) {
+              db.run(`DROP TABLE IF EXISTS workout_sets`);
+              db.run(`DROP TABLE IF EXISTS exercise_variations`);
+              db.run(`DROP TABLE IF EXISTS exercises`);
+              db.run(`DROP TABLE IF EXISTS exercise_groups`);
+              db.run(`CREATE TABLE IF NOT EXISTS exercise_groups (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, program_id INTEGER NOT NULL,
+                name TEXT NOT NULL, notes TEXT,
+                FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE,
+                UNIQUE(program_id, name));
+                CREATE TABLE IF NOT EXISTS exercises (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, exercise_group_id INTEGER NOT NULL,
+                name TEXT NOT NULL, tutorial_url TEXT, notes TEXT,
+                FOREIGN KEY (exercise_group_id) REFERENCES exercise_groups(id) ON DELETE CASCADE);
+                CREATE TABLE IF NOT EXISTS exercise_variations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, exercise_id INTEGER NOT NULL,
+                name TEXT NOT NULL, is_primary INTEGER NOT NULL DEFAULT 0,
+                tutorial_url TEXT, notes TEXT,
+                FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE);
+                CREATE TABLE IF NOT EXISTS workout_sets (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, workout_id INTEGER NOT NULL,
+                exercise_id INTEGER NOT NULL, exercise_variation_id INTEGER,
+                exercise_order INTEGER NOT NULL, set_number INTEGER NOT NULL,
+                set_type TEXT NOT NULL DEFAULT 'normal', reps INTEGER,
+                weight REAL, rir INTEGER, notes TEXT,
+                FOREIGN KEY (workout_id) REFERENCES workouts(id) ON DELETE CASCADE,
+                FOREIGN KEY (exercise_id) REFERENCES exercises(id) ON DELETE CASCADE,
+                FOREIGN KEY (exercise_variation_id) REFERENCES exercise_variations(id) ON DELETE SET NULL);`);
+              db.run(`INSERT OR REPLACE INTO schema_version (version) VALUES (${CURRENT_SCHEMA});`);
+            }
+          }
+          await saveToIndexedDB();
+          resolve();
+        } catch (err) {
+          db = oldDb;
+          newDb.close();
+          reject(new Error('Import failed after validation. Database unchanged.'));
+        }
       } catch (err) {
         reject(err);
       }
