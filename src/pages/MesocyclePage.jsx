@@ -84,11 +84,12 @@ export default function MesocyclePage() {
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
-      <div className="day-grid">
+      <div className="row g-3 mb-4">
         {Array.from({ length: mesocycle.microcycle_length }, (_, i) => {
           const dayWorkouts = workouts.filter((w) => w.day_offset === i);
           return (
-            <div className="day-cell" key={i}>
+            <div className="col-6 col-sm-4 col-md-3 col-lg-2" key={i}>
+              <div className="day-cell">
               <div className="day-label">
                 <span>{dayName(i)}</span>
                 <span>Day {i + 1}</span>
@@ -106,6 +107,7 @@ export default function MesocyclePage() {
                 </div>
               ))}
               <button className="add-chip" onClick={() => openAdd(i)}>+ Add workout</button>
+              </div>
             </div>
           );
         })}

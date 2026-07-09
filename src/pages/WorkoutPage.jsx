@@ -191,6 +191,7 @@ export default function WorkoutPage() {
               </div>
             </div>
             <div className="exercise-body">
+              <div className="table-responsive">
               <table className="set-table">
                 <thead>
                   <tr>
@@ -231,6 +232,7 @@ export default function WorkoutPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
               <div style={{ marginTop: 8 }}>
                 <select
                   onChange={(e) => { if (e.target.value) { handleAddSet(block.blockId, e.target.value); e.target.value = ''; } }}

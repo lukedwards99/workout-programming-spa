@@ -185,8 +185,8 @@ export default function ProgramExercisesPage() {
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
-      <div className="lib-layout">
-        <div className="lib-sidebar">
+      <div className="row">
+        <div className="col-12 col-md-3 mb-3 mb-md-0">
           <div
             className={`group-item ${selectedGroup === null ? 'active' : ''}`}
             onClick={() => setSelectedGroup(null)}
@@ -209,7 +209,7 @@ export default function ProgramExercisesPage() {
           </button>
         </div>
 
-        <div className="lib-main">
+        <div className="col-12 col-md-9">
           <input
             className="search-input"
             placeholder="Search exercises..."
@@ -332,7 +332,7 @@ export default function ProgramExercisesPage() {
       {/* Copy Modal */}
       {showCopyModal && (
         <div className="modal-overlay" onClick={() => setShowCopyModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ width: 520 }}>
+          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
             <h2>Copy Exercises from Another Program</h2>
             <div className="form-group">
               <label>Source Program</label>
