@@ -68,9 +68,10 @@ export default function HomePage() {
           <button className="btn btn-primary" onClick={openAdd}>+ New Program</button>
         </div>
       ) : (
-        <div className="card-grid">
+        <div className="row g-3">
           {programs.map((p) => (
-            <div className="card" key={p.id}>
+            <div className="col-12 col-sm-6 col-lg-4" key={p.id}>
+              <div className="card">
               <h3 style={{ marginBottom: 6 }}>{p.name}</h3>
               <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
                 {p.meso_count} mesocycle{p.meso_count !== 1 ? 's' : ''}
@@ -83,6 +84,7 @@ export default function HomePage() {
                 <Link to={`/programs/${p.id}`} className="btn btn-outline btn-sm">View</Link>
                 <button className="btn btn-outline btn-sm" onClick={() => openEdit(p)}>Edit</button>
                 <button className="btn btn-danger btn-sm" onClick={() => handleDelete(p.id)}>Delete</button>
+              </div>
               </div>
             </div>
           ))}

@@ -265,7 +265,7 @@ export default function ProgramDataPage() {
         )}
 
         {showConfirm && (
-          <div style={{ display: 'flex', gap: 10 }}>
+        <div className="d-flex gap-2 flex-wrap">
             <button className="btn btn-primary" onClick={handleImport}>Import Exercises</button>
             <button className="btn btn-outline" onClick={cancelImport}>Cancel</button>
           </div>
@@ -278,7 +278,7 @@ export default function ProgramDataPage() {
       <div className="data-card">
         <h2>Full Database Backup</h2>
         <p>Backup or restore your entire database including all programs and workout data. This exports as a <code>.sqlite</code> binary file.</p>
-        <div style={{ display: 'flex', gap: 10 }}>
+          <div className="d-flex gap-2 flex-wrap">
           <button className="btn btn-outline" onClick={handleFullExport}>&#x2193; Download Full Backup</button>
           <button className="btn btn-outline" onClick={handleFullImport}>&#x2191; Restore Full Backup</button>
           <button className="btn btn-outline" onClick={handleSeedDefaults}>Seed Default Exercises</button>

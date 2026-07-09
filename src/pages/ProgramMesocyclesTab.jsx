@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 
 export default function ProgramMesocyclesTab() {
   const { programId } = useParams();
+  const navigate = useNavigate();
   const [program, setProgram] = useState(null);
   const [mesocycles, setMesocycles] = useState([]);
   const [alert, setAlert] = useState(null);
@@ -85,11 +86,11 @@ export default function ProgramMesocyclesTab() {
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Length (days)</label>
-          <input type="number" value={form.microcycleLength} onChange={(e) => setForm({ ...form, microcycleLength: Number(e.target.value) })} min={1} max={120} style={{ width: 80 }} />
+          <input type="number" value={form.microcycleLength} onChange={(e) => setForm({ ...form, microcycleLength: Number(e.target.value) })} min={1} max={120} />
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Start Date</label>
-          <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} style={{ width: 160 }} />
+          <input type="date" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
         </div>
         <button type="submit" className="btn btn-primary">+ Add Mesocycle</button>
       </form>
@@ -97,32 +98,33 @@ export default function ProgramMesocyclesTab() {
       {mesocycles.length === 0 ? (
         <div className="empty-state"><p>No mesocycles yet. Create your first training block above.</p></div>
       ) : (
-        <table>
+        <div className="table-responsive">
+        <table className="responsive-table">
           <thead>
             <tr>
               <th>Name</th>
               <th>Length</th>
               <th>Start Date</th>
               <th>Workouts</th>
-              <th style={{ width: 170 }}>Actions</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
             {mesocycles.map((m) => (
-              <tr key={m.id}>
-                <td><strong>{m.name}</strong></td>
-                <td>{m.microcycle_length} days</td>
-                <td className="month-col">{new Date(m.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
-                <td><span className="badge">{m.workout_count} workouts</span></td>
-                <td className="row-actions">
-                  <Link to={`/mesocycles/${m.id}`} className="btn btn-outline btn-sm">View</Link>
-                  <button className="btn btn-outline btn-sm" onClick={() => openEdit(m)}>Edit</button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(m.id)}>Del</button>
+              <tr key={m.id} className="hoverable-row" onClick={() => navigate(`/mesocycles/${m.id}`)} style={{ cursor: 'pointer' }}>
+                <td data-label="Name"><strong>{m.name}</strong></td>
+                <td data-label="Length">{m.microcycle_length} days</td>
+                <td data-label="Start Date">{new Date(m.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                <td data-label="Workouts"><span className="badge">{m.workout_count} workouts</span></td>
+                <td data-label="Actions" className="row-actions">
+                  <button className="btn btn-outline btn-sm" onClick={(e) => { e.stopPropagation(); openEdit(m); }}>Edit</button>
+                  <button className="btn btn-danger btn-sm" onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}>Del</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {showEditModal && (

@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { workoutsApi } from '../api/workoutsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { exercisesApi } from '../api/exercisesApi';
+import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
 import { workoutSetsApi } from '../api/workoutSetsApi';
 
@@ -19,12 +20,15 @@ export default function WorkoutPage() {
   const [workout, setWorkout] = useState(null);
   const [exerciseBlocks, setExerciseBlocks] = useState([]);
   const [allExercises, setAllExercises] = useState([]);
-  const [allVariations, setAllVariations] = useState({}); // exerciseId -> variations[]
+  const [allGroups, setAllGroups] = useState([]);
+  const [allVariations, setAllVariations] = useState({});
   const [alert, setAlert] = useState(null);
   const [showAddEx, setShowAddEx] = useState(false);
+  const [addGroupId, setAddGroupId] = useState('');
   const [addExId, setAddExId] = useState('');
   const [addVarId, setAddVarId] = useState('');
   const [expandedEx, setExpandedEx] = useState(null);
+  const [expandedNotes, setExpandedNotes] = useState(new Set());
 
   const load = useCallback(() => {
     const w = workoutsApi.get(id);
@@ -32,7 +36,10 @@ export default function WorkoutPage() {
     setWorkout(w);
     setExerciseBlocks(workoutsApi.getExercisesWithSets(id));
     const meso = mesocyclesApi.get(w.mesocycle_id);
-    setAllExercises(meso ? exercisesApi.list(meso.program_id, null) : []);
+    if (meso) {
+      setAllExercises(exercisesApi.list(meso.program_id, null));
+      setAllGroups(exerciseGroupsApi.list(meso.program_id));
+    }
   }, [id]);
 
   useEffect(() => { load(); }, [load]);
@@ -73,6 +80,7 @@ export default function WorkoutPage() {
     });
     flash('success', `"${ex.name}" added.`);
     setShowAddEx(false);
+    setAddGroupId('');
     setAddExId('');
     setAddVarId('');
     load();
@@ -123,6 +131,33 @@ export default function WorkoutPage() {
     load();
   };
 
+  const handleMoveSet = (setId, direction) => {
+    for (const block of exerciseBlocks) {
+      const idx = block.sets.findIndex((s) => s.id === setId);
+      if (idx === -1) continue;
+      const newIdx = idx + direction;
+      if (newIdx < 0 || newIdx >= block.sets.length) return;
+      const a = block.sets[idx];
+      const b = block.sets[newIdx];
+      workoutSetsApi.update(a.id, { set_number: b.set_number });
+      workoutSetsApi.update(b.id, { set_number: a.set_number });
+      load();
+      return;
+    }
+  };
+
+  const toggleNote = (setId) => {
+    setExpandedNotes((prev) => {
+      const next = new Set(prev);
+      next.has(setId) ? next.delete(setId) : next.add(setId);
+      return next;
+    });
+  };
+
+  const filteredExercises = addGroupId
+    ? allExercises.filter((e) => e.exercise_group_id === Number(addGroupId))
+    : [];
+
   // Derived totals
   const workingSets = exerciseBlocks.reduce((sum, b) => sum + b.sets.filter((s) => s.set_type !== 'warmup').length, 0);
   const totalVolume = exerciseBlocks.reduce((sum, b) =>
@@ -150,12 +185,25 @@ export default function WorkoutPage() {
             <h2>Add Exercise</h2>
             <form onSubmit={(e) => { e.preventDefault(); handleAddExercise(); }}>
               <div className="form-group">
-                <label>Exercise</label>
-                <select value={addExId} onChange={(e) => setAddExId(e.target.value)}>
-                  <option value="">-- Select exercise --</option>
-                  {allExercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                <label>Muscle Group</label>
+                <select value={addGroupId} onChange={(e) => {
+                  setAddGroupId(e.target.value);
+                  setAddExId('');
+                  setAddVarId('');
+                }}>
+                  <option value="">-- Select group --</option>
+                  {allGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               </div>
+              {addGroupId && (
+                <div className="form-group">
+                  <label>Exercise</label>
+                  <select value={addExId} onChange={(e) => setAddExId(e.target.value)}>
+                    <option value="">-- Select exercise --</option>
+                    {filteredExercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+                  </select>
+                </div>
+              )}
               <div className="form-group">
                 <label>Variation (optional)</label>
                 <select value={addVarId} onChange={(e) => setAddVarId(e.target.value)}>
@@ -191,7 +239,8 @@ export default function WorkoutPage() {
               </div>
             </div>
             <div className="exercise-body">
-              <table className="set-table">
+              <div className="table-responsive">
+              <table className="set-table responsive-table">
                 <thead>
                   <tr>
                     <th>#</th>
@@ -204,41 +253,65 @@ export default function WorkoutPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {block.sets.map((s) => (
+                  {block.sets.map((s, i, arr) => (
                     <tr key={s.id}>
-                      <td>{s.set_number}</td>
-                      <td><span className={`badge ${setBadgeClass(s.set_type)}`}>{s.set_type}</span></td>
-                      <td>
+                      <td data-label="Set">{s.set_number}</td>
+                      <td data-label="Type">
+                        <select
+                          value={s.set_type}
+                          onChange={(e) => handleUpdateSet(s.id, 'set_type', e.target.value)}
+                          className="set-type-select"
+                        >
+                          {SET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </td>
+                      <td data-label="Reps">
                         <input type="number" value={s.reps ?? ''} placeholder="—"
                           onChange={(e) => handleUpdateSet(s.id, 'reps', e.target.value)} />
                       </td>
-                      <td>
+                      <td data-label="Weight">
                         <input type="number" value={s.weight ?? ''} placeholder="—" step="any"
                           onChange={(e) => handleUpdateSet(s.id, 'weight', e.target.value)} />
                       </td>
-                      <td>
+                      <td data-label="RIR">
                         <input type="number" value={s.rir ?? ''} placeholder="—"
                           onChange={(e) => handleUpdateSet(s.id, 'rir', e.target.value)} />
                       </td>
-                      <td>
-                        <input className="notes-inp" value={s.notes || ''} placeholder="—"
-                          onChange={(e) => handleUpdateSet(s.id, 'notes', e.target.value)} />
+                      <td data-label="Notes">
+                        {expandedNotes.has(s.id) ? (
+                          <>
+                            <textarea
+                              className="notes-expanded"
+                              value={s.notes || ''}
+                              onChange={(e) => handleUpdateSet(s.id, 'notes', e.target.value)}
+                              placeholder="Notes..."
+                              rows={3}
+                            />
+                            <button className="notes-collapse" onClick={() => toggleNote(s.id)}>Done</button>
+                          </>
+                        ) : (
+                          <button
+                            className={`notes-toggle${s.notes ? ' has-note' : ''}`}
+                            onClick={() => toggleNote(s.id)}
+                          >
+                            {s.notes ? s.notes : '+ note'}
+                          </button>
+                        )}
                       </td>
-                      <td>
+                      <td data-label="Actions">
+                        <span className="set-move-btns">
+                          <button className="btn btn-xs btn-outline" disabled={i === 0} onClick={() => handleMoveSet(s.id, -1)}>▲</button>
+                          <button className="btn btn-xs btn-outline" disabled={i === arr.length - 1} onClick={() => handleMoveSet(s.id, 1)}>▼</button>
+                        </span>
                         <button className="btn btn-danger btn-xs" onClick={() => handleDeleteSet(s.id)}>&times;</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              </div>
               <div style={{ marginTop: 8 }}>
-                <select
-                  onChange={(e) => { if (e.target.value) { handleAddSet(block.blockId, e.target.value); e.target.value = ''; } }}
-                  style={{ background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', padding: '4px 8px', fontSize: 12 }}
-                >
-                  <option value="">+ Add set (type)...</option>
-                  {SET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <button className="btn btn-outline btn-sm" onClick={() => handleAddSet(block.blockId, 'normal')}>+ Add Set</button>
               </div>
             </div>
           </div>

@@ -3,6 +3,7 @@ import { createDatabaseSQL } from './ddl';
 const IDB_NAME = 'workout-programming-v3';
 const IDB_STORE = 'databases';
 const CURRENT_SCHEMA = 2;
+const SQL_WASM_URL = 'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.wasm';
 
 let SQL = null;
 let db = null;
@@ -16,7 +17,7 @@ async function loadSqlJs() {
   if (SQL) return SQL;
   const initSqlJs = (await import('sql.js')).default;
   SQL = await initSqlJs({
-    locateFile: (file) => `/${file}`,
+    locateFile: () => SQL_WASM_URL,
   });
   return SQL;
 }
