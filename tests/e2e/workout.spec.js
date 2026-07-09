@@ -84,8 +84,9 @@ test.describe('Workout Page — Exercises & Sets', () => {
   test('removes an exercise from the workout', async ({ page }) => {
     await addExerciseViaUI(page, 'Barbell Bench Press');
     await expect(page.locator('.exercise-block')).toHaveCount(1);
-    page.once('dialog', (dialog) => dialog.accept());
     await page.locator('.exercise-block').first().locator('button.btn-danger.btn-sm').click();
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content .btn-danger').click();
     await page.waitForTimeout(500);
     await expect(page.locator('.empty-state')).toBeVisible();
   });

@@ -21,11 +21,11 @@ test.describe('Copy Exercises Between Programs', () => {
     await expect(page.locator('.ex-item')).toHaveCount(0);
 
     await page.click('button:has-text("Copy from Program")');
-    await page.waitForSelector('.modal-box');
-    await page.locator('.modal-box select').selectOption('Program A');
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content select').selectOption('Program A');
     await page.waitForTimeout(1000);
 
-    const checkboxes = page.locator('.modal-box input[type="checkbox"]');
+    const checkboxes = page.locator('.modal-content input[type="checkbox"]');
     await expect(checkboxes.first()).toBeVisible();
 
     // Copy just the first exercise
@@ -52,11 +52,11 @@ test.describe('Copy Exercises Between Programs', () => {
     await navigateTo(page, `/programs/${idB}/exercises`);
 
     await page.click('button:has-text("Copy from Program")');
-    await page.waitForSelector('.modal-box');
-    await page.locator('.modal-box button:has-text("Cancel")').click();
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content button:has-text("Cancel")').click();
     await page.waitForTimeout(300);
 
-    await expect(page.locator('.modal-box')).toHaveCount(0);
+    await expect(page.locator('.modal-content')).toHaveCount(0);
     await expect(page.locator('.ex-item')).toHaveCount(0);
   });
 });

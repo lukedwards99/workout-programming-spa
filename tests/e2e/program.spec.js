@@ -48,10 +48,10 @@ test.describe('Program Page — Mesocycles', () => {
   test('edits a mesocycle via modal', async ({ page }) => {
     await addMesocycleViaUI(page, 'Original Name', 4);
     await page.locator('button:has-text("Edit")').click();
-    await page.waitForSelector('.modal-box');
-    await page.locator('.modal-box input[required]').fill('Renamed Block');
-    await page.locator('.modal-box input[type="number"]').fill('10');
-    await page.locator('.modal-box button:has-text("Save")').click();
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content input[required]').fill('Renamed Block');
+    await page.locator('.modal-content input[type="number"]').fill('10');
+    await page.locator('.modal-content button:has-text("Save")').click();
     await page.waitForTimeout(500);
     await expect(page.locator('tbody')).toContainText('Renamed Block');
     await expect(page.locator('tbody')).toContainText('10 days');
@@ -60,8 +60,9 @@ test.describe('Program Page — Mesocycles', () => {
   test('deletes a mesocycle with confirmation', async ({ page }) => {
     await addMesocycleViaUI(page, 'Delete Me');
     await expect(page.locator('tbody tr')).toHaveCount(1);
-    page.once('dialog', (dialog) => dialog.accept());
     await page.locator('button:has-text("Del")').click();
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content .btn-danger').click();
     await page.waitForTimeout(500);
     await expect(page.locator('.empty-state')).toBeVisible();
   });
