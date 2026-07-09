@@ -5,6 +5,7 @@ import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exercisesApi } from '../api/exercisesApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
 import { copyApi } from '../api/copyApi';
+import { FormModal, ConfirmModal } from '../components';
 
 export default function ProgramExercisesPage() {
   const { programId } = useParams();
@@ -33,6 +34,10 @@ export default function ProgramExercisesPage() {
   const [copySourceProgramId, setCopySourceProgramId] = useState('');
   const [copySourceData, setCopySourceData] = useState([]);
   const [selectedExIds, setSelectedExIds] = useState(new Set());
+
+  // Delete confirmations
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const load = useCallback(() => {
     const p = programsApi.get(pid);
@@ -79,11 +84,8 @@ export default function ProgramExercisesPage() {
 
   const deleteGroup = (id) => {
     const g = groups.find((x) => x.id === id);
-    if (!window.confirm(`Delete "${g.name}"? All exercises in this group will also be deleted.`)) return;
-    exerciseGroupsApi.delete(id);
-    if (selectedGroup === id) setSelectedGroup(null);
-    flash('success', `"${g.name}" deleted.`);
-    load();
+    setDeleteTarget({ type: 'group', id, name: g.name });
+    setShowDeleteConfirm(true);
   };
 
   // ── Exercises ──
@@ -114,10 +116,8 @@ export default function ProgramExercisesPage() {
 
   const deleteEx = (id) => {
     const ex = exercises.find((x) => x.id === id);
-    if (!window.confirm(`Delete "${ex.name}"?`)) return;
-    exercisesApi.delete(id);
-    flash('success', `"${ex.name}" deleted.`);
-    load();
+    setDeleteTarget({ type: 'exercise', id, name: ex.name });
+    setShowDeleteConfirm(true);
   };
 
   // ── Variations ──
@@ -133,10 +133,35 @@ export default function ProgramExercisesPage() {
 
   const deleteVariation = (id) => {
     const v = exerciseVariationsApi.get(id);
-    if (!window.confirm(`Delete variation "${v.name}"?`)) return;
-    exerciseVariationsApi.delete(id);
-    flash('success', `Variation "${v.name}" deleted.`);
+    setDeleteTarget({ type: 'variation', id, name: v.name });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    switch (deleteTarget.type) {
+      case 'group':
+        exerciseGroupsApi.delete(deleteTarget.id);
+        if (selectedGroup === deleteTarget.id) setSelectedGroup(null);
+        break;
+      case 'exercise':
+        exercisesApi.delete(deleteTarget.id);
+        break;
+      case 'variation':
+        exerciseVariationsApi.delete(deleteTarget.id);
+        break;
+    }
+    flash('success', `"${deleteTarget.name}" deleted.`);
     load();
+  };
+
+  const getDeleteMessage = () => {
+    if (!deleteTarget) return '';
+    switch (deleteTarget.type) {
+      case 'group': return `Delete "${deleteTarget.name}"? All exercises in this group will also be deleted.`;
+      case 'exercise': return `Delete "${deleteTarget.name}"?`;
+      case 'variation': return `Delete variation "${deleteTarget.name}"?`;
+      default: return '';
+    }
   };
 
   // ── Copy ──
@@ -153,7 +178,8 @@ export default function ProgramExercisesPage() {
     setSelectedExIds(next);
   };
 
-  const handleCopy = () => {
+  const handleCopy = (e) => {
+    e.preventDefault();
     if (selectedExIds.size === 0) return;
     copyApi.copyExercises(Number(copySourceProgramId), pid, [...selectedExIds]);
     flash('success', `Copied ${selectedExIds.size} exercise(s).`);
@@ -161,10 +187,8 @@ export default function ProgramExercisesPage() {
     load();
   };
 
-  // All other programs for the copy picker
   const allPrograms = programsApi.list().filter((p) => p.id !== pid);
 
-  // Filter
   let filtered = exercises;
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
@@ -273,115 +297,89 @@ export default function ProgramExercisesPage() {
       </div>
 
       {/* Group Modal */}
-      {showGroupModal && (
-        <div className="modal-overlay" onClick={() => setShowGroupModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingGroupId ? 'Edit Group' : 'Add Group'}</h2>
-            <form onSubmit={handleGroupSubmit}>
-              <div className="form-group">
-                <label>Name</label>
-                <input value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} placeholder="e.g. Chest" required autoFocus />
-              </div>
-              <div className="form-group">
-                <label>Notes</label>
-                <textarea value={groupForm.notes} onChange={(e) => setGroupForm({ ...groupForm, notes: e.target.value })} />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowGroupModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </div>
-            </form>
-          </div>
+      <FormModal show={showGroupModal} onHide={() => setShowGroupModal(false)} title={editingGroupId ? 'Edit Group' : 'Add Group'} onSubmit={handleGroupSubmit}>
+        <div className="form-group">
+          <label>Name</label>
+          <input value={groupForm.name} onChange={(e) => setGroupForm({ ...groupForm, name: e.target.value })} placeholder="e.g. Chest" required autoFocus />
         </div>
-      )}
+        <div className="form-group">
+          <label>Notes</label>
+          <textarea value={groupForm.notes} onChange={(e) => setGroupForm({ ...groupForm, notes: e.target.value })} />
+        </div>
+      </FormModal>
 
       {/* Exercise Modal */}
-      {showExModal && (
-        <div className="modal-overlay" onClick={() => setShowExModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingExId ? 'Edit Exercise' : 'Add Exercise'}</h2>
-            <form onSubmit={handleExSubmit}>
-              <div className="form-group">
-                <label>Muscle Group</label>
-                <select value={exForm.groupId} onChange={(e) => setExForm({ ...exForm, groupId: Number(e.target.value) })} required>
-                  <option value="">-- Select --</option>
-                  {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label>Exercise Name</label>
-                <input value={exForm.name} onChange={(e) => setExForm({ ...exForm, name: e.target.value })} placeholder="e.g. Barbell Bench Press" required autoFocus />
-              </div>
-              <div className="form-group">
-                <label>Tutorial URL (optional)</label>
-                <input value={exForm.tutorialUrl} onChange={(e) => setExForm({ ...exForm, tutorialUrl: e.target.value })} placeholder="https://..." />
-              </div>
-              <div className="form-group">
-                <label>Notes</label>
-                <textarea value={exForm.notes} onChange={(e) => setExForm({ ...exForm, notes: e.target.value })} placeholder="Form cues, tips..." />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowExModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </div>
-            </form>
-          </div>
+      <FormModal show={showExModal} onHide={() => setShowExModal(false)} title={editingExId ? 'Edit Exercise' : 'Add Exercise'} onSubmit={handleExSubmit}>
+        <div className="form-group">
+          <label>Muscle Group</label>
+          <select value={exForm.groupId} onChange={(e) => setExForm({ ...exForm, groupId: Number(e.target.value) })} required>
+            <option value="">-- Select --</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
         </div>
-      )}
+        <div className="form-group">
+          <label>Exercise Name</label>
+          <input value={exForm.name} onChange={(e) => setExForm({ ...exForm, name: e.target.value })} placeholder="e.g. Barbell Bench Press" required autoFocus />
+        </div>
+        <div className="form-group">
+          <label>Tutorial URL (optional)</label>
+          <input value={exForm.tutorialUrl} onChange={(e) => setExForm({ ...exForm, tutorialUrl: e.target.value })} placeholder="https://..." />
+        </div>
+        <div className="form-group">
+          <label>Notes</label>
+          <textarea value={exForm.notes} onChange={(e) => setExForm({ ...exForm, notes: e.target.value })} placeholder="Form cues, tips..." />
+        </div>
+      </FormModal>
 
       {/* Copy Modal */}
-      {showCopyModal && (
-        <div className="modal-overlay" onClick={() => setShowCopyModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2>Copy Exercises from Another Program</h2>
-            <div className="form-group">
-              <label>Source Program</label>
-              <select value={copySourceProgramId} onChange={(e) => {
-                const val = e.target.value;
-                setCopySourceProgramId(val);
-                if (val) {
-                  setCopySourceData(copyApi.getSourceExercises(Number(val)));
-                  setSelectedExIds(new Set());
-                } else {
-                  setCopySourceData([]);
-                  setSelectedExIds(new Set());
-                }
-              }}>
-                <option value="">-- Select program --</option>
-                {allPrograms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
-            </div>
+      <FormModal show={showCopyModal} onHide={() => setShowCopyModal(false)} title="Copy Exercises from Another Program" onSubmit={handleCopy} submitLabel={`Copy Selected (${selectedExIds.size})`}>
+        <div className="form-group">
+          <label>Source Program</label>
+          <select value={copySourceProgramId} onChange={(e) => {
+            const val = e.target.value;
+            setCopySourceProgramId(val);
+            if (val) {
+              setCopySourceData(copyApi.getSourceExercises(Number(val)));
+              setSelectedExIds(new Set());
+            } else {
+              setCopySourceData([]);
+              setSelectedExIds(new Set());
+            }
+          }}>
+            <option value="">-- Select program --</option>
+            {allPrograms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
 
-            {copySourceData.length > 0 && (
-              <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
-                {copySourceData.map(({ group, exercises }) => (
-                  <div key={group.id} style={{ marginBottom: 12 }}>
-                    <strong style={{ fontSize: 13, color: 'var(--text-muted)' }}>{group.name}</strong>
-                    {exercises.map((ex) => (
-                      <label key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 14, cursor: 'pointer' }}>
-                        <input
-                          type="checkbox"
-                          checked={selectedExIds.has(ex.id)}
-                          onChange={() => toggleExSelect(ex.id)}
-                        />
-                        {ex.name}
-                        {ex.notes && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({ex.notes})</span>}
-                      </label>
-                    ))}
-                  </div>
+        {copySourceData.length > 0 && (
+          <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
+            {copySourceData.map(({ group, exercises }) => (
+              <div key={group.id} style={{ marginBottom: 12 }}>
+                <strong style={{ fontSize: 13, color: 'var(--text-muted)' }}>{group.name}</strong>
+                {exercises.map((ex) => (
+                  <label key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 14, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedExIds.has(ex.id)}
+                      onChange={() => toggleExSelect(ex.id)}
+                    />
+                    {ex.name}
+                    {ex.notes && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({ex.notes})</span>}
+                  </label>
                 ))}
               </div>
-            )}
-
-            <div className="modal-actions">
-              <button type="button" className="btn btn-outline" onClick={() => setShowCopyModal(false)}>Cancel</button>
-              <button type="button" className="btn btn-primary" onClick={handleCopy} disabled={selectedExIds.size === 0}>
-                Copy Selected ({selectedExIds.size})
-              </button>
-            </div>
+            ))}
           </div>
-        </div>
-      )}
+        )}
+      </FormModal>
+
+      <ConfirmModal
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title={`Delete ${deleteTarget?.type === 'variation' ? 'Variation' : deleteTarget?.type === 'exercise' ? 'Exercise' : 'Group'}`}
+        message={getDeleteMessage()}
+      />
     </>
   );
 }

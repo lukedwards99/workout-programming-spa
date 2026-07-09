@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { programsApi } from '../api/programsApi';
+import { FormModal, ConfirmModal } from '../components';
 
 export default function HomePage() {
   const [programs, setPrograms] = useState([]);
@@ -8,6 +9,8 @@ export default function HomePage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ name: '', notes: '' });
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const load = useCallback(() => {
     setPrograms(programsApi.list());
@@ -47,9 +50,13 @@ export default function HomePage() {
 
   const handleDelete = (id) => {
     const p = programs.find((x) => x.id === id);
-    if (!window.confirm(`Delete "${p.name}"? All mesocycles and workout data inside will also be deleted.`)) return;
-    programsApi.delete(id);
-    flash('success', `"${p.name}" deleted.`);
+    setPendingDelete({ id, name: p.name });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    programsApi.delete(pendingDelete.id);
+    flash('success', `"${pendingDelete.name}" deleted.`);
     load();
   };
 
@@ -91,35 +98,32 @@ export default function HomePage() {
         </div>
       )}
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2>{editingId ? 'Edit Program' : 'New Program'}</h2>
-            <form onSubmit={handleSave}>
-              <div className="form-group">
-                <label>Name</label>
-                <input
-                  type="text" value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  placeholder="e.g. Push/Pull/Legs 2025" required autoFocus
-                />
-              </div>
-              <div className="form-group">
-                <label>Notes (optional)</label>
-                <textarea
-                  value={form.notes}
-                  onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                  placeholder="Any notes about this program..."
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </div>
-            </form>
-          </div>
+      <FormModal show={showModal} onHide={() => setShowModal(false)} title={editingId ? 'Edit Program' : 'New Program'} onSubmit={handleSave}>
+        <div className="form-group">
+          <label>Name</label>
+          <input
+            type="text" value={form.name}
+            onChange={(e) => setForm({ ...form, name: e.target.value })}
+            placeholder="e.g. Push/Pull/Legs 2025" required autoFocus
+          />
         </div>
-      )}
+        <div className="form-group">
+          <label>Notes (optional)</label>
+          <textarea
+            value={form.notes}
+            onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            placeholder="Any notes about this program..."
+          />
+        </div>
+      </FormModal>
+
+      <ConfirmModal
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Delete Program"
+        message={`Delete "${pendingDelete?.name}"? All mesocycles and workout data inside will also be deleted.`}
+      />
     </>
   );
 }
