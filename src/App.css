@@ -199,7 +199,36 @@ tr:hover { background: rgba(255,255,255,.02); }
   max-width: 100%;
 }
 .set-table select { width: auto; }
+.set-type-select {
+  padding: 2px 4px; font-size: 12px; font-weight: 500;
+  text-transform: capitalize; width: auto;
+}
+.set-move-btns { display: inline-flex; flex-direction: column; gap: 1px; margin-right: 6px; vertical-align: middle; }
+.set-move-btns .btn { padding: 1px 5px; font-size: 9px; line-height: 1.2; border-radius: 3px; }
+.set-move-btns .btn:disabled { opacity: 0.3; cursor: default; }
 .set-table .notes-inp { width: 90px; text-align: left; }
+.notes-toggle {
+  background: none; border: 1px dashed var(--border); border-radius: 4px;
+  color: var(--text-muted); cursor: pointer; font-size: 12px; padding: 3px 8px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 120px;
+}
+.notes-toggle.has-note {
+  border-style: solid; border-color: var(--border);
+  color: var(--text); background: rgba(255,255,255,.04);
+}
+.notes-toggle:hover { border-color: var(--accent); color: var(--text); }
+.notes-expanded {
+  width: 100%; padding: 5px 8px; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 4px;
+  color: var(--text); font-size: 13px; font-family: inherit;
+  resize: vertical;
+}
+.notes-expanded:focus { outline: none; border-color: var(--accent); }
+.notes-collapse {
+  display: block; margin-top: 4px; background: none; border: none;
+  color: var(--accent); cursor: pointer; font-size: 12px; padding: 2px 0;
+}
+.notes-collapse:hover { text-decoration: underline; }
 
 .totals-bar {
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
@@ -290,7 +319,6 @@ tr:hover { background: rgba(255,255,255,.02); }
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    cursor: pointer;
   }
   .responsive-table tbody tr:hover { border-color: var(--accent); }
   .responsive-table tbody td {
@@ -313,5 +341,5 @@ tr:hover { background: rgba(255,255,255,.02); }
   .responsive-table tbody td:last-child { padding-bottom: 12px; padding-top: 8px; border-top: 1px solid var(--border); margin-top: 4px; }
   .responsive-table tbody td:last-child:before { display: none; }
   .responsive-table .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-  .responsive-table .hoverable-row:hover { background: rgba(255,255,255,.02); }
+  .responsive-table .hoverable-row:hover { background: rgba(255,255,255,.02); cursor: pointer; }
 }
