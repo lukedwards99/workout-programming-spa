@@ -13,7 +13,8 @@ export default defineConfig(({ mode }) => ({
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
-    }))
+    })),
+    __APP_VERSION__: JSON.stringify('alpha-1.0.0'),
   },
   server: {
     headers: {}

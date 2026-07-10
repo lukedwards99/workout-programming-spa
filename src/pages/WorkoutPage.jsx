@@ -6,6 +6,7 @@ import { exercisesApi } from '../api/exercisesApi';
 import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
 import { workoutSetsApi } from '../api/workoutSetsApi';
+import { FormModal, ConfirmModal } from '../components';
 
 const SET_TYPES = ['warmup', 'normal', 'dropset', 'failure'];
 
@@ -29,6 +30,8 @@ export default function WorkoutPage() {
   const [addVarId, setAddVarId] = useState('');
   const [expandedEx, setExpandedEx] = useState(null);
   const [expandedNotes, setExpandedNotes] = useState(new Set());
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+  const [pendingRemove, setPendingRemove] = useState(null);
 
   const load = useCallback(() => {
     const w = workoutsApi.get(id);
@@ -125,9 +128,14 @@ export default function WorkoutPage() {
 
   const handleRemoveExercise = (blockId) => {
     const block = exerciseBlocks.find((b) => b.blockId === blockId);
-    if (!block || !window.confirm(`Remove "${block.exercise_name}" from this workout?`)) return;
-    workoutSetsApi.deleteByExercise(id, block.exercise_id, block.variation_id || null);
-    flash('success', `"${block.exercise_name}" removed.`);
+    if (!block) return;
+    setPendingRemove({ blockId, name: block.exercise_name, exerciseId: block.exercise_id, variationId: block.variation_id || null });
+    setShowRemoveConfirm(true);
+  };
+
+  const confirmRemove = () => {
+    workoutSetsApi.deleteByExercise(id, pendingRemove.exerciseId, pendingRemove.variationId);
+    flash('success', `"${pendingRemove.name}" removed.`);
     load();
   };
 
@@ -158,7 +166,6 @@ export default function WorkoutPage() {
     ? allExercises.filter((e) => e.exercise_group_id === Number(addGroupId))
     : [];
 
-  // Derived totals
   const workingSets = exerciseBlocks.reduce((sum, b) => sum + b.sets.filter((s) => s.set_type !== 'warmup').length, 0);
   const totalVolume = exerciseBlocks.reduce((sum, b) =>
     sum + b.sets.filter((s) => s.set_type !== 'warmup').reduce((s2, s) => s2 + ((s.reps || 0) * (s.weight || 0)), 0), 0
@@ -179,46 +186,35 @@ export default function WorkoutPage() {
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
-      {showAddEx && (
-        <div className="modal-overlay" onClick={() => setShowAddEx(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2>Add Exercise</h2>
-            <form onSubmit={(e) => { e.preventDefault(); handleAddExercise(); }}>
-              <div className="form-group">
-                <label>Muscle Group</label>
-                <select value={addGroupId} onChange={(e) => {
-                  setAddGroupId(e.target.value);
-                  setAddExId('');
-                  setAddVarId('');
-                }}>
-                  <option value="">-- Select group --</option>
-                  {allGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-                </select>
-              </div>
-              {addGroupId && (
-                <div className="form-group">
-                  <label>Exercise</label>
-                  <select value={addExId} onChange={(e) => setAddExId(e.target.value)}>
-                    <option value="">-- Select exercise --</option>
-                    {filteredExercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
-                  </select>
-                </div>
-              )}
-              <div className="form-group">
-                <label>Variation (optional)</label>
-                <select value={addVarId} onChange={(e) => setAddVarId(e.target.value)}>
-                  <option value="">-- None --</option>
-                  {(allVariations[addExId] || []).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                </select>
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowAddEx(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Add</button>
-              </div>
-            </form>
-          </div>
+      <FormModal show={showAddEx} onHide={() => setShowAddEx(false)} title="Add Exercise" onSubmit={(e) => { e.preventDefault(); handleAddExercise(); }} submitLabel="Add">
+        <div className="form-group">
+          <label>Muscle Group</label>
+          <select value={addGroupId} onChange={(e) => {
+            setAddGroupId(e.target.value);
+            setAddExId('');
+            setAddVarId('');
+          }}>
+            <option value="">-- Select group --</option>
+            {allGroups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
         </div>
-      )}
+        {addGroupId && (
+          <div className="form-group">
+            <label>Exercise</label>
+            <select value={addExId} onChange={(e) => setAddExId(e.target.value)}>
+              <option value="">-- Select exercise --</option>
+              {filteredExercises.map((ex) => <option key={ex.id} value={ex.id}>{ex.name}</option>)}
+            </select>
+          </div>
+        )}
+        <div className="form-group">
+          <label>Variation (optional)</label>
+          <select value={addVarId} onChange={(e) => setAddVarId(e.target.value)}>
+            <option value="">-- None --</option>
+            {(allVariations[addExId] || []).map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+          </select>
+        </div>
+      </FormModal>
 
       {exerciseBlocks.length === 0 ? (
         <div className="empty-state"><p>No exercises yet. Click "+ Add Exercise" to get started.</p></div>
@@ -325,6 +321,15 @@ export default function WorkoutPage() {
           <div className="total-item"><div className="val">{totalVolume.toLocaleString()}</div><div className="lbl">Total Volume</div></div>
         </div>
       )}
+
+      <ConfirmModal
+        show={showRemoveConfirm}
+        onHide={() => setShowRemoveConfirm(false)}
+        onConfirm={confirmRemove}
+        title="Remove Exercise"
+        message={`Remove "${pendingRemove?.name}" from this workout?`}
+        confirmLabel="Remove"
+      />
     </>
   );
 }

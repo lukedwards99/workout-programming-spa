@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
+import { FormModal, ConfirmModal } from '../components';
 
 export default function ProgramMesocyclesTab() {
   const { programId } = useParams();
@@ -13,6 +14,8 @@ export default function ProgramMesocyclesTab() {
   const [editId, setEditId] = useState(null);
   const [editForm, setEditForm] = useState({ name: '', microcycleLength: 7, startDate: '', notes: '' });
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   function today() { return new Date().toISOString().split('T')[0]; }
 
@@ -69,9 +72,13 @@ export default function ProgramMesocyclesTab() {
 
   const handleDelete = (id) => {
     const m = mesocycles.find((x) => x.id === id);
-    if (!window.confirm(`Delete "${m.name}"? All workouts inside will also be deleted.`)) return;
-    mesocyclesApi.delete(id);
-    flash('success', `"${m.name}" deleted.`);
+    setPendingDelete({ id, name: m.name });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    mesocyclesApi.delete(pendingDelete.id);
+    flash('success', `"${pendingDelete.name}" deleted.`);
     load();
   };
 
@@ -127,35 +134,32 @@ export default function ProgramMesocyclesTab() {
         </div>
       )}
 
-      {showEditModal && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2>Edit Mesocycle</h2>
-            <form onSubmit={handleEdit}>
-              <div className="form-group">
-                <label>Name</label>
-                <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required autoFocus />
-              </div>
-              <div className="form-group">
-                <label>Microcycle Length</label>
-                <input type="number" value={editForm.microcycleLength} onChange={(e) => setEditForm({ ...editForm, microcycleLength: Number(e.target.value) })} min={1} max={120} />
-              </div>
-              <div className="form-group">
-                <label>Start Date</label>
-                <input type="date" value={editForm.startDate} onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })} />
-              </div>
-              <div className="form-group">
-                <label>Notes</label>
-                <textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowEditModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </div>
-            </form>
-          </div>
+      <FormModal show={showEditModal} onHide={() => setShowEditModal(false)} title="Edit Mesocycle" onSubmit={handleEdit}>
+        <div className="form-group">
+          <label>Name</label>
+          <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required autoFocus />
         </div>
-      )}
+        <div className="form-group">
+          <label>Microcycle Length</label>
+          <input type="number" value={editForm.microcycleLength} onChange={(e) => setEditForm({ ...editForm, microcycleLength: Number(e.target.value) })} min={1} max={120} />
+        </div>
+        <div className="form-group">
+          <label>Start Date</label>
+          <input type="date" value={editForm.startDate} onChange={(e) => setEditForm({ ...editForm, startDate: e.target.value })} />
+        </div>
+        <div className="form-group">
+          <label>Notes</label>
+          <textarea value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+        </div>
+      </FormModal>
+
+      <ConfirmModal
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Delete Mesocycle"
+        message={`Delete "${pendingDelete?.name}"? All workouts inside will also be deleted.`}
+      />
     </>
   );
 }

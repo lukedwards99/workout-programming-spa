@@ -53,8 +53,9 @@ test.describe('Regression Tests', () => {
       await page.waitForTimeout(300);
 
       // Delete program
-      page.once('dialog', (dialog) => dialog.accept());
       await page.locator('button:has-text("Delete")').click();
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content .btn-danger').click();
       await page.waitForTimeout(500);
 
       // Create a new program and check that Child Block is gone
@@ -122,17 +123,17 @@ test.describe('Regression Tests', () => {
 
       // Add Bench Press with Close Grip variation
       await page.click('button:has-text("+ Add Exercise")');
-      await page.waitForSelector('.modal-box');
-      await page.locator('.modal-box select').first().selectOption({ label: 'Bench Press' });
-      await page.locator('.modal-box select').last().selectOption({ label: 'Close Grip' });
-      await page.locator('.modal-box button:has-text("Add")').click();
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content select').last().selectOption({ label: 'Close Grip' });
+      await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
 
       // Add Bench Press without variation also
       await page.click('button:has-text("+ Add Exercise")');
-      await page.waitForSelector('.modal-box');
-      await page.locator('.modal-box select').first().selectOption({ label: 'Bench Press' });
-      await page.locator('.modal-box button:has-text("Add")').click();
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
 
       // Should show 2 blocks (one with variation, one without)
@@ -242,17 +243,17 @@ test.describe('Regression Tests', () => {
 
       // Add Bench Press with Close Grip
       await page.click('button:has-text("+ Add Exercise")');
-      await page.waitForSelector('.modal-box');
-      await page.locator('.modal-box select').first().selectOption({ label: 'Bench Press' });
-      await page.locator('.modal-box select').last().selectOption({ label: 'Close Grip' });
-      await page.locator('.modal-box button:has-text("Add")').click();
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content select').last().selectOption({ label: 'Close Grip' });
+      await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
 
       // Add Bench Press without variation
       await page.click('button:has-text("+ Add Exercise")');
-      await page.waitForSelector('.modal-box');
-      await page.locator('.modal-box select').first().selectOption({ label: 'Bench Press' });
-      await page.locator('.modal-box button:has-text("Add")').click();
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
 
       // Add sets to both blocks
@@ -345,9 +346,9 @@ test.describe('Regression Tests', () => {
 
       // Try adding same exercise again
       await page.click('button:has-text("+ Add Exercise")');
-      await page.waitForSelector('.modal-box');
-      await page.locator('.modal-box select').first().selectOption({ label: 'Bench Press' });
-      await page.locator('.modal-box button:has-text("Add")').click();
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
 
       // Should show warning and still have only 1 block
@@ -376,8 +377,9 @@ test.describe('Regression Tests', () => {
       const buffer = fs.readFileSync(tempPath);
 
       // Delete all data
-      page.once('dialog', (dialog) => dialog.accept());
       await page.click('button:has-text("Delete All Data")');
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content .btn-danger').click();
       await page.waitForTimeout(500);
 
       // Verify data is gone
@@ -412,9 +414,10 @@ test.describe('Regression Tests', () => {
 
       await navigateTo(page, `/programs/${programId}/data`);
 
-      // Confirm dialog and click seed
-      page.once('dialog', (dialog) => dialog.accept());
+      // Confirm and click seed
       await page.click('button:has-text("Seed Default Exercises")');
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content .btn-primary').click();
       await page.waitForTimeout(1000);
 
       // Navigate to exercises tab and verify groups were created
@@ -426,8 +429,9 @@ test.describe('Regression Tests', () => {
 
       // Seed again — should not duplicate
       await navigateTo(page, `/programs/${programId}/data`);
-      page.once('dialog', (dialog) => dialog.accept());
       await page.click('button:has-text("Seed Default Exercises")');
+      await page.waitForSelector('.modal-content');
+      await page.locator('.modal-content .btn-primary').click();
       await page.waitForTimeout(1000);
 
       await navigateTo(page, `/programs/${programId}/exercises`);

@@ -9,6 +9,7 @@ import { exercisesApi } from '../api/exercisesApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
 import { workoutSetsApi } from '../api/workoutSetsApi';
 import { summaryApi } from '../api/summaryApi';
+import { ConfirmModal } from '../components';
 
 export default function ProgramDataPage() {
   const { programId } = useParams();
@@ -20,6 +21,9 @@ export default function ProgramDataPage() {
   const [pendingFile, setPendingFile] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const fileRef = useRef(null);
+
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [showSeedConfirm, setShowSeedConfirm] = useState(false);
 
   const load = useCallback(() => {
     const p = programsApi.get(pid);
@@ -37,7 +41,6 @@ export default function ProgramDataPage() {
     setTimeout(() => setAlert(null), 5000);
   };
 
-  // ── Program-level JSON Export/Import ──
   const handleExportProgram = () => {
     const groups = exerciseGroupsApi.list(pid);
     const exs = exercisesApi.list(pid, null).map((e) => {
@@ -99,17 +102,14 @@ export default function ProgramDataPage() {
         return;
       }
 
-      // Import exercise groups and exercises
       for (const grp of data.exerciseGroups) {
         exerciseGroupsApi.findOrCreate(pid, grp.name);
       }
 
       for (const ex of data.exercises) {
         const group = exerciseGroupsApi.findOrCreate(pid, ex.groupName);
-        // Skip if exercise with same name already exists in this group
         const existing = exercisesApi.list(pid, group.id).find((e) => e.name === ex.name);
         if (existing) {
-          // Add variations if new
           for (const v of (ex.variations || [])) {
             const existingVars = exerciseVariationsApi.list(existing.id);
             if (!existingVars.find((ev) => ev.name === v.name)) {
@@ -157,7 +157,6 @@ export default function ProgramDataPage() {
     if (fileRef.current) fileRef.current.value = '';
   };
 
-  // ── Full Database Backup ──
   const handleFullExport = () => {
     const data = exportDatabase();
     const blob = new Blob([data], { type: 'application/octet-stream' });
@@ -171,7 +170,6 @@ export default function ProgramDataPage() {
   };
 
   const handleFullImport = async () => {
-    // Trigger file picker for .sqlite
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.sqlite';
@@ -189,8 +187,7 @@ export default function ProgramDataPage() {
     input.click();
   };
 
-  const handleDeleteAll = () => {
-    if (!window.confirm('Delete ALL data across all programs? This cannot be undone.')) return;
+  const confirmDeleteAll = () => {
     deleteAllData();
     flash('success', 'All data deleted.');
     load();
@@ -205,8 +202,7 @@ export default function ProgramDataPage() {
     { group: 'Core', exercises: ['Plank', 'Hanging Leg Raise', 'Cable Crunch', 'Ab Wheel Rollout'] },
   ];
 
-  const handleSeedDefaults = () => {
-    if (!window.confirm(`Seed default exercise library into "${program.name}"? Existing exercises will not be duplicated.`)) return;
+  const confirmSeed = () => {
     let addedCount = 0;
     for (const { group, exercises } of DEFAULT_EXERCISES) {
       const grp = exerciseGroupsApi.findOrCreate(pid, group);
@@ -229,7 +225,6 @@ export default function ProgramDataPage() {
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
-      {/* Program Stats */}
       <div className="data-card">
         <h2>Program Summary</h2>
         <div className="stats-grid">
@@ -243,14 +238,12 @@ export default function ProgramDataPage() {
         </div>
       </div>
 
-      {/* Program Export */}
       <div className="data-card">
         <h2>Export Program Exercises</h2>
         <p>Download this program's exercise library as a <code>.json</code> file. You can import it into another program. <strong>Note: this only exports exercises, not workout data.</strong></p>
         <button className="btn btn-primary" onClick={handleExportProgram}>&#x2193; Export Exercises</button>
       </div>
 
-      {/* Program Import */}
       <div className="data-card">
         <h2>Import Exercises into Program</h2>
         <p>Upload a previously exported program <code>.json</code> file. Exercises will be merged into this program (same-named groups will be reused).</p>
@@ -274,17 +267,34 @@ export default function ProgramDataPage() {
 
       <hr className="divider" />
 
-      {/* Full Database Backup */}
       <div className="data-card">
         <h2>Full Database Backup</h2>
         <p>Backup or restore your entire database including all programs and workout data. This exports as a <code>.sqlite</code> binary file.</p>
-          <div className="d-flex gap-2 flex-wrap">
+        <div className="d-flex gap-2 flex-wrap">
           <button className="btn btn-outline" onClick={handleFullExport}>&#x2193; Download Full Backup</button>
           <button className="btn btn-outline" onClick={handleFullImport}>&#x2191; Restore Full Backup</button>
-          <button className="btn btn-outline" onClick={handleSeedDefaults}>Seed Default Exercises</button>
-          <button className="btn btn-danger btn-sm" onClick={handleDeleteAll}>Delete All Data</button>
+          <button className="btn btn-outline" onClick={() => setShowSeedConfirm(true)}>Seed Default Exercises</button>
+          <button className="btn btn-danger btn-sm" onClick={() => setShowDeleteAllConfirm(true)}>Delete All Data</button>
         </div>
       </div>
+
+      <ConfirmModal
+        show={showDeleteAllConfirm}
+        onHide={() => setShowDeleteAllConfirm(false)}
+        onConfirm={confirmDeleteAll}
+        title="Delete All Data"
+        message="Delete ALL data across all programs? This cannot be undone."
+      />
+
+      <ConfirmModal
+        show={showSeedConfirm}
+        onHide={() => setShowSeedConfirm(false)}
+        onConfirm={confirmSeed}
+        title="Seed Default Exercises"
+        message={`Seed default exercise library into "${program.name}"? Existing exercises will not be duplicated.`}
+        confirmLabel="Seed"
+        variant="primary"
+      />
     </>
   );
 }

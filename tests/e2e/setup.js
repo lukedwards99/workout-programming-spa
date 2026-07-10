@@ -17,9 +17,9 @@ export async function clearDatabase(page) {
   } else {
     // Create a temp program
     await page.click('button:has-text("+ New Program")');
-    await page.waitForSelector('.modal-box');
-    await page.locator('.modal-box input[required]').fill('__temp__');
-    await page.locator('.modal-box button:has-text("Save")').click();
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content input[required]').fill('__temp__');
+    await page.locator('.modal-content button:has-text("Save")').click();
     await page.waitForTimeout(500);
     const card = page.locator('.card').first();
     await card.locator('a:has-text("View")').click();
@@ -32,8 +32,9 @@ export async function clearDatabase(page) {
   await page.waitForTimeout(300);
 
   // Click Delete All Data
-  page.once('dialog', (dialog) => dialog.accept());
   await page.click('button:has-text("Delete All Data")');
+  await page.waitForSelector('.modal-content');
+  await page.locator('.modal-content .btn-danger').click();
   await page.waitForTimeout(800);
 
   // Go home
@@ -56,12 +57,12 @@ export async function navigateTo(page, path) {
 
 export async function createProgramViaUI(page, name, notes = '') {
   await page.click('button:has-text("+ New Program")');
-  await page.waitForSelector('.modal-box');
-  await page.locator('.modal-box input[required]').fill(name);
+  await page.waitForSelector('.modal-content');
+  await page.locator('.modal-content input[required]').fill(name);
   if (notes) {
-    await page.locator('.modal-box textarea').fill(notes);
+    await page.locator('.modal-content textarea').fill(notes);
   }
-  await page.locator('.modal-box button:has-text("Save")').click();
+  await page.locator('.modal-content button:has-text("Save")').click();
   await page.waitForTimeout(500);
 }
 
@@ -101,9 +102,9 @@ export async function viewMesocycle(page, name) {
 export async function addWorkoutViaUI(page, dayIndex, name) {
   const cells = page.locator('.day-cell');
   await cells.nth(dayIndex).locator('button:has-text("+ Add workout")').click();
-  await page.waitForSelector('.modal-box');
-  await page.locator('.modal-box input').fill(name);
-  await page.locator('.modal-box button:has-text("Save")').click();
+  await page.waitForSelector('.modal-content');
+  await page.locator('.modal-content input').fill(name);
+  await page.locator('.modal-content button:has-text("Save")').click();
   await page.waitForTimeout(500);
 }
 
@@ -114,12 +115,12 @@ export async function openWorkout(page, name) {
 
 export async function addExerciseViaUI(page, exerciseName, variationName = null) {
   await page.click('button:has-text("+ Add Exercise")');
-  await page.waitForSelector('.modal-box');
-  await page.locator('.modal-box select').first().selectOption({ label: exerciseName });
+  await page.waitForSelector('.modal-content');
+  await page.locator('.modal-content select').first().selectOption({ label: exerciseName });
   if (variationName) {
-    await page.locator('.modal-box select').last().selectOption({ label: variationName });
+    await page.locator('.modal-content select').last().selectOption({ label: variationName });
   }
-  await page.locator('.modal-box button:has-text("Add")').click();
+  await page.locator('.modal-content button:has-text("Add")').click();
   await page.waitForTimeout(500);
 }
 
@@ -140,19 +141,19 @@ export async function fillSetRow(page, exerciseIndex, setIndex, { reps, weight, 
 
 export async function addExerciseGroupViaUI(page, name, notes = '') {
   await page.locator('.lib-sidebar button:has-text("+ New Group")').click();
-  await page.waitForSelector('.modal-box');
-  await page.locator('.modal-box input[required]').fill(name);
-  if (notes) await page.locator('.modal-box textarea').fill(notes);
-  await page.locator('.modal-box button:has-text("Save")').click();
+  await page.waitForSelector('.modal-content');
+  await page.locator('.modal-content input[required]').fill(name);
+  if (notes) await page.locator('.modal-content textarea').fill(notes);
+  await page.locator('.modal-content button:has-text("Save")').click();
   await page.waitForTimeout(400);
 }
 
 export async function addExerciseToLibraryViaUI(page, groupName, exerciseName, notes = '', tutorialUrl = '') {
   await page.click('button:has-text("+ Add Exercise")');
-  await page.waitForSelector('.modal-box');
-  await page.locator('.modal-box select').selectOption(groupName);
-  await page.locator('.modal-box input[required]').fill(exerciseName);
-  if (notes) await page.locator('.modal-box textarea').fill(notes);
-  await page.locator('.modal-box button:has-text("Save")').click();
+  await page.waitForSelector('.modal-content');
+  await page.locator('.modal-content select').selectOption(groupName);
+  await page.locator('.modal-content input[required]').fill(exerciseName);
+  if (notes) await page.locator('.modal-content textarea').fill(notes);
+  await page.locator('.modal-content button:has-text("Save")').click();
   await page.waitForTimeout(400);
 }

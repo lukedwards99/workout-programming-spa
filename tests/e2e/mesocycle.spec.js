@@ -53,8 +53,9 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await addWorkoutViaUI(page, 0, 'Remove Me');
     await expect(page.locator('.day-cell').first()).toContainText('Remove Me');
 
-    page.on('dialog', (dialog) => dialog.accept());
     await page.locator('.workout-chip button.btn-danger').click();
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content .btn-danger').click();
     await page.waitForTimeout(500);
 
     await expect(page.locator('.day-cell').first()).not.toContainText('Remove Me');
@@ -71,11 +72,11 @@ test.describe('Mesocycle Page — Calendar View', () => {
 
   test('closes add workout modal with Cancel', async ({ page }) => {
     await page.locator('.day-cell').first().locator('button:has-text("+ Add workout")').click();
-    await page.waitForSelector('.modal-box');
-    await page.locator('.modal-box button:has-text("Cancel")').click();
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content button:has-text("Cancel")').click();
     await page.waitForTimeout(300);
 
-    await expect(page.locator('.modal-box')).toHaveCount(0);
+    await expect(page.locator('.modal-content')).toHaveCount(0);
     await expect(page.locator('.day-cell').first().locator('.workout-chip')).toHaveCount(0);
   });
 

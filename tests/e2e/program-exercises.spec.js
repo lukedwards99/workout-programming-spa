@@ -94,8 +94,9 @@ test.describe('Program Exercises Page', () => {
     await addExerciseGroupViaUI(page, 'Chest');
     await addExerciseToLibraryViaUI(page, 'Chest', 'Delete Me');
 
-    page.once('dialog', (dialog) => dialog.accept());
     await page.locator('.ex-item').filter({ hasText: 'Delete Me' }).locator('button:has-text("Del")').click();
+    await page.waitForSelector('.modal-content');
+    await page.locator('.modal-content .btn-danger').click();
     await page.waitForTimeout(500);
 
     await expect(page.locator('.ex-item').filter({ hasText: 'Delete Me' })).toHaveCount(0);

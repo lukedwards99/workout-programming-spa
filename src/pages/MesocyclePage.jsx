@@ -3,6 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { workoutsApi } from '../api/workoutsApi';
+import { FormModal, ConfirmModal } from '../components';
 
 export default function MesocyclePage() {
   const { mesocycleId } = useParams();
@@ -13,6 +14,8 @@ export default function MesocyclePage() {
   const [showModal, setShowModal] = useState(false);
   const [addDay, setAddDay] = useState(0);
   const [woName, setWoName] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
 
   const load = useCallback(() => {
     const m = mesocyclesApi.get(Number(mesocycleId));
@@ -47,9 +50,13 @@ export default function MesocyclePage() {
 
   const handleDelete = (id) => {
     const w = workouts.find((x) => x.id === id);
-    if (!window.confirm(`Delete "${w.name}"?`)) return;
-    workoutsApi.delete(id);
-    flash('success', `"${w.name}" deleted.`);
+    setPendingDelete({ id, name: w.name });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    workoutsApi.delete(pendingDelete.id);
+    flash('success', `"${pendingDelete.name}" deleted.`);
     load();
   };
 
@@ -113,27 +120,24 @@ export default function MesocyclePage() {
         })}
       </div>
 
-      {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal-box" onClick={(e) => e.stopPropagation()}>
-            <h2>Add Workout</h2>
-            <form onSubmit={handleAdd}>
-              <div className="form-group">
-                <label>Workout Name</label>
-                <input
-                  value={woName} onChange={(e) => setWoName(e.target.value)}
-                  placeholder={`e.g. ${dayName(addDay)} Workout`}
-                  required autoFocus
-                />
-              </div>
-              <div className="modal-actions">
-                <button type="button" className="btn btn-outline" onClick={() => setShowModal(false)}>Cancel</button>
-                <button type="submit" className="btn btn-primary">Save</button>
-              </div>
-            </form>
-          </div>
+      <FormModal show={showModal} onHide={() => setShowModal(false)} title="Add Workout" onSubmit={handleAdd} submitLabel="Add">
+        <div className="form-group">
+          <label>Workout Name</label>
+          <input
+            value={woName} onChange={(e) => setWoName(e.target.value)}
+            placeholder={`e.g. ${dayName(addDay)} Workout`}
+            required autoFocus
+          />
         </div>
-      )}
+      </FormModal>
+
+      <ConfirmModal
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title="Delete Workout"
+        message={`Delete "${pendingDelete?.name}"?`}
+      />
     </>
   );
 }
