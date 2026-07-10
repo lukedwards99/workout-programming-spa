@@ -332,7 +332,7 @@ export default function ProgramExercisesPage() {
       </FormModal>
 
       {/* Copy Modal */}
-      <FormModal show={showCopyModal} onHide={() => setShowCopyModal(false)} title="Copy Exercises from Another Program" onSubmit={handleCopy} submitLabel={`Copy Selected (${selectedExIds.size})`}>
+      <FormModal show={showCopyModal} onHide={() => setShowCopyModal(false)} title="Copy Exercises from Another Program" onSubmit={handleCopy} submitLabel={`Copy Selected (${selectedExIds.size})`} submitDisabled={selectedExIds.size === 0}>
         <div className="form-group">
           <label>Source Program</label>
           <select value={copySourceProgramId} onChange={(e) => {

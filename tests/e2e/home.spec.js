@@ -66,6 +66,23 @@ test.describe('Home Page — Programs', () => {
     await expect(page.locator('.card')).toHaveCount(3);
   });
 
+  test('confirmation modal text is readable on dark background', async ({ page }) => {
+    await createProgramViaUI(page, 'Readability Test');
+    await page.locator('button:has-text("Delete")').click();
+    await page.waitForSelector('.modal-content');
+
+    const [fg, ref] = await page.locator('.modal-content').evaluate((el) => {
+      const fg = getComputedStyle(el).color;
+      const probe = document.createElement('span');
+      probe.style.color = 'var(--text)';
+      el.appendChild(probe);
+      const ref = getComputedStyle(probe).color;
+      probe.remove();
+      return [fg, ref];
+    });
+    await expect(fg).toBe(ref);
+  });
+
   test('closes modal when clicking Cancel', async ({ page }) => {
     await page.click('button:has-text("+ New Program")');
     await page.waitForSelector('.modal-content');

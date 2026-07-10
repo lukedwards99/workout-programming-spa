@@ -39,6 +39,21 @@ test.describe('Copy Exercises Between Programs', () => {
     await expect(page.locator('.ex-item')).toHaveCount(1);
   });
 
+  test('copy button is disabled when no exercises are selected', async ({ page }) => {
+    await clearDatabase(page);
+
+    await seedProgramViaUI(page, 'Source');
+    await navigateTo(page, '/');
+    const idB = await seedProgramViaUI(page, 'Target');
+    await navigateTo(page, `/programs/${idB}/exercises`);
+
+    await page.click('button:has-text("Copy from Program")');
+    await page.waitForSelector('.modal-content');
+
+    const copyBtn = page.locator('.modal-content button:has-text("Copy Selected")');
+    await expect(copyBtn).toBeDisabled();
+  });
+
   test('copy modal can be cancelled', async ({ page }) => {
     await clearDatabase(page);
 
