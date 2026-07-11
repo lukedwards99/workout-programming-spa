@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { activateProgram, deactivateProgram } from '../db/databaseService';
+import { programsApi } from '../api/programsApi';
 import { workoutsApi } from '../api/workoutsApi';
-import { mesocyclesApi } from '../api/mesocyclesApi';
 import { exercisesApi } from '../api/exercisesApi';
 import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
@@ -16,13 +17,14 @@ function setBadgeClass(type) {
 }
 
 export default function WorkoutPage() {
-  const { workoutId } = useParams();
+  const { programId, workoutId } = useParams();
   const id = Number(workoutId);
   const [workout, setWorkout] = useState(null);
   const [exerciseBlocks, setExerciseBlocks] = useState([]);
   const [allExercises, setAllExercises] = useState([]);
   const [allGroups, setAllGroups] = useState([]);
   const [allVariations, setAllVariations] = useState({});
+  const [program, setProgram] = useState(null);
   const [alert, setAlert] = useState(null);
   const [showAddEx, setShowAddEx] = useState(false);
   const [addGroupId, setAddGroupId] = useState('');
@@ -32,20 +34,37 @@ export default function WorkoutPage() {
   const [expandedNotes, setExpandedNotes] = useState(new Set());
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [pendingRemove, setPendingRemove] = useState(null);
+  const [error, setError] = useState(null);
 
   const load = useCallback(() => {
     const w = workoutsApi.get(id);
-    if (!w) return;
+    if (!w) {
+      setError('Workout not found.');
+      return;
+    }
     setWorkout(w);
     setExerciseBlocks(workoutsApi.getExercisesWithSets(id));
-    const meso = mesocyclesApi.get(w.mesocycle_id);
-    if (meso) {
-      setAllExercises(exercisesApi.list(meso.program_id, null));
-      setAllGroups(exerciseGroupsApi.list(meso.program_id));
-    }
+    setAllExercises(exercisesApi.list(null));
+    setAllGroups(exerciseGroupsApi.list());
+    setError(null);
   }, [id]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const pid = Number(programId);
+    const p = programsApi.get(pid);
+    if (!p) {
+      setError('Program not found.');
+      return;
+    }
+    setProgram(p);
+    activateProgram(pid)
+      .then(() => load())
+      .catch((e) => setError(e.message));
+
+    return () => {
+      deactivateProgram().catch(console.error);
+    };
+  }, [programId, workoutId, load]);
 
   useEffect(() => {
     const vars = {};
@@ -55,7 +74,8 @@ export default function WorkoutPage() {
     setAllVariations(vars);
   }, [allExercises]);
 
-  if (!workout) return <div className="empty-state"><p>Workout not found.</p></div>;
+  if (error) return <div className="empty-state"><p>{error}</p></div>;
+  if (!workout || !program) return <div className="empty-state"><p>Loading...</p></div>;
 
   const flash = (type, msg) => {
     setAlert({ type, msg });
@@ -175,7 +195,7 @@ export default function WorkoutPage() {
     <>
       <div className="breadcrumb">
         <Link to="/">Programs</Link><span>/</span>
-        <Link to={`/mesocycles/${workout.mesocycle_id}`}>Mesocycle</Link><span>/</span>
+        <Link to={`/programs/${program.id}/mesocycles/${workout.mesocycle_id}`}>Mesocycle</Link><span>/</span>
         <strong>{workout.name}</strong>
       </div>
 

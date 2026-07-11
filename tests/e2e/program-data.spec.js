@@ -41,10 +41,10 @@ test.describe('Program Data Page', () => {
     expect(stat.size).toBeGreaterThan(50);
   });
 
-  test('exports full database as .sqlite file', async ({ page }) => {
+  test('exports program backup as .sqlite file', async ({ page }) => {
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.click('button:has-text("Download Full Backup")'),
+      page.click('button:has-text("Download Program Backup")'),
     ]);
     expect(download.suggestedFilename()).toMatch(/\.sqlite$/);
   });

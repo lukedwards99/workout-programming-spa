@@ -5,6 +5,7 @@ import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exercisesApi } from '../api/exercisesApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
 import { copyApi } from '../api/copyApi';
+import { activateProgram, saveNow } from '../db/databaseService';
 import { FormModal, ConfirmModal } from '../components';
 
 export default function ProgramExercisesPage() {
@@ -34,6 +35,7 @@ export default function ProgramExercisesPage() {
   const [copySourceProgramId, setCopySourceProgramId] = useState('');
   const [copySourceData, setCopySourceData] = useState([]);
   const [selectedExIds, setSelectedExIds] = useState(new Set());
+  const [copyLoading, setCopyLoading] = useState(false);
 
   // Delete confirmations
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -43,8 +45,8 @@ export default function ProgramExercisesPage() {
     const p = programsApi.get(pid);
     if (!p) return;
     setProgram(p);
-    setGroups(exerciseGroupsApi.list(pid));
-    setExercises(exercisesApi.list(pid, selectedGroup));
+    setGroups(exerciseGroupsApi.list());
+    setExercises(exercisesApi.list(selectedGroup));
   }, [pid, selectedGroup]);
 
   useEffect(() => { load(); }, [load]);
@@ -63,7 +65,7 @@ export default function ProgramExercisesPage() {
       exerciseGroupsApi.update(editingGroupId, groupForm);
       flash('success', `"${groupForm.name}" updated.`);
     } else {
-      exerciseGroupsApi.create({ programId: pid, name: groupForm.name, notes: groupForm.notes });
+      exerciseGroupsApi.create({ name: groupForm.name, notes: groupForm.notes });
       flash('success', `"${groupForm.name}" created.`);
     }
     setShowGroupModal(false);
@@ -181,10 +183,17 @@ export default function ProgramExercisesPage() {
   const handleCopy = (e) => {
     e.preventDefault();
     if (selectedExIds.size === 0) return;
-    copyApi.copyExercises(Number(copySourceProgramId), pid, [...selectedExIds]);
-    flash('success', `Copied ${selectedExIds.size} exercise(s).`);
-    setShowCopyModal(false);
-    load();
+    setCopyLoading(true);
+    saveNow()
+      .then(() => copyApi.copyExercises(Number(copySourceProgramId), pid, [...selectedExIds]))
+      .then(() => activateProgram(pid, { skipSave: true }))
+      .then(() => {
+        flash('success', `Copied ${selectedExIds.size} exercise(s).`);
+        setShowCopyModal(false);
+        load();
+      })
+      .catch((err) => flash('danger', `Copy failed: ${err.message}`))
+      .finally(() => setCopyLoading(false));
   };
 
   const allPrograms = programsApi.list().filter((p) => p.id !== pid);
@@ -216,7 +225,7 @@ export default function ProgramExercisesPage() {
             onClick={() => setSelectedGroup(null)}
           >
             <span>All Exercises</span>
-            <span className="group-count">{exercisesApi.list(pid, null).length}</span>
+            <span className="group-count">{exercisesApi.list(null).length}</span>
           </div>
           {groups.map((g) => (
             <div
@@ -332,15 +341,17 @@ export default function ProgramExercisesPage() {
       </FormModal>
 
       {/* Copy Modal */}
-      <FormModal show={showCopyModal} onHide={() => setShowCopyModal(false)} title="Copy Exercises from Another Program" onSubmit={handleCopy} submitLabel={`Copy Selected (${selectedExIds.size})`} submitDisabled={selectedExIds.size === 0}>
+      <FormModal show={showCopyModal} onHide={() => setShowCopyModal(false)} title="Copy Exercises from Another Program" onSubmit={handleCopy} submitLabel={`Copy Selected (${selectedExIds.size})`} submitDisabled={selectedExIds.size === 0 || copyLoading}>
         <div className="form-group">
           <label>Source Program</label>
           <select value={copySourceProgramId} onChange={(e) => {
             const val = e.target.value;
             setCopySourceProgramId(val);
             if (val) {
-              setCopySourceData(copyApi.getSourceExercises(Number(val)));
-              setSelectedExIds(new Set());
+              copyApi.getSourceExercises(Number(val)).then((data) => {
+                setCopySourceData(data);
+                setSelectedExIds(new Set());
+              });
             } else {
               setCopySourceData([]);
               setSelectedExIds(new Set());

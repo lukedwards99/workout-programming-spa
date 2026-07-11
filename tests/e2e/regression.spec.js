@@ -124,7 +124,9 @@ test.describe('Regression Tests', () => {
       // Add Bench Press with Close Grip variation
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
-      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content select').first().selectOption({ index: 1 });
+      await page.waitForTimeout(300);
+      await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content select').last().selectOption({ label: 'Close Grip' });
       await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
@@ -132,7 +134,9 @@ test.describe('Regression Tests', () => {
       // Add Bench Press without variation also
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
-      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content select').first().selectOption({ index: 1 });
+      await page.waitForTimeout(300);
+      await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
 
@@ -244,7 +248,9 @@ test.describe('Regression Tests', () => {
       // Add Bench Press with Close Grip
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
-      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content select').first().selectOption({ index: 1 });
+      await page.waitForTimeout(300);
+      await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content select').last().selectOption({ label: 'Close Grip' });
       await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
@@ -252,7 +258,9 @@ test.describe('Regression Tests', () => {
       // Add Bench Press without variation
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
-      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content select').first().selectOption({ index: 1 });
+      await page.waitForTimeout(300);
+      await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
 
@@ -289,12 +297,12 @@ test.describe('Regression Tests', () => {
   });
 
   test.describe('P2-2: Malformed import preserves existing data', () => {
-    test('importing a fake SQLite file with missing tables fails gracefully', async ({ page }) => {
+    test('restoring a malformed program backup reports error and preserves data', async ({ page }) => {
       // Create a minimal SQLite file with schema_version but no app tables
       const SQL = await initSqlJs();
       const badDb = new SQL.Database();
       badDb.run('CREATE TABLE schema_version (version INTEGER)');
-      badDb.run('INSERT INTO schema_version (version) VALUES (2)');
+      badDb.run('INSERT INTO schema_version (version) VALUES (3)');
       const fakeBuffer = Buffer.from(badDb.export());
       badDb.close();
 
@@ -306,17 +314,17 @@ test.describe('Regression Tests', () => {
       await navigateTo(page, `/programs/${programId}`);
       await expect(page.locator('td:has-text("Real Block")')).toBeVisible();
 
-      // Navigate to data tab to trigger full import
+      // Navigate to data tab to trigger program restore with malformed file
       await navigateTo(page, `/programs/${programId}/data`);
 
-      // Trigger full import with the malformed file
+      // Trigger program restore with malformed file
       const fileChooserPromise = page.waitForEvent('filechooser');
-      await page.click('text=Restore Full Backup');
+      await page.click('text=Restore Program Backup');
       const fc = await fileChooserPromise;
       await fc.setFiles({ name: 'fake.db', mimeType: 'application/octet-stream', buffer: fakeBuffer });
       await page.waitForTimeout(1000);
 
-      // Should show error alert — import was rejected
+      // Should show error alert — restore was rejected
       await expect(page.locator('.alert-danger')).toBeVisible();
 
       // Real data should still be intact
@@ -347,7 +355,9 @@ test.describe('Regression Tests', () => {
       // Try adding same exercise again
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
-      await page.locator('.modal-content select').first().selectOption({ label: 'Bench Press' });
+      await page.locator('.modal-content select').first().selectOption({ index: 1 });
+      await page.waitForTimeout(300);
+      await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content button:has-text("Add")').click();
       await page.waitForTimeout(500);
 
@@ -357,53 +367,67 @@ test.describe('Regression Tests', () => {
     });
   });
 
-  test.describe('P2-4: Valid full backup restore', () => {
-    test('export then import restores data correctly', async ({ page }) => {
+  test.describe('P2-4: Valid program backup restore', () => {
+    test('export then restore returns program to backup state', async ({ page }) => {
       await clearDatabase(page);
-      const programId = await seedProgramViaUI(page, 'Backup Test');
+
+      // Create program A
+      const idA = await seedProgramViaUI(page, 'Program A');
       await addMesocycleViaUI(page, 'Block Alpha');
 
-      await navigateTo(page, `/programs/${programId}/exercises`);
+      await navigateTo(page, `/programs/${idA}/exercises`);
       await addExerciseGroupViaUI(page, 'Chest');
       await addExerciseToLibraryViaUI(page, 'Chest', 'Bench Press');
 
-      // Export full .sqlite backup
-      await navigateTo(page, `/programs/${programId}/data`);
+      // Create program B as isolation check
+      await navigateTo(page, '/');
+      const idB = await seedProgramViaUI(page, 'Program B');
+      await addMesocycleViaUI(page, 'Block Beta');
+
+      await navigateTo(page, `/programs/${idB}/exercises`);
+      await addExerciseGroupViaUI(page, 'Back');
+      await addExerciseToLibraryViaUI(page, 'Back', 'Pull Up');
+
+      // Export program A backup
+      await navigateTo(page, `/programs/${idA}/data`);
       const [download] = await Promise.all([
         page.waitForEvent('download'),
-        page.click('button:has-text("Download Full Backup")'),
+        page.click('button:has-text("Download Program Backup")'),
       ]);
       const tempPath = await download.path();
       const buffer = fs.readFileSync(tempPath);
 
-      // Delete all data
-      await page.click('button:has-text("Delete All Data")');
-      await page.waitForSelector('.modal-content');
-      await page.locator('.modal-content .btn-danger').click();
-      await page.waitForTimeout(500);
+      // Mutate program A (add another mesocycle)
+      await navigateTo(page, `/programs/${idA}`);
+      await addMesocycleViaUI(page, 'Block Gamma');
+      await expect(page.locator('td:has-text("Block Alpha")')).toBeVisible();
+      await expect(page.locator('td:has-text("Block Gamma")')).toBeVisible();
+      await expect(page.locator('tbody tr')).toHaveCount(2);
 
-      // Verify data is gone
-      await navigateTo(page, '/');
-      await expect(page.locator('.empty-state p')).toBeVisible();
-
-      // Create a fresh program so the app is initialized
-      const newProgramId = await seedProgramViaUI(page, 'Restore Program');
-
-      // Import the backup
-      await navigateTo(page, `/programs/${newProgramId}/data`);
+      // Restore program A from backup
+      await navigateTo(page, `/programs/${idA}/data`);
       const fileChooserPromise = page.waitForEvent('filechooser');
-      await page.click('text=Restore Full Backup');
+      await page.click('text=Restore Program Backup');
       const fc = await fileChooserPromise;
       await fc.setFiles({ name: 'backup.sqlite', mimeType: 'application/octet-stream', buffer });
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(500);
 
-      // Verify restored data
-      await navigateTo(page, `/programs/${programId}`);
+      // Confirm restore
+      await page.locator('.modal-content .btn-danger').click();
+      await page.waitForTimeout(1500);
+
+      // Verify A is back to backup state (only Block Alpha)
+      await navigateTo(page, `/programs/${idA}`);
       await expect(page.locator('td:has-text("Block Alpha")')).toBeVisible();
+      await expect(page.locator('tbody tr')).toHaveCount(1);
 
-      // Verify restored exercises
-      await navigateTo(page, `/programs/${programId}/exercises`);
-      await expect(page.locator('.ex-item:has-text("Bench Press")')).toBeVisible();
+      // Verify B is unchanged
+      await navigateTo(page, `/programs/${idB}`);
+      await expect(page.locator('td:has-text("Block Beta")')).toBeVisible();
+      await expect(page.locator('tbody tr')).toHaveCount(1);
+
+      await navigateTo(page, `/programs/${idB}/exercises`);
+      await expect(page.locator('.ex-item:has-text("Pull Up")')).toBeVisible();
     });
   });
 

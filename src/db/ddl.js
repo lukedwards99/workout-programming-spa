@@ -1,6 +1,6 @@
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
-export const createDatabaseSQL = `
+export const createCatalogSQL = `
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS schema_version (
@@ -14,15 +14,23 @@ CREATE TABLE IF NOT EXISTS programs (
     created_at TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+INSERT OR IGNORE INTO schema_version (version) VALUES (${SCHEMA_VERSION});
+`;
+
+export const createProgramSQL = `
+PRAGMA foreign_keys = ON;
+
+CREATE TABLE IF NOT EXISTS schema_version (
+    version INTEGER PRIMARY KEY
+);
+
 CREATE TABLE IF NOT EXISTS mesocycles (
     id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    program_id        INTEGER NOT NULL,
     name              TEXT    NOT NULL,
     microcycle_length INTEGER NOT NULL DEFAULT 7,
     start_date        TEXT    NOT NULL,
     notes             TEXT,
-    sort_order        INTEGER NOT NULL DEFAULT 0,
-    FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE
+    sort_order        INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS workouts (
@@ -36,12 +44,10 @@ CREATE TABLE IF NOT EXISTS workouts (
 );
 
 CREATE TABLE IF NOT EXISTS exercise_groups (
-    id         INTEGER PRIMARY KEY AUTOINCREMENT,
-    program_id INTEGER NOT NULL,
-    name       TEXT    NOT NULL,
-    notes      TEXT,
-    FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE CASCADE,
-    UNIQUE(program_id, name)
+    id   INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT    NOT NULL,
+    notes TEXT,
+    UNIQUE(name)
 );
 
 CREATE TABLE IF NOT EXISTS exercises (
@@ -82,3 +88,5 @@ CREATE TABLE IF NOT EXISTS workout_sets (
 
 INSERT OR IGNORE INTO schema_version (version) VALUES (${SCHEMA_VERSION});
 `;
+
+export { SCHEMA_VERSION };

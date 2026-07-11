@@ -68,7 +68,7 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await addExerciseViaUI(page, 'Barbell Bench Press');
     const firstRow = page.locator('.exercise-block').first().locator('.set-table tbody tr').first();
     const inputs = firstRow.locator('input');
-    await expect(inputs).toHaveCount(4);
+    await expect(inputs).toHaveCount(3);
     await expect(page.locator('.exercise-block').first()).toContainText('normal');
   });
 

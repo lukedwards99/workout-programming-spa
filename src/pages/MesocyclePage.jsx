@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
+import { activateProgram, deactivateProgram } from '../db/databaseService';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { workoutsApi } from '../api/workoutsApi';
 import { FormModal, ConfirmModal } from '../components';
 
 export default function MesocyclePage() {
-  const { mesocycleId } = useParams();
+  const { programId, mesocycleId } = useParams();
   const [mesocycle, setMesocycle] = useState(null);
   const [workouts, setWorkouts] = useState([]);
   const [program, setProgram] = useState(null);
@@ -16,18 +17,36 @@ export default function MesocyclePage() {
   const [woName, setWoName] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const [error, setError] = useState(null);
 
-  const load = useCallback(() => {
-    const m = mesocyclesApi.get(Number(mesocycleId));
-    if (!m) return;
-    setMesocycle(m);
-    setWorkouts(workoutsApi.list(m.id));
-    setProgram(programsApi.get(m.program_id));
-  }, [mesocycleId]);
+  useEffect(() => {
+    const pid = Number(programId);
+    const p = programsApi.get(pid);
+    if (!p) {
+      setError('Program not found.');
+      return;
+    }
+    setProgram(p);
+    activateProgram(pid)
+      .then(() => {
+        const m = mesocyclesApi.get(Number(mesocycleId));
+        if (!m) {
+          setError('Mesocycle not found in this program.');
+          return;
+        }
+        setMesocycle(m);
+        setWorkouts(workoutsApi.list(m.id));
+        setError(null);
+      })
+      .catch((e) => setError(e.message));
 
-  useEffect(() => { load(); }, [load]);
+    return () => {
+      deactivateProgram().catch(console.error);
+    };
+  }, [programId, mesocycleId]);
 
-  if (!mesocycle) return <div className="empty-state"><p>Mesocycle not found.</p></div>;
+  if (error) return <div className="empty-state"><p>{error}</p></div>;
+  if (!mesocycle) return <div className="empty-state"><p>Loading...</p></div>;
 
   const flash = (type, msg) => {
     setAlert({ type, msg });
@@ -45,7 +64,7 @@ export default function MesocyclePage() {
     flash('success', `"${woName}" added.`);
     setShowModal(false);
     setWoName('');
-    load();
+    setWorkouts(workoutsApi.list(mesocycle.id));
   };
 
   const handleDelete = (id) => {
@@ -57,7 +76,7 @@ export default function MesocyclePage() {
   const confirmDelete = () => {
     workoutsApi.delete(pendingDelete.id);
     flash('success', `"${pendingDelete.name}" deleted.`);
-    load();
+    setWorkouts(workoutsApi.list(mesocycle.id));
   };
 
   const openAdd = (dayOffset) => {
@@ -103,7 +122,7 @@ export default function MesocyclePage() {
               </div>
               {dayWorkouts.map((w) => (
                 <div key={w.id} style={{ position: 'relative' }}>
-                  <Link to={`/workouts/${w.id}`} className="workout-chip">
+                  <Link to={`/programs/${program.id}/workouts/${w.id}`} className="workout-chip">
                     {w.name}
                     <button
                       className="btn btn-xs btn-danger"

@@ -12,6 +12,8 @@ export default function HomePage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState(null);
 
+  const [saving, setSaving] = useState(false);
+
   const load = useCallback(() => {
     setPrograms(programsApi.list());
   }, []);
@@ -35,17 +37,24 @@ export default function HomePage() {
     setShowModal(true);
   };
 
-  const handleSave = (e) => {
+  const handleSave = async (e) => {
     e.preventDefault();
-    if (editingId) {
-      programsApi.update(editingId, form);
-      flash('success', `"${form.name}" updated.`);
-    } else {
-      programsApi.create(form);
-      flash('success', `"${form.name}" created.`);
+    setSaving(true);
+    try {
+      if (editingId) {
+        await programsApi.update(editingId, form);
+        flash('success', `"${form.name}" updated.`);
+      } else {
+        await programsApi.create(form);
+        flash('success', `"${form.name}" created.`);
+      }
+      setShowModal(false);
+      load();
+    } catch (err) {
+      flash('danger', `Failed: ${err.message}`);
+    } finally {
+      setSaving(false);
     }
-    setShowModal(false);
-    load();
   };
 
   const handleDelete = (id) => {
@@ -54,10 +63,18 @@ export default function HomePage() {
     setShowDeleteConfirm(true);
   };
 
-  const confirmDelete = () => {
-    programsApi.delete(pendingDelete.id);
-    flash('success', `"${pendingDelete.name}" deleted.`);
-    load();
+  const confirmDelete = async () => {
+    setSaving(true);
+    try {
+      await programsApi.delete(pendingDelete.id);
+      flash('success', `"${pendingDelete.name}" deleted.`);
+      setShowDeleteConfirm(false);
+      load();
+    } catch (err) {
+      flash('danger', `Delete failed: ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -72,7 +89,7 @@ export default function HomePage() {
       {programs.length === 0 ? (
         <div className="empty-state">
           <p>No programs yet. Create your first training program to get started.</p>
-          <button className="btn btn-primary" onClick={openAdd}>+ New Program</button>
+        <button className="btn btn-primary" onClick={openAdd} disabled={saving}>+ New Program</button>
         </div>
       ) : (
         <div className="row g-3">
@@ -80,9 +97,6 @@ export default function HomePage() {
             <div className="col-12 col-sm-6 col-lg-4" key={p.id}>
               <div className="card">
               <h3 style={{ marginBottom: 6 }}>{p.name}</h3>
-              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 6 }}>
-                {p.meso_count} mesocycle{p.meso_count !== 1 ? 's' : ''}
-              </p>
               {p.notes && (
                 <p style={{ fontSize: 14, color: 'var(--text-muted)', marginBottom: 14 }}>{p.notes}</p>
               )}

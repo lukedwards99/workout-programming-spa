@@ -46,10 +46,21 @@ export default function App() {
             <Route path="exercises" element={<ProgramExercisesPage />} />
             <Route path="data" element={<ProgramDataPage />} />
           </Route>
-          <Route path="/mesocycles/:mesocycleId" element={<MesocyclePage />} />
-          <Route path="/workouts/:workoutId" element={<WorkoutPage />} />
+          <Route path="/programs/:programId/mesocycles/:mesocycleId" element={<MesocyclePage />} />
+          <Route path="/programs/:programId/workouts/:workoutId" element={<WorkoutPage />} />
+          {/* Legacy route redirects */}
+          <Route path="/mesocycles/:mesocycleId" element={<MesocycleFallback />} />
+          <Route path="/workouts/:workoutId" element={<WorkoutFallback />} />
         </Routes>
       </div>
     </div>
   );
+}
+
+function MesocycleFallback() {
+  return <div className="empty-state"><p>Please navigate via a program. Legacy URLs are no longer supported.</p></div>;
+}
+
+function WorkoutFallback() {
+  return <div className="empty-state"><p>Please navigate via a program. Legacy URLs are no longer supported.</p></div>;
 }
