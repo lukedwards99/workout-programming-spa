@@ -1,0 +1,424 @@
+import { useState, useEffect, useCallback, type FormEvent, type MouseEvent, type ChangeEvent } from 'react';
+import { useParams } from 'react-router-dom';
+import type { Program, ExerciseGroupWithCount, Exercise, ExerciseVariation, ExerciseCopySourceGroup } from '../types/domain';
+import { programsApi } from '../api/programsApi';
+import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
+import { exercisesApi } from '../api/exercisesApi';
+import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
+import { copyApi } from '../api/copyApi';
+import { activateProgram, saveNow } from '../db/databaseService';
+import { FormModal, ConfirmModal } from '../components';
+
+interface Alert {
+  type: string;
+  msg: string;
+}
+
+interface DeleteTarget {
+  type: 'group' | 'exercise' | 'variation';
+  id: number;
+  name: string;
+}
+
+interface GroupForm {
+  name: string;
+  notes: string;
+}
+
+interface ExForm {
+  groupId: number | string;
+  name: string;
+  tutorialUrl: string;
+  notes: string;
+}
+
+export default function ProgramExercisesPage() {
+  const { programId } = useParams<{ programId: string }>();
+  const pid = Number(programId);
+  const [program, setProgram] = useState<Program | null>(null);
+  const [groups, setGroups] = useState<ExerciseGroupWithCount[]>([]);
+  const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
+  const [exercises, setExercises] = useState<Exercise[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [alert, setAlert] = useState<Alert | null>(null);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [varInputs, setVarInputs] = useState<Record<number, string>>({});
+
+  // Group modal
+  const [showGroupModal, setShowGroupModal] = useState(false);
+  const [groupForm, setGroupForm] = useState<GroupForm>({ name: '', notes: '' });
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
+
+  // Exercise modal
+  const [showExModal, setShowExModal] = useState(false);
+  const [exForm, setExForm] = useState<ExForm>({ groupId: '', name: '', tutorialUrl: '', notes: '' });
+  const [editingExId, setEditingExId] = useState<number | null>(null);
+
+  // Copy modal
+  const [showCopyModal, setShowCopyModal] = useState(false);
+  const [copySourceProgramId, setCopySourceProgramId] = useState('');
+  const [copySourceData, setCopySourceData] = useState<ExerciseCopySourceGroup[]>([]);
+  const [selectedExIds, setSelectedExIds] = useState<Set<number>>(new Set());
+  const [copyLoading, setCopyLoading] = useState(false);
+
+  // Delete confirmations
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
+
+  const load = useCallback(() => {
+    const p = programsApi.get(pid);
+    if (!p) return;
+    setProgram(p);
+    setGroups(exerciseGroupsApi.list());
+    setExercises(exercisesApi.list(selectedGroup));
+  }, [pid, selectedGroup]);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (!program) return <div className="empty-state"><p>Program not found.</p></div>;
+
+  const flash = (type: string, msg: string) => {
+    setAlert({ type, msg });
+    setTimeout(() => setAlert(null), 4000);
+  };
+
+  // ── Groups ──
+  const handleGroupSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (editingGroupId) {
+      exerciseGroupsApi.update(editingGroupId, groupForm);
+      flash('success', `"${groupForm.name}" updated.`);
+    } else {
+      exerciseGroupsApi.create({ name: groupForm.name, notes: groupForm.notes });
+      flash('success', `"${groupForm.name}" created.`);
+    }
+    setShowGroupModal(false);
+    load();
+  };
+
+  const openAddGroup = () => {
+    setEditingGroupId(null);
+    setGroupForm({ name: '', notes: '' });
+    setShowGroupModal(true);
+  };
+
+  const openEditGroup = (g: ExerciseGroupWithCount) => {
+    setEditingGroupId(g.id);
+    setGroupForm({ name: g.name, notes: g.notes || '' });
+    setShowGroupModal(true);
+  };
+
+  const deleteGroup = (id: number) => {
+    const g = groups.find((x) => x.id === id);
+    if (!g) return;
+    setDeleteTarget({ type: 'group', id, name: g.name });
+    setShowDeleteConfirm(true);
+  };
+
+  // ── Exercises ──
+  const handleExSubmit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (editingExId) {
+      exercisesApi.update(editingExId, exForm as { groupId: number; name: string; tutorialUrl: string; notes: string });
+      flash('success', `"${exForm.name}" updated.`);
+    } else {
+      exercisesApi.create(exForm as { groupId: number; name: string; tutorialUrl: string; notes: string });
+      flash('success', `"${exForm.name}" created.`);
+    }
+    setShowExModal(false);
+    load();
+  };
+
+  const openAddEx = () => {
+    setEditingExId(null);
+    setExForm({ groupId: selectedGroup || (groups[0]?.id || ''), name: '', tutorialUrl: '', notes: '' });
+    setShowExModal(true);
+  };
+
+  const openEditEx = (ex: Exercise) => {
+    setEditingExId(ex.id);
+    setExForm({ groupId: ex.exercise_group_id, name: ex.name, tutorialUrl: ex.tutorial_url || '', notes: ex.notes || '' });
+    setShowExModal(true);
+  };
+
+  const deleteEx = (id: number) => {
+    const ex = exercises.find((x) => x.id === id);
+    if (!ex) return;
+    setDeleteTarget({ type: 'exercise', id, name: ex.name });
+    setShowDeleteConfirm(true);
+  };
+
+  // ── Variations ──
+  const addVariation = (exerciseId: number) => {
+    const name = (varInputs[exerciseId] || '').trim();
+    if (!name) return;
+    const existing = exerciseVariationsApi.list(exerciseId);
+    exerciseVariationsApi.create({ exerciseId, name, isPrimary: existing.length === 0 });
+    flash('success', `Variation "${name}" added.`);
+    setVarInputs({ ...varInputs, [exerciseId]: '' });
+    load();
+  };
+
+  const deleteVariation = (id: number) => {
+    const v = exerciseVariationsApi.get(id);
+    if (!v) return;
+    setDeleteTarget({ type: 'variation', id, name: v.name });
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    switch (deleteTarget.type) {
+      case 'group':
+        exerciseGroupsApi.delete(deleteTarget.id);
+        if (selectedGroup === deleteTarget.id) setSelectedGroup(null);
+        break;
+      case 'exercise':
+        exercisesApi.delete(deleteTarget.id);
+        break;
+      case 'variation':
+        exerciseVariationsApi.delete(deleteTarget.id);
+        break;
+    }
+    flash('success', `"${deleteTarget.name}" deleted.`);
+    load();
+  };
+
+  const getDeleteMessage = (): string => {
+    if (!deleteTarget) return '';
+    switch (deleteTarget.type) {
+      case 'group': return `Delete "${deleteTarget.name}"? All exercises in this group will also be deleted.`;
+      case 'exercise': return `Delete "${deleteTarget.name}"?`;
+      case 'variation': return `Delete variation "${deleteTarget.name}"?`;
+      default: return '';
+    }
+  };
+
+  // ── Copy ──
+  const openCopyModal = () => {
+    setShowCopyModal(true);
+    setCopySourceProgramId('');
+    setCopySourceData([]);
+    setSelectedExIds(new Set());
+  };
+
+  const toggleExSelect = (exId: number) => {
+    const next = new Set(selectedExIds);
+    if (next.has(exId)) next.delete(exId); else next.add(exId);
+    setSelectedExIds(next);
+  };
+
+  const handleCopy = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (selectedExIds.size === 0) return;
+    setCopyLoading(true);
+    saveNow()
+      .then(() => copyApi.copyExercises(Number(copySourceProgramId), pid, [...selectedExIds]))
+      .then(() => activateProgram(pid, { skipSave: true }))
+      .then(() => {
+        flash('success', `Copied ${selectedExIds.size} exercise(s).`);
+        setShowCopyModal(false);
+        load();
+      })
+      .catch((err: Error) => flash('danger', `Copy failed: ${err.message}`))
+      .finally(() => setCopyLoading(false));
+  };
+
+  const allPrograms = programsApi.list().filter((p) => p.id !== pid);
+
+  let filtered = exercises;
+  if (searchQuery) {
+    const q = searchQuery.toLowerCase();
+    filtered = filtered.filter((e) => e.name.toLowerCase().includes(q));
+  }
+
+  return (
+    <>
+      <div className="page-header">
+        <h1>Exercise Library</h1>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {allPrograms.length > 0 && (
+            <button className="btn btn-outline" onClick={openCopyModal}>Copy from Program</button>
+          )}
+          <button className="btn btn-primary" onClick={openAddEx}>+ Add Exercise</button>
+        </div>
+      </div>
+
+      {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
+
+      <div className="row">
+        <div className="col-12 col-md-3 mb-3 mb-md-0">
+          <div
+            className={`group-item ${selectedGroup === null ? 'active' : ''}`}
+            onClick={() => setSelectedGroup(null)}
+          >
+            <span>All Exercises</span>
+            <span className="group-count">{exercisesApi.list(null).length}</span>
+          </div>
+          {groups.map((g) => (
+            <div
+              key={g.id}
+              className={`group-item ${selectedGroup === g.id ? 'active' : ''}`}
+              onClick={() => setSelectedGroup(g.id)}
+            >
+              <span>{g.name}</span>
+              <span className="group-count">{g.exercise_count}</span>
+            </div>
+          ))}
+          <button className="btn btn-outline btn-sm" onClick={openAddGroup} style={{ marginTop: 12, width: '100%' }}>
+            + New Group
+          </button>
+        </div>
+
+        <div className="col-12 col-md-9">
+          <input
+            className="search-input"
+            placeholder="Search exercises..."
+            value={searchQuery}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setSearchQuery(e.target.value)}
+          />
+
+          {filtered.length === 0 ? (
+            <div className="empty-state"><p>No exercises found.</p></div>
+          ) : (
+            filtered.map((ex) => {
+              const variations = exerciseVariationsApi.list(ex.id) || [];
+              const isOpen = expandedId === ex.id;
+              return (
+                <div className="ex-item" key={ex.id}>
+                  <div className="ex-item-header" onClick={() => setExpandedId(isOpen ? null : ex.id)}>
+                    <div>
+                      <h4>{ex.name}</h4>
+                      <div className="ex-item-meta">
+                        {groups.find((g) => g.id === ex.exercise_group_id)?.name || 'Unknown'} &middot; {variations.length} variation{variations.length !== 1 ? 's' : ''}
+                        {ex.notes && <> &middot; {ex.notes}</>}
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button className="btn btn-outline btn-sm" onClick={(e: MouseEvent) => { e.stopPropagation(); openEditEx(ex); }}>Edit</button>
+                      <button className="btn btn-danger btn-sm" onClick={(e: MouseEvent) => { e.stopPropagation(); deleteEx(ex.id); }}>Del</button>
+                    </div>
+                  </div>
+                  {isOpen && (
+                    <div className="ex-item-detail">
+                      {ex.tutorial_url && (
+                        <div style={{ fontSize: 12, marginBottom: 8 }}>
+                          <a href={ex.tutorial_url} target="_blank" rel="noreferrer">{ex.tutorial_url}</a>
+                        </div>
+                      )}
+                      <strong style={{ fontSize: 12, color: 'var(--text-muted)' }}>Variations</strong>
+                      {variations.map((v: ExerciseVariation) => (
+                        <div className="var-item" key={v.id}>
+                          <span>
+                            {v.name}{v.is_primary ? <span className="var-primary">primary</span> : ''}
+                          </span>
+                          <button className="btn btn-xs btn-danger" onClick={() => deleteVariation(v.id)}>&times;</button>
+                        </div>
+                      ))}
+                      <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                        <input
+                          style={{ flex: 1, padding: '5px 8px', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 4, color: 'var(--text)', fontSize: 12 }}
+                          placeholder="Variation name..."
+                          value={varInputs[ex.id] || ''}
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => setVarInputs({ ...varInputs, [ex.id]: e.target.value })}
+                        />
+                        <button className="btn btn-primary btn-xs" onClick={() => addVariation(ex.id)}>+</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Group Modal */}
+      <FormModal show={showGroupModal} onHide={() => setShowGroupModal(false)} title={editingGroupId ? 'Edit Group' : 'Add Group'} onSubmit={handleGroupSubmit}>
+        <div className="form-group">
+          <label>Name</label>
+          <input value={groupForm.name} onChange={(e: ChangeEvent<HTMLInputElement>) => setGroupForm({ ...groupForm, name: e.target.value })} placeholder="e.g. Chest" required autoFocus />
+        </div>
+        <div className="form-group">
+          <label>Notes</label>
+          <textarea value={groupForm.notes} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setGroupForm({ ...groupForm, notes: e.target.value })} />
+        </div>
+      </FormModal>
+
+      {/* Exercise Modal */}
+      <FormModal show={showExModal} onHide={() => setShowExModal(false)} title={editingExId ? 'Edit Exercise' : 'Add Exercise'} onSubmit={handleExSubmit}>
+        <div className="form-group">
+          <label>Muscle Group</label>
+          <select value={exForm.groupId} onChange={(e: ChangeEvent<HTMLSelectElement>) => setExForm({ ...exForm, groupId: Number(e.target.value) })} required>
+            <option value="">-- Select --</option>
+            {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+          </select>
+        </div>
+        <div className="form-group">
+          <label>Exercise Name</label>
+          <input value={exForm.name} onChange={(e: ChangeEvent<HTMLInputElement>) => setExForm({ ...exForm, name: e.target.value })} placeholder="e.g. Barbell Bench Press" required autoFocus />
+        </div>
+        <div className="form-group">
+          <label>Tutorial URL (optional)</label>
+          <input value={exForm.tutorialUrl} onChange={(e: ChangeEvent<HTMLInputElement>) => setExForm({ ...exForm, tutorialUrl: e.target.value })} placeholder="https://..." />
+        </div>
+        <div className="form-group">
+          <label>Notes</label>
+          <textarea value={exForm.notes} onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setExForm({ ...exForm, notes: e.target.value })} placeholder="Form cues, tips..." />
+        </div>
+      </FormModal>
+
+      {/* Copy Modal */}
+      <FormModal show={showCopyModal} onHide={() => setShowCopyModal(false)} title="Copy Exercises from Another Program" onSubmit={handleCopy} submitLabel={`Copy Selected (${selectedExIds.size})`} submitDisabled={selectedExIds.size === 0 || copyLoading}>
+        <div className="form-group">
+          <label>Source Program</label>
+          <select value={copySourceProgramId} onChange={(e: ChangeEvent<HTMLSelectElement>) => {
+            const val = e.target.value;
+            setCopySourceProgramId(val);
+            if (val) {
+              copyApi.getSourceExercises(Number(val)).then((data) => {
+                setCopySourceData(data);
+                setSelectedExIds(new Set());
+              });
+            } else {
+              setCopySourceData([]);
+              setSelectedExIds(new Set());
+            }
+          }}>
+            <option value="">-- Select program --</option>
+            {allPrograms.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </div>
+
+        {copySourceData.length > 0 && (
+          <div style={{ maxHeight: 300, overflowY: 'auto', marginBottom: 16 }}>
+            {copySourceData.map(({ group, exercises: groupExercises }) => (
+              <div key={group.id} style={{ marginBottom: 12 }}>
+                <strong style={{ fontSize: 13, color: 'var(--text-muted)' }}>{group.name}</strong>
+                {groupExercises.map((ex) => (
+                  <label key={ex.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 14, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedExIds.has(ex.id)}
+                      onChange={() => toggleExSelect(ex.id)}
+                    />
+                    {ex.name}
+                    {ex.notes && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({ex.notes})</span>}
+                  </label>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </FormModal>
+
+      <ConfirmModal
+        show={showDeleteConfirm}
+        onHide={() => setShowDeleteConfirm(false)}
+        onConfirm={confirmDelete}
+        title={`Delete ${deleteTarget?.type === 'variation' ? 'Variation' : deleteTarget?.type === 'exercise' ? 'Exercise' : 'Group'}`}
+        message={getDeleteMessage()}
+      />
+    </>
+  );
+}
