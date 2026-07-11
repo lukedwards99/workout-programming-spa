@@ -1,5 +1,5 @@
 import type { Workout, WorkoutSetWithNames, WorkoutExerciseBlock } from '../types/domain';
-import type { CreateWorkoutInput, UpdateWorkoutInput } from '../types/api';
+import type { CreateWorkoutInput, UpdateWorkoutInput, CopyWorkoutInput } from '../types/api';
 import type { SqlRow, SqlValue } from '../types/database';
 import { queryAll, queryOne, execSQL, lastInsertRowId } from '../db/databaseService';
 
@@ -59,6 +59,33 @@ export const workoutsApi = {
   },
   delete(id: number): void {
     execSQL('DELETE FROM workouts WHERE id = ?', [id]);
+  },
+  copy(id: number, { name, dayOffset }: CopyWorkoutInput): Workout | null {
+    const source = this.get(id);
+    if (!source) return null;
+
+    execSQL('BEGIN');
+    try {
+      execSQL(
+        'INSERT INTO workouts (mesocycle_id, name, day_offset, notes, sort_order) VALUES (?, ?, ?, ?, ?)',
+        [source.mesocycle_id, name, dayOffset, source.notes, source.sort_order]
+      );
+      const newId = lastInsertRowId();
+
+      execSQL(
+        `INSERT INTO workout_sets (workout_id, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes)
+         SELECT ?, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes
+         FROM workout_sets
+         WHERE workout_id = ?`,
+        [newId, id]
+      );
+
+      execSQL('COMMIT');
+      return this.get(newId);
+    } catch (e) {
+      execSQL('ROLLBACK');
+      throw e;
+    }
   },
   getExercisesWithSets(workoutId: number): WorkoutExerciseBlock[] {
     interface BlockRow extends SqlRow {

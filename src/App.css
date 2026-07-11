@@ -210,12 +210,28 @@ tr:hover { background: rgba(255,255,255,.02); }
   display: flex; justify-content: space-between;
 }
 .workout-chip {
-  display: block; padding: 8px 12px; border-radius: 6px;
+  display: flex; align-items: center; gap: 4px;
+  padding: 8px 12px; border-radius: 6px;
   background: var(--bg); border: 1px solid var(--border); margin-bottom: 6px;
   text-decoration: none; color: var(--text); font-size: 14px;
-  transition: .15s; cursor: pointer;
+  transition: .15s;
 }
-.workout-chip:hover { border-color: var(--accent); background: rgba(233,69,96,.08); text-decoration: none; }
+.workout-chip:hover { border-color: var(--accent); background: rgba(233,69,96,.08); }
+.workout-chip-link {
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--text); text-decoration: none;
+}
+.workout-chip-link:hover { text-decoration: none; color: var(--text); }
+.chip-edit-btn {
+  flex-shrink: 0; padding: 2px 8px; font-size: 14px; line-height: 1.5;
+  border-radius: 4px; background: none; border: 1px solid var(--border);
+  color: var(--text-muted); cursor: pointer; transition: .15s;
+}
+.chip-edit-btn:hover { border-color: var(--accent); color: var(--accent); }
+.chip-edit-btn:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 1px;
+}
 .add-chip { display: block; width: 100%; padding: 8px; background: transparent; border: 1px dashed var(--border); border-radius: 6px; color: var(--text-muted); cursor: pointer; font-size: 13px; margin-top: 6px; transition: .15s; }
 .add-chip:hover { border-color: var(--accent); color: var(--accent); }
 

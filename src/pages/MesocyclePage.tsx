@@ -5,7 +5,7 @@ import { activateProgram, deactivateProgram } from '../db/databaseService';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { workoutsApi } from '../api/workoutsApi';
-import { FormModal, ConfirmModal } from '../components';
+import { FormModal, ConfirmModal, WorkoutEditModal } from '../components';
 
 interface Alert {
   type: string;
@@ -29,6 +29,12 @@ export default function MesocyclePage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Edit state ──
+  const [editingWorkout, setEditingWorkout] = useState<Workout | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editDay, setEditDay] = useState(0);
+  const [editBusy, setEditBusy] = useState(false);
 
   useEffect(() => {
     const pid = Number(programId);
@@ -64,6 +70,10 @@ export default function MesocyclePage() {
     setTimeout(() => setAlert(null), 4000);
   };
 
+  const refreshWorkouts = () => {
+    setWorkouts(workoutsApi.list(mesocycle.id));
+  };
+
   const handleAdd = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!woName.trim()) return;
@@ -75,7 +85,7 @@ export default function MesocyclePage() {
     flash('success', `"${woName}" added.`);
     setShowModal(false);
     setWoName('');
-    setWorkouts(workoutsApi.list(mesocycle.id));
+    refreshWorkouts();
   };
 
   const handleDelete = (id: number) => {
@@ -89,7 +99,67 @@ export default function MesocyclePage() {
     if (!pendingDelete) return;
     workoutsApi.delete(pendingDelete.id);
     flash('success', `"${pendingDelete.name}" deleted.`);
-    setWorkouts(workoutsApi.list(mesocycle.id));
+    refreshWorkouts();
+  };
+
+  const openEdit = (workout: Workout) => {
+    setEditingWorkout(workout);
+    setEditName(workout.name);
+    setEditDay(workout.day_offset);
+  };
+
+  const closeEdit = () => {
+    if (editBusy) return;
+    setEditingWorkout(null);
+  };
+
+  const handleEditSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const trimmed = editName.trim();
+    if (!trimmed || !editingWorkout) return;
+    setEditBusy(true);
+    try {
+      const result = workoutsApi.update(editingWorkout.id, {
+        name: trimmed,
+        dayOffset: editDay,
+        notes: editingWorkout.notes ?? undefined,
+      });
+      if (!result) throw new Error('Update returned null');
+      refreshWorkouts();
+      flash('success', `"${trimmed}" updated.`);
+      setEditingWorkout(null);
+    } catch (err) {
+      flash('danger', `Could not update workout: ${(err as Error).message}`);
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    const trimmed = editName.trim();
+    if (!trimmed || !editingWorkout) return;
+    setEditBusy(true);
+    try {
+      const result = workoutsApi.copy(editingWorkout.id, {
+        name: `${trimmed} (Copy)`,
+        dayOffset: editDay,
+      });
+      if (!result) throw new Error('Copy returned null');
+      refreshWorkouts();
+      flash('success', `"${trimmed} (Copy)" created.`);
+      setEditingWorkout(null);
+    } catch (err) {
+      flash('danger', `Could not copy workout: ${(err as Error).message}`);
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleEditDelete = () => {
+    if (!editingWorkout) return;
+    setPendingDelete({ id: editingWorkout.id, name: editingWorkout.name });
+    setEditingWorkout(null);
+    setShowDeleteConfirm(true);
   };
 
   const openAdd = (dayOffset: number) => {
@@ -134,15 +204,15 @@ export default function MesocyclePage() {
                 <span>Day {i + 1}</span>
               </div>
               {dayWorkouts.map((w) => (
-                <div key={w.id} style={{ position: 'relative' }}>
-                  <Link to={`/programs/${program!.id}/workouts/${w.id}`} className="workout-chip">
+                <div key={w.id} className="workout-chip">
+                  <Link to={`/programs/${program!.id}/workouts/${w.id}`} className="workout-chip-link">
                     {w.name}
-                    <button
-                      className="btn btn-xs btn-danger"
-                      style={{ float: 'right', marginTop: -1 }}
-                      onClick={(e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); handleDelete(w.id); }}
-                    >&times;</button>
                   </Link>
+                  <button
+                    className="chip-edit-btn"
+                    aria-label={`Edit ${w.name}`}
+                    onClick={(e: MouseEvent) => { e.preventDefault(); e.stopPropagation(); openEdit(w); }}
+                  >&#9998;</button>
                 </div>
               ))}
               <button className="add-chip" onClick={() => openAdd(i)}>+ Add workout</button>
@@ -170,6 +240,25 @@ export default function MesocyclePage() {
         title="Delete Workout"
         message={`Delete "${pendingDelete?.name}"?`}
       />
+
+      {editingWorkout && (
+        <WorkoutEditModal
+          show={!!editingWorkout}
+          workoutName={editName}
+          dayOffset={editDay}
+          days={Array.from({ length: mesocycle.microcycle_length }, (_, i) => ({
+            value: i,
+            label: `Day ${i + 1} — ${dayName(i)}`,
+          }))}
+          busy={editBusy}
+          onNameChange={setEditName}
+          onDayChange={setEditDay}
+          onSave={handleEditSubmit}
+          onCopy={handleCopy}
+          onDelete={handleEditDelete}
+          onHide={closeEdit}
+        />
+      )}
     </>
   );
 }
