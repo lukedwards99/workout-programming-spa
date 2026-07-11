@@ -144,6 +144,7 @@ export default function ProgramMesocyclesTab() {
                 <td data-label="Start Date">{new Date(m.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                 <td data-label="Workouts"><span className="badge">{m.workout_count} workouts</span></td>
                 <td data-label="Actions" className="row-actions">
+                  <button className="btn btn-outline btn-sm" onClick={(e: MouseEvent) => { e.stopPropagation(); navigate(`/programs/${program.id}/mesocycles/${m.id}`); }}>View</button>
                   <button className="btn btn-outline btn-sm" onClick={(e: MouseEvent) => { e.stopPropagation(); openEdit(m); }}>Edit</button>
                   <button className="btn btn-danger btn-sm" onClick={(e: MouseEvent) => { e.stopPropagation(); handleDelete(m.id); }}>Del</button>
                 </td>
