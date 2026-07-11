@@ -1,17 +1,35 @@
 import { useState, useEffect } from 'react';
 import { useParams, Outlet, Link, NavLink } from 'react-router-dom';
 import { programsApi } from '../api/programsApi';
+import { activateProgram, deactivateProgram } from '../db/databaseService';
 
 export default function ProgramPage() {
   const { programId } = useParams();
   const [program, setProgram] = useState(null);
+  const [error, setError] = useState(null);
+  const [activated, setActivated] = useState(false);
 
   useEffect(() => {
-    const p = programsApi.get(Number(programId));
-    if (p) setProgram(p);
+    setActivated(false);
+    setError(null);
+    const pid = Number(programId);
+    const p = programsApi.get(pid);
+    if (!p) {
+      setError('Program not found.');
+      return;
+    }
+    setProgram(p);
+    activateProgram(pid)
+      .then(() => setActivated(true))
+      .catch((e) => setError(e.message));
+
+    return () => {
+      deactivateProgram().catch(console.error);
+    };
   }, [programId]);
 
-  if (!program) return <div className="empty-state"><p>Program not found.</p></div>;
+  if (error) return <div className="empty-state"><p>{error}</p></div>;
+  if (!program || !activated) return <div className="empty-state"><p>Loading...</p></div>;
 
   return (
     <>

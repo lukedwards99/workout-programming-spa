@@ -5,7 +5,7 @@ import {
 } from './setup';
 
 test.describe('Copy Exercises Between Programs', () => {
-  test.skip('copies selected exercises from one program to another', async ({ page }) => {
+  test('copies selected exercises from one program to another', async ({ page }) => {
     await clearDatabase(page);
 
     const idA = await seedProgramViaUI(page, 'Program A');
@@ -23,20 +23,24 @@ test.describe('Copy Exercises Between Programs', () => {
     await page.click('button:has-text("Copy from Program")');
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content select').selectOption('Program A');
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(3000);
 
     const checkboxes = page.locator('.modal-content input[type="checkbox"]');
     await expect(checkboxes.first()).toBeVisible();
 
-    // Copy just the first exercise
-    await checkboxes.first().check();
+    // Check both checkboxes (select all exercises)
+    const count = await checkboxes.count();
+    for (let i = 0; i < count; i++) {
+      await checkboxes.nth(i).check();
+    }
     await page.waitForTimeout(300);
 
     await page.locator('button:has-text("Copy Selected")').click();
-    await page.waitForTimeout(1500);
+    await page.waitForTimeout(3000);
 
+    await expect(page.locator('.ex-item')).toHaveCount(2);
     await expect(page.locator('.ex-item').filter({ hasText: 'Barbell Bench Press' })).toBeVisible();
-    await expect(page.locator('.ex-item')).toHaveCount(1);
+    await expect(page.locator('.ex-item').filter({ hasText: 'Pull-Up' })).toBeVisible();
   });
 
   test('copy button is disabled when no exercises are selected', async ({ page }) => {

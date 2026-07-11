@@ -2,13 +2,11 @@ import { queryAll, queryOne, execSQL, lastInsertRowId } from '../db/databaseServ
 import { exerciseVariationsApi } from './exerciseVariationsApi';
 
 export const exercisesApi = {
-  list(programId, groupId) {
-    let sql = `SELECT e.* FROM exercises e
-               JOIN exercise_groups eg ON e.exercise_group_id = eg.id
-               WHERE eg.program_id = ?`;
-    const params = [programId];
+  list(groupId) {
+    let sql = `SELECT e.* FROM exercises e`;
+    const params = [];
     if (groupId != null) {
-      sql += ' AND e.exercise_group_id = ?';
+      sql += ' WHERE e.exercise_group_id = ?';
       params.push(groupId);
     }
     sql += ' ORDER BY e.name';
@@ -40,12 +38,11 @@ export const exercisesApi = {
   delete(id) {
     execSQL('DELETE FROM exercises WHERE id = ?', [id]);
   },
-  search(programId, query) {
+  search(query) {
     return queryAll(
       `SELECT e.* FROM exercises e
-       JOIN exercise_groups eg ON e.exercise_group_id = eg.id
-       WHERE eg.program_id = ? AND e.name LIKE ? ORDER BY e.name`,
-      [programId, `%${query}%`]
+       WHERE e.name LIKE ? ORDER BY e.name`,
+      [`%${query}%`]
     );
   },
 };

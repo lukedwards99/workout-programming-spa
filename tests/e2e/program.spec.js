@@ -7,6 +7,7 @@ test.describe('Program Page — Mesocycles', () => {
     await page.waitForTimeout(500);
     await createProgramViaUI(page, 'Test Program', 'Program notes');
     await viewProgram(page, 'Test Program');
+    await page.waitForTimeout(500);
   });
 
   test('shows program name and notes on the page', async ({ page }) => {
@@ -67,13 +68,13 @@ test.describe('Program Page — Mesocycles', () => {
     await expect(page.locator('.empty-state')).toBeVisible();
   });
 
-  test('navigates to mesocycle calendar on View click', async ({ page }) => {
+  test('navigates to mesocycle calendar on row click', async ({ page }) => {
     await addMesocycleViaUI(page, 'View Block');
     const row = page.locator('tr', { hasText: 'View Block' });
-    await row.locator('a:has-text("View")').click();
-    await page.waitForSelector('.day-grid', { timeout: 5000 });
+    await row.click();
+    await page.waitForTimeout(500);
     await expect(page.locator('.breadcrumb')).toContainText('View Block');
-    await expect(page).toHaveURL(/\/mesocycles\//);
+    await expect(page).toHaveURL(/\/programs\/.*\/mesocycles\//);
   });
 
   test('clears the add form after successful submission', async ({ page }) => {

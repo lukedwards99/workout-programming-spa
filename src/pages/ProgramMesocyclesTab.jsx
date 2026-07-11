@@ -23,7 +23,7 @@ export default function ProgramMesocyclesTab() {
     const p = programsApi.get(Number(programId));
     if (p) {
       setProgram(p);
-      setMesocycles(mesocyclesApi.list(p.id));
+      setMesocycles(mesocyclesApi.list());
     }
   }, [programId]);
 
@@ -40,7 +40,6 @@ export default function ProgramMesocyclesTab() {
     e.preventDefault();
     if (!form.name.trim()) return;
     mesocyclesApi.create({
-      programId: program.id,
       name: form.name.trim(),
       microcycleLength: form.microcycleLength,
       startDate: form.startDate,
@@ -118,7 +117,7 @@ export default function ProgramMesocyclesTab() {
           </thead>
           <tbody>
             {mesocycles.map((m) => (
-              <tr key={m.id} className="hoverable-row" onClick={() => navigate(`/mesocycles/${m.id}`)} style={{ cursor: 'pointer' }}>
+              <tr key={m.id} className="hoverable-row" onClick={() => navigate(`/programs/${program.id}/mesocycles/${m.id}`)} style={{ cursor: 'pointer' }}>
                 <td data-label="Name"><strong>{m.name}</strong></td>
                 <td data-label="Length">{m.microcycle_length} days</td>
                 <td data-label="Start Date">{new Date(m.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>

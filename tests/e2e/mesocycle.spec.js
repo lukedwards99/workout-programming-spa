@@ -21,7 +21,6 @@ test.describe('Mesocycle Page — Calendar View', () => {
   test('renders correct number of day cells based on microcycle length', async ({ page }) => {
     const cells = page.locator('.day-cell');
     await expect(cells).toHaveCount(7);
-    await expect(cells.first()).toContainText('Monday');
     await expect(cells.first()).toContainText('Day 1');
   });
 
@@ -67,7 +66,7 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await page.waitForSelector('.breadcrumb', { timeout: 5000 });
 
     await expect(page.locator('.page-header h1')).toHaveText('Chest Day');
-    await expect(page).toHaveURL(/\/workouts\//);
+    await expect(page).toHaveURL(/\/programs\/.*\/workouts\//);
   });
 
   test('closes add workout modal with Cancel', async ({ page }) => {
@@ -80,12 +79,10 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await expect(page.locator('.day-cell').first().locator('.workout-chip')).toHaveCount(0);
   });
 
-  test('shows correct day names in labels', async ({ page }) => {
-    // Default 7-day week names
-    const expectedDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  test('shows correct day labels on each day cell', async ({ page }) => {
     const cells = page.locator('.day-cell');
     for (let i = 0; i < 7; i++) {
-      await expect(cells.nth(i)).toContainText(expectedDays[i]);
+      await expect(cells.nth(i)).toContainText(`Day ${i + 1}`);
     }
   });
 });

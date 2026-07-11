@@ -27,7 +27,6 @@ export const workoutsApi = {
   delete(id) {
     execSQL('DELETE FROM workouts WHERE id = ?', [id]);
   },
-  // Get exercises with their sets for a workout
   getExercisesWithSets(workoutId) {
     const rows = queryAll(
       `SELECT DISTINCT
