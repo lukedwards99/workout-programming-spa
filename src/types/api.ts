@@ -43,6 +43,11 @@ export interface UpdateWorkoutInput {
   notes?: string;
 }
 
+export interface CopyWorkoutInput {
+  name: string;
+  dayOffset: number;
+}
+
 // ── Workout Set ──
 
 export interface CreateWorkoutSetInput {

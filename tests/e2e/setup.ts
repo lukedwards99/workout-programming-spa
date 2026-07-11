@@ -127,10 +127,10 @@ export async function addSetViaUI(page: Page, type: string = 'normal'): Promise<
 export async function fillSetRow(page: Page, exerciseIndex: number, setIndex: number, { reps, weight, rir }: { reps?: number; weight?: number; rir?: number }): Promise<void> {
   const rows = page.locator('.exercise-block').nth(exerciseIndex).locator('.set-table tbody tr');
   const row = rows.nth(setIndex);
-  if (reps !== undefined) await row.locator('input').nth(0).fill(String(reps));
-  if (weight !== undefined) await row.locator('input').nth(1).fill(String(weight));
-  if (rir !== undefined) await row.locator('input').nth(2).fill(String(rir));
-  await page.waitForTimeout(300);
+  if (reps !== undefined) await row.locator('td[data-label="Reps"] input').fill(String(reps));
+  if (weight !== undefined) await row.locator('td[data-label="Weight"] input').fill(String(weight));
+  if (rir !== undefined) await row.locator('td[data-label="RIR"] input').fill(String(rir));
+  await page.waitForTimeout(500);
 }
 
 export async function addExerciseGroupViaUI(page: Page, name: string, notes: string = ''): Promise<void> {
@@ -150,4 +150,31 @@ export async function addExerciseToLibraryViaUI(page: Page, groupName: string, e
   if (notes) await page.locator('.modal-content textarea').fill(notes);
   await page.locator('.modal-content button:has-text("Save")').click();
   await page.waitForTimeout(400);
+}
+
+export async function openWorkoutEdit(page: Page, workoutName: string): Promise<void> {
+  const chip = page.locator('.workout-chip', { hasText: workoutName });
+  await chip.locator('[aria-label^="Edit"]').click();
+  await page.waitForSelector('.modal-content');
+}
+
+export async function editWorkout(page: Page, workoutName: string, newName: string, newDay?: string | number): Promise<void> {
+  await openWorkoutEdit(page, workoutName);
+  if (newName !== workoutName) {
+    await page.locator('#edit-workout-name').fill(newName);
+  }
+  if (newDay !== undefined) {
+    await page.locator('#edit-workout-day').selectOption(String(newDay));
+  }
+  await page.locator('.modal-content button:has-text("Save Changes")').click();
+  await page.waitForTimeout(500);
+}
+
+export async function copyWorkout(page: Page, workoutName: string, targetDay?: string | number): Promise<void> {
+  await openWorkoutEdit(page, workoutName);
+  if (targetDay !== undefined) {
+    await page.locator('#edit-workout-day').selectOption(String(targetDay));
+  }
+  await page.locator('.modal-content button:has-text("Copy Workout")').click();
+  await page.waitForTimeout(500);
 }
