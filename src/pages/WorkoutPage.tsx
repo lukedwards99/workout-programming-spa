@@ -326,9 +326,9 @@ export default function WorkoutPage() {
                 </thead>
                 <tbody>
                   {block.sets.map((s, i, arr) => (
-                    <tr key={s.id}>
-                      <td data-label="Set">{s.set_number}</td>
-                      <td data-label="Type">
+                    <tr className="workout-set-row" key={s.id}>
+                      <td className="set-number-cell" data-label="Set">{s.set_number}</td>
+                      <td className="set-type-cell" data-label="Type">
                         <select
                           value={s.set_type}
                           onChange={(e: ChangeEvent<HTMLSelectElement>) => handleUpdateSet(s.id, 'set_type', e.target.value)}
@@ -337,23 +337,23 @@ export default function WorkoutPage() {
                           {SET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </td>
-                      <td data-label="Planned Reps">
+                      <td className="set-planned-reps-cell" data-label="Planned Reps">
                         <input type="number" value={s.planned_reps ?? ''} placeholder="—"
                           onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'planned_reps', e.target.value)} />
                       </td>
-                      <td data-label="Actual Reps">
+                      <td className="set-actual-reps-cell" data-label="Actual Reps">
                         <input type="number" value={s.actual_reps ?? ''} placeholder="—"
                           onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'actual_reps', e.target.value)} />
                       </td>
-                      <td data-label="Weight">
+                      <td className="set-weight-cell" data-label="Weight">
                         <input type="number" value={s.weight ?? ''} placeholder="—" step="any"
                           onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'weight', e.target.value)} />
                       </td>
-                      <td data-label="RIR">
+                      <td className="set-rir-cell" data-label="RIR">
                         <input type="number" value={s.rir ?? ''} placeholder="—"
                           onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'rir', e.target.value)} />
                       </td>
-                      <td data-label="Notes">
+                      <td className="set-notes-cell" data-label="Notes">
                         {expandedNotes.has(s.id) ? (
                           <>
                             <textarea
@@ -374,7 +374,7 @@ export default function WorkoutPage() {
                           </button>
                         )}
                       </td>
-                      <td data-label="Actions">
+                      <td className="set-actions-cell" data-label="Actions">
                         <span className="set-move-btns">
                           <button className="btn btn-xs btn-outline" disabled={i === 0} onClick={() => handleMoveSet(s.id, -1)}>▲</button>
                           <button className="btn btn-xs btn-outline" disabled={i === arr.length - 1} onClick={() => handleMoveSet(s.id, 1)}>▼</button>

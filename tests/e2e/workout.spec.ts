@@ -103,6 +103,30 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await expect(page.locator('.exercise-block').first()).toContainText('normal');
   });
 
+  test('groups workout set fields into compact pairs on mobile', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await addExerciseViaUI(page, 'Barbell Bench Press');
+
+    const row = page.locator('.workout-set-row').first();
+    const plannedBox = await row.locator('.set-planned-reps-cell').boundingBox();
+    const actualBox = await row.locator('.set-actual-reps-cell').boundingBox();
+    const weightBox = await row.locator('.set-weight-cell').boundingBox();
+    const rirBox = await row.locator('.set-rir-cell').boundingBox();
+    const notesBox = await row.locator('.set-notes-cell').boundingBox();
+    const actionsBox = await row.locator('.set-actions-cell').boundingBox();
+
+    expect(plannedBox).not.toBeNull();
+    expect(actualBox).not.toBeNull();
+    expect(weightBox).not.toBeNull();
+    expect(rirBox).not.toBeNull();
+    expect(notesBox).not.toBeNull();
+    expect(actionsBox).not.toBeNull();
+    expect(plannedBox!.y).toBe(actualBox!.y);
+    expect(weightBox!.y).toBe(rirBox!.y);
+    expect(notesBox!.width).toBeGreaterThan(plannedBox!.width);
+    expect(actionsBox!.width).toBeGreaterThan(plannedBox!.width);
+  });
+
   test('deletes a set from an exercise', async ({ page }) => {
     await addExerciseViaUI(page, 'Barbell Bench Press');
     await addSetViaUI(page, 'normal');

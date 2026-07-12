@@ -626,4 +626,49 @@ tr:hover { background: rgba(255,255,255,.02); }
   .responsive-table tbody td:last-child:before { display: none; }
   .responsive-table .row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
   .responsive-table .hoverable-row:hover { background: rgba(255,255,255,.02); cursor: pointer; }
+
+  /* Workout sets have several editable fields, so group related values instead
+     of using the generic one-field-per-line responsive table layout. */
+  .set-table.responsive-table tbody tr.workout-set-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    margin-bottom: 10px;
+    overflow: hidden;
+  }
+  .set-table.responsive-table tbody tr.workout-set-row td {
+    padding: 7px 10px;
+    font-size: 13px;
+  }
+  .set-table.responsive-table tbody tr.workout-set-row td:first-child {
+    padding-top: 7px;
+    font-size: 14px;
+  }
+  .set-table.responsive-table tbody tr.workout-set-row td::before {
+    margin-bottom: 1px;
+  }
+  .set-table.responsive-table .set-number-cell,
+  .set-table.responsive-table .set-type-cell {
+    padding-top: 10px;
+  }
+  .set-table.responsive-table .set-notes-cell,
+  .set-table.responsive-table .set-actions-cell {
+    grid-column: 1 / -1;
+  }
+  .set-table.responsive-table .set-notes-cell {
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+    padding-top: 8px;
+  }
+  .set-table.responsive-table .set-actions-cell {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 6px;
+    border-top: 1px solid var(--border);
+    margin-top: 2px;
+    padding: 7px 10px 10px;
+  }
+  .set-table.responsive-table .set-actions-cell .set-move-btns {
+    margin-right: 0;
+  }
 }
