@@ -8,6 +8,8 @@ import ProgramMesocyclesTab from './pages/ProgramMesocyclesTab';
 import ProgramExercisesPage from './pages/ProgramExercisesPage';
 import ProgramDataPage from './pages/ProgramDataPage';
 import ProgramSummaryPage from './pages/ProgramSummaryPage';
+import TutorialPage from './pages/TutorialPage';
+import AboutPage from './pages/AboutPage';
 import MesocyclePage from './pages/MesocyclePage';
 import WorkoutPage from './pages/WorkoutPage';
 
@@ -42,6 +44,8 @@ export default function App() {
       <div className="container">
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/tutorial" element={<TutorialPage />} />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="/programs/:programId" element={<ProgramPage />}>
             <Route index element={<ProgramMesocyclesTab />} />
             <Route path="exercises" element={<ProgramExercisesPage />} />

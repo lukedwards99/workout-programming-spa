@@ -101,7 +101,10 @@ export default function HomePage() {
       {programs.length === 0 ? (
         <div className="empty-state">
           <p>No programs yet. Create your first training program to get started.</p>
-        <button className="btn btn-primary" onClick={openAdd} disabled={saving}>+ New Program</button>
+          <button className="btn btn-primary" onClick={openAdd} disabled={saving}>+ New Program</button>
+          <p style={{ marginTop: 12, fontSize: 13 }}>
+            Not sure where to start? <Link to="/tutorial">Check out the tutorial</Link>
+          </p>
         </div>
       ) : (
         <div className="row g-3">
