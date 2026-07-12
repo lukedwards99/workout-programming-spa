@@ -82,9 +82,10 @@ test.describe('Program Page — Mesocycles', () => {
     await expect(page.locator('input[placeholder*="4-Week"]')).toHaveValue('');
   });
 
-  test('has tabs for Mesocycles, Exercises, and Data', async ({ page }) => {
+  test('has tabs for Mesocycles, Exercises, Data, and Summary', async ({ page }) => {
     await expect(page.locator('.program-tabs a').filter({ hasText: 'Mesocycles' })).toBeVisible();
     await expect(page.locator('.program-tabs a').filter({ hasText: 'Exercises' })).toBeVisible();
     await expect(page.locator('.program-tabs a').filter({ hasText: 'Data' })).toBeVisible();
+    await expect(page.locator('.program-tabs a').filter({ hasText: 'Summary' })).toBeVisible();
   });
 });

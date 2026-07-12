@@ -8,7 +8,7 @@ test.describe('Home Page — Programs', () => {
 
   test('shows empty state when no programs exist', async ({ page }) => {
     await expect(page.locator('.empty-state')).toBeVisible();
-    await expect(page.locator('.empty-state p')).toHaveText(/No programs yet/);
+    await expect(page.locator('.empty-state p').first()).toHaveText(/No programs yet/);
   });
 
   test('creates a new program via modal', async ({ page }) => {
