@@ -64,7 +64,6 @@ export interface DatabaseService {
   replaceCatalogDb: (newBytes: Uint8Array) => Promise<void>;
 
   validateProgramStructure: (database: import('sql.js').Database) => boolean;
-  validateLegacyStructure: (database: import('sql.js').Database) => boolean;
 
   exportProgramBackup: (programId: number) => Promise<Uint8Array>;
   importProgramBackup: (programId: number, buffer: ArrayBuffer) => Promise<BackupMetadata>;

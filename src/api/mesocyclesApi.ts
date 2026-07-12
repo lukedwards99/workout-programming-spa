@@ -7,7 +7,7 @@ function asMesocycle(row: SqlRow): Mesocycle {
   return {
     id: row.id as number,
     name: row.name as string,
-    microcycle_length: row.microcycle_length as number,
+    mesocycle_length: row.mesocycle_length as number,
     start_date: row.start_date as string,
     notes: row.notes as string | null,
     sort_order: row.sort_order as number,
@@ -32,17 +32,17 @@ export const mesocyclesApi = {
     const row = queryOne('SELECT * FROM mesocycles WHERE id = ?', [id]);
     return row ? asMesocycle(row) : null;
   },
-  create({ name, microcycleLength, startDate, notes }: CreateMesocycleInput): Mesocycle | null {
+  create({ name, mesocycleLength, startDate, notes }: CreateMesocycleInput): Mesocycle | null {
     execSQL(
-      'INSERT INTO mesocycles (name, microcycle_length, start_date, notes) VALUES (?, ?, ?, ?)',
-      [name, microcycleLength || 7, startDate, notes || null]
+      'INSERT INTO mesocycles (name, mesocycle_length, start_date, notes) VALUES (?, ?, ?, ?)',
+      [name, mesocycleLength || 7, startDate, notes || null]
     );
     return this.get(lastInsertRowId());
   },
-  update(id: number, { name, microcycleLength, startDate, notes }: UpdateMesocycleInput): Mesocycle | null {
+  update(id: number, { name, mesocycleLength, startDate, notes }: UpdateMesocycleInput): Mesocycle | null {
     execSQL(
-      'UPDATE mesocycles SET name = ?, microcycle_length = ?, start_date = ?, notes = ? WHERE id = ?',
-      [name, microcycleLength, startDate, notes || null, id]
+      'UPDATE mesocycles SET name = ?, mesocycle_length = ?, start_date = ?, notes = ? WHERE id = ?',
+      [name, mesocycleLength, startDate, notes || null, id]
     );
     return this.get(id);
   },

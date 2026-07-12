@@ -3,6 +3,33 @@ import type { CreateWorkoutInput, UpdateWorkoutInput, CopyWorkoutInput } from '.
 import type { SqlRow, SqlValue } from '../types/database';
 import { queryAll, queryOne, execSQL, lastInsertRowId } from '../db/databaseService';
 
+/**
+ * Inserts a new workout row and deep-copies all workout_sets from the source.
+ * Does NOT start its own transaction — the caller must wrap in BEGIN/COMMIT.
+ * Returns the new workout ID.
+ */
+export function cloneWorkoutSets(
+  source: Workout,
+  name: string,
+  dayOffset: number
+): number {
+  execSQL(
+    'INSERT INTO workouts (mesocycle_id, name, day_offset, notes, sort_order) VALUES (?, ?, ?, ?, ?)',
+    [source.mesocycle_id, name, dayOffset, source.notes, source.sort_order]
+  );
+  const newId = lastInsertRowId();
+
+  execSQL(
+    `INSERT INTO workout_sets (workout_id, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes)
+     SELECT ?, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes
+     FROM workout_sets
+     WHERE workout_id = ?`,
+    [newId, source.id]
+  );
+
+  return newId;
+}
+
 function asWorkout(row: SqlRow): Workout {
   return {
     id: row.id as number,
@@ -66,20 +93,7 @@ export const workoutsApi = {
 
     execSQL('BEGIN');
     try {
-      execSQL(
-        'INSERT INTO workouts (mesocycle_id, name, day_offset, notes, sort_order) VALUES (?, ?, ?, ?, ?)',
-        [source.mesocycle_id, name, dayOffset, source.notes, source.sort_order]
-      );
-      const newId = lastInsertRowId();
-
-      execSQL(
-        `INSERT INTO workout_sets (workout_id, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes)
-         SELECT ?, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes
-         FROM workout_sets
-         WHERE workout_id = ?`,
-        [newId, id]
-      );
-
+      const newId = cloneWorkoutSets(source, name, dayOffset);
       execSQL('COMMIT');
       return this.get(newId);
     } catch (e) {

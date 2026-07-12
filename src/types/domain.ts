@@ -15,7 +15,7 @@ export interface Program {
 export interface Mesocycle {
   id: EntityId;
   name: string;
-  microcycle_length: number;
+  mesocycle_length: number;
   start_date: IsoDate;
   notes: string | null;
   sort_order: number;
