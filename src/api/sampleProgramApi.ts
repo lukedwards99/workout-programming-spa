@@ -7,6 +7,7 @@ import { workoutsApi } from './workoutsApi';
 import { workoutSetsApi } from './workoutSetsApi';
 import { activateProgram, deactivateProgram } from '../db/databaseService';
 import { localToday } from '../utils/dates';
+import type { WorkoutSetType } from '../types/domain';
 
 interface SetDef {
   exerciseName: string;
@@ -165,12 +166,18 @@ export async function createSampleProgram(): Promise<SampleProgramResult> {
 
       let exerciseOrder = 0;
       let currentExName = '';
+      let currentBlockKey = '';
       let currentSetNum = 0;
 
       for (const sDef of wDef.sets) {
         if (sDef.exerciseName !== currentExName) {
           exerciseOrder++;
           currentExName = sDef.exerciseName;
+        }
+
+        const blockKey = `${sDef.exerciseName}::${sDef.variationName ?? ''}`;
+        if (blockKey !== currentBlockKey) {
+          currentBlockKey = blockKey;
           currentSetNum = 1;
         } else {
           currentSetNum++;
@@ -192,7 +199,7 @@ export async function createSampleProgram(): Promise<SampleProgramResult> {
           exerciseVariationId: varId,
           exerciseOrder,
           setNumber: currentSetNum,
-          setType: sDef.setType as 'warmup' | 'normal' | 'dropset' | 'failure',
+          setType: sDef.setType as WorkoutSetType,
           plannedReps: sDef.reps,
           weight: sDef.weight,
           rir: sDef.rir ?? null,
