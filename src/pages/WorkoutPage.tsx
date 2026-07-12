@@ -13,10 +13,10 @@ import { summaryApi } from '../api/summaryApi';
 import { FormModal, ConfirmModal } from '../components';
 import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
 
-const SET_TYPES = ['warmup', 'normal', 'dropset', 'failure'] as const;
+const SET_TYPES = ['warmup', 'normal', 'dropset', 'failure', 'rest-pause'] as const;
 
 function setBadgeClass(type: string): string {
-  const map: Record<string, string> = { warmup: 'badge-warmup', normal: 'badge-normal', dropset: 'badge-dropset', failure: 'badge-failure' };
+  const map: Record<string, string> = { warmup: 'badge-warmup', normal: 'badge-normal', dropset: 'badge-dropset', failure: 'badge-failure', 'rest-pause': 'badge-rest-pause' };
   return map[type] || 'badge-normal';
 }
 
@@ -143,7 +143,7 @@ export default function WorkoutPage() {
   };
 
   const handleUpdateSet = (setId: number, field: string, value: string) => {
-    const numericFields = ['reps', 'weight', 'rir', 'set_number'];
+    const numericFields = ['planned_reps', 'actual_reps', 'weight', 'rir', 'set_number'];
     const s: Record<string, string | number | null> = {};
     if (value === '') {
       s[field] = null;
@@ -276,7 +276,8 @@ export default function WorkoutPage() {
                   <tr>
                     <th>#</th>
                     <th>Type</th>
-                    <th>Reps</th>
+                    <th>Planned Reps</th>
+                    <th>Actual Reps</th>
                     <th>Weight</th>
                     <th>RIR</th>
                     <th>Notes</th>
@@ -296,9 +297,13 @@ export default function WorkoutPage() {
                           {SET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </td>
-                      <td data-label="Reps">
-                        <input type="number" value={s.reps ?? ''} placeholder="—"
-                          onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'reps', e.target.value)} />
+                      <td data-label="Planned Reps">
+                        <input type="number" value={s.planned_reps ?? ''} placeholder="—"
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'planned_reps', e.target.value)} />
+                      </td>
+                      <td data-label="Actual Reps">
+                        <input type="number" value={s.actual_reps ?? ''} placeholder="—"
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'actual_reps', e.target.value)} />
                       </td>
                       <td data-label="Weight">
                         <input type="number" value={s.weight ?? ''} placeholder="—" step="any"

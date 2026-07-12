@@ -20,8 +20,8 @@ export function cloneWorkoutSets(
   const newId = lastInsertRowId();
 
   execSQL(
-    `INSERT INTO workout_sets (workout_id, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes)
-     SELECT ?, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes
+    `INSERT INTO workout_sets (workout_id, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, planned_reps, actual_reps, weight, rir, notes)
+     SELECT ?, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, planned_reps, actual_reps, weight, rir, notes
      FROM workout_sets
      WHERE workout_id = ?`,
     [newId, source.id]
@@ -50,7 +50,8 @@ function asSetWithNames(row: SqlRow): WorkoutSetWithNames {
     exercise_order: row.exercise_order as number,
     set_number: row.set_number as number,
     set_type: row.set_type as WorkoutSetWithNames['set_type'],
-    reps: row.reps as number | null,
+    planned_reps: row.planned_reps as number | null,
+    actual_reps: row.actual_reps as number | null,
     weight: row.weight as number | null,
     rir: row.rir as number | null,
     notes: row.notes as string | null,

@@ -146,8 +146,8 @@ test.describe('Workout Generator', () => {
     await addExerciseViaUI(page, 'Bench Press');
     await addSetViaUI(page, 'normal');
     await addSetViaUI(page, 'dropset');
-    await fillSetRow(page, 0, 0, { reps: 10, weight: 135, rir: 2 });
-    await fillSetRow(page, 0, 1, { reps: 8, weight: 95 });
+    await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 135, rir: 2 });
+    await fillSetRow(page, 0, 1, { plannedReps: 8, weight: 95 });
     await page.waitForTimeout(500);
 
     // Navigate back to mesocycle page

@@ -158,6 +158,7 @@ tr:hover { background: rgba(255,255,255,.02); }
 .badge-normal { background: #1a4a2a; color: var(--success); }
 .badge-dropset { background: #4a3a1a; color: var(--warning); }
 .badge-failure { background: #4a1a2a; color: var(--danger); }
+.badge-rest-pause { background: #3d245f; color: #c99cff; }
 
 /* ── Loading ── */
 .loading-screen {

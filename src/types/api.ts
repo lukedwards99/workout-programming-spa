@@ -57,7 +57,8 @@ export interface CreateWorkoutSetInput {
   exerciseOrder: number;
   setNumber: number;
   setType?: WorkoutSetType;
-  reps?: number | null;
+  plannedReps?: number | null;
+  actualReps?: number | null;
   weight?: number | null;
   rir?: number | null;
   notes?: string;
@@ -66,7 +67,8 @@ export interface CreateWorkoutSetInput {
 export interface UpdateWorkoutSetInput {
   set_type?: WorkoutSetType;
   set_number?: number;
-  reps?: number | null;
+  planned_reps?: number | null;
+  actual_reps?: number | null;
   weight?: number | null;
   rir?: number | null;
   notes?: string;

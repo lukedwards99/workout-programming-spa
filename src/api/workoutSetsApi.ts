@@ -12,7 +12,8 @@ function asWorkoutSet(row: SqlRow): WorkoutSet {
     exercise_order: row.exercise_order as number,
     set_number: row.set_number as number,
     set_type: row.set_type as WorkoutSet['set_type'],
-    reps: row.reps as number | null,
+    planned_reps: row.planned_reps as number | null,
+    actual_reps: row.actual_reps as number | null,
     weight: row.weight as number | null,
     rir: row.rir as number | null,
     notes: row.notes as string | null,
@@ -43,11 +44,11 @@ export const workoutSetsApi = {
     const row = queryOne('SELECT * FROM workout_sets WHERE id = ?', [id]);
     return row ? asWorkoutSet(row) : null;
   },
-  create({ workoutId, exerciseId, exerciseVariationId, exerciseOrder, setNumber, setType, reps, weight, rir, notes }: CreateWorkoutSetInput): WorkoutSet | null {
+  create({ workoutId, exerciseId, exerciseVariationId, exerciseOrder, setNumber, setType, plannedReps, actualReps, weight, rir, notes }: CreateWorkoutSetInput): WorkoutSet | null {
     execSQL(
-      `INSERT INTO workout_sets (workout_id, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [workoutId, exerciseId, (exerciseVariationId as SqlValue) ?? null, exerciseOrder, setNumber, setType || 'normal', (reps as SqlValue) ?? null, (weight as SqlValue) ?? null, (rir as SqlValue) ?? null, notes || null]
+      `INSERT INTO workout_sets (workout_id, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, planned_reps, actual_reps, weight, rir, notes)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [workoutId, exerciseId, (exerciseVariationId as SqlValue) ?? null, exerciseOrder, setNumber, setType || 'normal', (plannedReps as SqlValue) ?? null, (actualReps as SqlValue) ?? null, (weight as SqlValue) ?? null, (rir as SqlValue) ?? null, notes || null]
     );
     return this.get(lastInsertRowId());
   },
@@ -56,13 +57,14 @@ export const workoutSetsApi = {
     if (!existing) return null;
     const setNumber = changes.set_number ?? existing.set_number as number;
     const setType = changes.set_type ?? existing.set_type as WorkoutSet['set_type'];
-    const repVal = changes.reps !== undefined ? changes.reps : existing.reps as number | null;
+    const plannedReps = changes.planned_reps !== undefined ? changes.planned_reps : existing.planned_reps as number | null;
+    const actualReps = changes.actual_reps !== undefined ? changes.actual_reps : existing.actual_reps as number | null;
     const weightVal = changes.weight !== undefined ? changes.weight : existing.weight as number | null;
     const rirVal = changes.rir !== undefined ? changes.rir : existing.rir as number | null;
     const notesVal = changes.notes !== undefined ? changes.notes : existing.notes as string | null;
     execSQL(
-      'UPDATE workout_sets SET set_number = ?, set_type = ?, reps = ?, weight = ?, rir = ?, notes = ? WHERE id = ?',
-      [setNumber, setType, repVal ?? null, weightVal ?? null, rirVal ?? null, notesVal || null, id]
+      'UPDATE workout_sets SET set_number = ?, set_type = ?, planned_reps = ?, actual_reps = ?, weight = ?, rir = ?, notes = ? WHERE id = ?',
+      [setNumber, setType, plannedReps ?? null, actualReps ?? null, weightVal ?? null, rirVal ?? null, notesVal || null, id]
     );
     return this.get(id);
   },

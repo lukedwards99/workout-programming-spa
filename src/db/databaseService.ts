@@ -129,7 +129,7 @@ function validateProgramStructure(database: import('sql.js').Database): boolean 
     exercise_groups: ['id', 'name', 'notes'],
     exercises: ['id', 'exercise_group_id', 'name', 'tutorial_url', 'notes'],
     exercise_variations: ['id', 'exercise_id', 'name', 'is_primary', 'tutorial_url', 'notes'],
-    workout_sets: ['id', 'workout_id', 'exercise_id', 'exercise_variation_id', 'exercise_order', 'set_number', 'set_type', 'reps', 'weight', 'rir', 'notes'],
+    workout_sets: ['id', 'workout_id', 'exercise_id', 'exercise_variation_id', 'exercise_order', 'set_number', 'set_type', 'planned_reps', 'actual_reps', 'weight', 'rir', 'notes'],
   };
   for (const [table, columns] of Object.entries(requiredTables)) {
     try {

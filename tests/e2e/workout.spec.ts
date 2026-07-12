@@ -55,20 +55,22 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await addSetViaUI(page, 'normal');
     await addSetViaUI(page, 'dropset');
     await addSetViaUI(page, 'failure');
+    await addSetViaUI(page, 'rest-pause');
 
     const body = page.locator('.exercise-block').first().locator('.set-table tbody');
-    await expect(body.locator('tr')).toHaveCount(5);
+    await expect(body.locator('tr')).toHaveCount(6);
     await expect(body).toContainText('warmup');
     await expect(body).toContainText('normal');
     await expect(body).toContainText('dropset');
     await expect(body).toContainText('failure');
+    await expect(body).toContainText('rest-pause');
   });
 
   test('set inputs exist and are editable', async ({ page }) => {
     await addExerciseViaUI(page, 'Barbell Bench Press');
     const firstRow = page.locator('.exercise-block').first().locator('.set-table tbody tr').first();
     const inputs = firstRow.locator('input');
-    await expect(inputs).toHaveCount(3);
+    await expect(inputs).toHaveCount(4);
     await expect(page.locator('.exercise-block').first()).toContainText('normal');
   });
 
@@ -108,5 +110,8 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await addSetViaUI(page, 'normal');
     await page.waitForTimeout(400);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('2');
+    await addSetViaUI(page, 'rest-pause');
+    await page.waitForTimeout(400);
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('3');
   });
 });

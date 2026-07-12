@@ -193,7 +193,7 @@ export async function createSampleProgram(): Promise<SampleProgramResult> {
           exerciseOrder,
           setNumber: currentSetNum,
           setType: sDef.setType as 'warmup' | 'normal' | 'dropset' | 'failure',
-          reps: sDef.reps,
+          plannedReps: sDef.reps,
           weight: sDef.weight,
           rir: sDef.rir ?? null,
         });
