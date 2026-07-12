@@ -16,14 +16,14 @@ export interface UpdateProgramInput {
 
 export interface CreateMesocycleInput {
   name: string;
-  microcycleLength?: number;
+  mesocycleLength?: number;
   startDate: IsoDate;
   notes?: string;
 }
 
 export interface UpdateMesocycleInput {
   name: string;
-  microcycleLength: number;
+  mesocycleLength: number;
   startDate: IsoDate;
   notes?: string;
 }

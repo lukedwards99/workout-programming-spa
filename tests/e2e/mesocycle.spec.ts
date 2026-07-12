@@ -21,7 +21,7 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await expect(page.locator('.breadcrumb')).toContainText('Block 1');
   });
 
-  test('renders correct number of day cells based on microcycle length', async ({ page }) => {
+  test('renders correct number of day cells based on mesocycle length', async ({ page }) => {
     const cells = page.locator('.day-cell');
     await expect(cells).toHaveCount(7);
     await expect(cells.first()).toContainText('Day 1');

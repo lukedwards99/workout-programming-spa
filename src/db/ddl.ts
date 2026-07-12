@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION: number = 3;
+export const SCHEMA_VERSION: number = 4;
 
 export const createCatalogSQL: string = `
 PRAGMA foreign_keys = ON;
@@ -25,12 +25,12 @@ CREATE TABLE IF NOT EXISTS schema_version (
 );
 
 CREATE TABLE IF NOT EXISTS mesocycles (
-    id                INTEGER PRIMARY KEY AUTOINCREMENT,
-    name              TEXT    NOT NULL,
-    microcycle_length INTEGER NOT NULL DEFAULT 7,
-    start_date        TEXT    NOT NULL,
-    notes             TEXT,
-    sort_order        INTEGER NOT NULL DEFAULT 0
+    id               INTEGER PRIMARY KEY AUTOINCREMENT,
+    name             TEXT    NOT NULL,
+    mesocycle_length INTEGER NOT NULL DEFAULT 7,
+    start_date       TEXT    NOT NULL,
+    notes            TEXT,
+    sort_order       INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS workouts (

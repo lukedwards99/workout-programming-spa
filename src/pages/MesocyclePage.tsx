@@ -6,6 +6,7 @@ import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { workoutsApi } from '../api/workoutsApi';
 import { FormModal, ConfirmModal, WorkoutEditModal } from '../components';
+import WorkoutGeneratorModal from '../components/workout-generator/WorkoutGeneratorModal';
 
 interface Alert {
   type: string;
@@ -35,6 +36,9 @@ export default function MesocyclePage() {
   const [editName, setEditName] = useState('');
   const [editDay, setEditDay] = useState(0);
   const [editBusy, setEditBusy] = useState(false);
+
+  // ── Generator state ──
+  const [showGenerator, setShowGenerator] = useState(false);
 
   useEffect(() => {
     const pid = Number(programId);
@@ -186,15 +190,18 @@ export default function MesocyclePage() {
 
       <div className="page-header">
         <h1>{mesocycle.name}</h1>
+        <button className="btn btn-outline" onClick={() => setShowGenerator(true)}>
+          Generate Workouts
+        </button>
       </div>
       <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
-        Started {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} &middot; {mesocycle.microcycle_length}-day mesocycle
+        Started {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} &middot; {mesocycle.mesocycle_length}-day mesocycle
       </p>
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
       <div className="row g-3 mb-4">
-        {Array.from({ length: mesocycle.microcycle_length }, (_, i) => {
+        {Array.from({ length: mesocycle.mesocycle_length }, (_, i) => {
           const dayWorkouts = workouts.filter((w) => w.day_offset === i);
           return (
             <div className="col-6 col-sm-4 col-md-3 col-lg-2" key={i}>
@@ -246,7 +253,7 @@ export default function MesocyclePage() {
           show={!!editingWorkout}
           workoutName={editName}
           dayOffset={editDay}
-          days={Array.from({ length: mesocycle.microcycle_length }, (_, i) => ({
+          days={Array.from({ length: mesocycle.mesocycle_length }, (_, i) => ({
             value: i,
             label: `Day ${i + 1} — ${dayName(i)}`,
           }))}
@@ -257,6 +264,19 @@ export default function MesocyclePage() {
           onCopy={handleCopy}
           onDelete={handleEditDelete}
           onHide={closeEdit}
+        />
+      )}
+
+      {mesocycle && (
+        <WorkoutGeneratorModal
+          show={showGenerator}
+          mesocycle={mesocycle}
+          workouts={workouts}
+          onHide={() => setShowGenerator(false)}
+          onGenerated={(count) => {
+            refreshWorkouts();
+            flash('success', `${count} workout${count !== 1 ? 's' : ''} generated.`);
+          }}
         />
       )}
     </>

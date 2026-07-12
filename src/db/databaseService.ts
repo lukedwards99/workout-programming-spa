@@ -2,12 +2,11 @@ import type { SqlValue, SqlRow, SqlParams, IDBBatchOp } from '../types/database'
 import type { BackupMetadata, BackupValidationResult } from '../types/api';
 import { createCatalogSQL, createProgramSQL, SCHEMA_VERSION } from './ddl';
 
-const IDB_NAME = 'workout-programming-v3';
+const IDB_NAME = 'workout-programming-v4';
 const IDB_STORE = 'databases';
 const CATALOG_KEY = 'catalog-v1';
 const PROGRAM_KEY_PREFIX = 'program-v1:';
-const MIGRATION_MARKER_KEY = 'migration-v3-complete';
-const LEGACY_V2_KEY = 'v2';
+const MIGRATION_MARKER_KEY = 'migration-v4-complete';
 const SQL_WASM_URL = 'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.wasm';
 
 let SQL: import('sql.js').SqlJsStatic | null = null;
@@ -206,7 +205,7 @@ function validateProgramStructure(database: import('sql.js').Database): boolean 
   }
 
   const requiredTables: Record<string, string[]> = {
-    mesocycles: ['id', 'name', 'microcycle_length', 'start_date', 'notes', 'sort_order'],
+    mesocycles: ['id', 'name', 'mesocycle_length', 'start_date', 'notes', 'sort_order'],
     workouts: ['id', 'mesocycle_id', 'name', 'day_offset', 'notes', 'sort_order'],
     exercise_groups: ['id', 'name', 'notes'],
     exercises: ['id', 'exercise_group_id', 'name', 'tutorial_url', 'notes'],
@@ -228,30 +227,7 @@ function validateProgramStructure(database: import('sql.js').Database): boolean 
   return true;
 }
 
-function validateLegacyStructure(database: import('sql.js').Database): boolean {
-  const requiredTables: Record<string, string[]> = {
-    programs: ['id', 'name', 'created_at', 'notes'],
-    mesocycles: ['id', 'program_id', 'name', 'microcycle_length', 'start_date', 'notes', 'sort_order'],
-    workouts: ['id', 'mesocycle_id', 'name', 'day_offset', 'notes', 'sort_order'],
-    exercise_groups: ['id', 'program_id', 'name', 'notes'],
-    exercises: ['id', 'exercise_group_id', 'name', 'tutorial_url', 'notes'],
-    exercise_variations: ['id', 'exercise_id', 'name', 'is_primary', 'tutorial_url', 'notes'],
-    workout_sets: ['id', 'workout_id', 'exercise_id', 'exercise_variation_id', 'exercise_order', 'set_number', 'set_type', 'reps', 'weight', 'rir', 'notes'],
-  };
-  for (const [table, columns] of Object.entries(requiredTables)) {
-    try {
-      const info = database.exec(`PRAGMA table_info(${table})`);
-      if (!info.length || !info[0].values.length) return false;
-      const existingColumns = info[0].values.map((r: SqlValue[]) => r[1] as string);
-      for (const col of columns) {
-        if (!existingColumns.includes(col)) return false;
-      }
-    } catch {
-      return false;
-    }
-  }
-  return true;
-}
+
 
 // ── Program store management ──
 
@@ -346,178 +322,6 @@ async function saveNewProgramStore(programId: number, database: import('sql.js')
   await idbPut(programKey(programId), database.export());
 }
 
-// ── Legacy migration ──
-
-async function migrateLegacyData(legacyDb: import('sql.js').Database): Promise<void> {
-  const sql = await loadSqlJs();
-
-  const programs = readLegacyPrograms(legacyDb);
-
-  const catalog = new sql.Database();
-  catalog.run(createCatalogSQL);
-
-  if (programs.length === 0) {
-    if (catalogDb) catalogDb.close();
-    catalogDb = catalog;
-    await saveCatalog();
-    await idbPut(MIGRATION_MARKER_KEY, 1);
-    return;
-  }
-
-  const programStores: { id: number; db: import('sql.js').Database }[] = [];
-
-  for (const prog of programs) {
-    const progDb = new sql.Database();
-    progDb.run(createProgramSQL);
-
-    // Copy mesocycles
-    const mesos = readAll(legacyDb, `SELECT * FROM mesocycles WHERE program_id = ?`, [prog.id]);
-    const mesoIds: number[] = [];
-    for (const m of mesos) {
-      progDb.run(
-        'INSERT INTO mesocycles (id, name, microcycle_length, start_date, notes, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
-        [m.id, m.name, m.microcycle_length, m.start_date, m.notes, m.sort_order]
-      );
-      mesoIds.push(m.id as number);
-    }
-
-    // Copy workouts for these mesocycles
-    let allWorkoutIds: number[] = [];
-    if (mesoIds.length > 0) {
-      for (const mesoId of mesoIds) {
-        const workouts = readAll(legacyDb, 'SELECT * FROM workouts WHERE mesocycle_id = ?', [mesoId]);
-        for (const w of workouts) {
-          progDb.run(
-            'INSERT INTO workouts (id, mesocycle_id, name, day_offset, notes, sort_order) VALUES (?, ?, ?, ?, ?, ?)',
-            [w.id, w.mesocycle_id, w.name, w.day_offset, w.notes, w.sort_order]
-          );
-          allWorkoutIds.push(w.id as number);
-        }
-      }
-    }
-
-    // Copy exercise_groups
-    const groups = readAll(legacyDb, 'SELECT * FROM exercise_groups WHERE program_id = ?', [prog.id]);
-    const groupIds: number[] = [];
-    for (const g of groups) {
-      progDb.run(
-        'INSERT INTO exercise_groups (id, name, notes) VALUES (?, ?, ?)',
-        [g.id, g.name, g.notes]
-      );
-      groupIds.push(g.id as number);
-    }
-
-    // Copy exercises
-    let allExIds: number[] = [];
-    if (groupIds.length > 0) {
-      for (const gid of groupIds) {
-        const exercises = readAll(legacyDb, 'SELECT * FROM exercises WHERE exercise_group_id = ?', [gid]);
-        for (const e of exercises) {
-          progDb.run(
-            'INSERT INTO exercises (id, exercise_group_id, name, tutorial_url, notes) VALUES (?, ?, ?, ?, ?)',
-            [e.id, e.exercise_group_id, e.name, e.tutorial_url, e.notes]
-          );
-          allExIds.push(e.id as number);
-        }
-      }
-
-      // Copy exercise_variations
-      if (allExIds.length > 0) {
-        for (const exId of allExIds) {
-          const vars = readAll(legacyDb, 'SELECT * FROM exercise_variations WHERE exercise_id = ?', [exId]);
-          for (const v of vars) {
-            progDb.run(
-              'INSERT INTO exercise_variations (id, exercise_id, name, is_primary, tutorial_url, notes) VALUES (?, ?, ?, ?, ?, ?)',
-              [v.id, v.exercise_id, v.name, v.is_primary, v.tutorial_url, v.notes]
-            );
-          }
-        }
-      }
-    }
-
-    // Copy workout_sets (only where both workout and exercise are in this program)
-    if (allWorkoutIds.length > 0 && allExIds.length > 0) {
-      for (const wid of allWorkoutIds) {
-        const placeholders = allExIds.map(() => '?').join(',');
-        const sets = readAll(legacyDb, `SELECT * FROM workout_sets WHERE workout_id = ? AND exercise_id IN (${placeholders})`, [wid, ...allExIds]);
-        for (const s of sets) {
-          progDb.run(
-            'INSERT INTO workout_sets (id, workout_id, exercise_id, exercise_variation_id, exercise_order, set_number, set_type, reps, weight, rir, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [s.id, s.workout_id, s.exercise_id, (s.exercise_variation_id as SqlValue) ?? null, s.exercise_order, s.set_number, s.set_type, (s.reps as SqlValue) ?? null, (s.weight as SqlValue) ?? null, (s.rir as SqlValue) ?? null, s.notes]
-          );
-        }
-      }
-    }
-
-    if (!validateProgramStructure(progDb)) {
-      progDb.close();
-      throw new Error(`Generated program store for "${prog.name}" failed validation.`);
-    }
-
-    programStores.push({ id: prog.id, db: progDb });
-
-    // Insert into catalog
-    catalog.run(
-      'INSERT INTO programs (id, name, notes, created_at) VALUES (?, ?, ?, ?)',
-      [prog.id, prog.name, prog.notes, prog.created_at]
-    );
-  }
-
-  // Atomically persist everything in one IDB transaction
-  const idb = await openIndexedDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = idb.transaction(IDB_STORE, 'readwrite');
-    const store = tx.objectStore(IDB_STORE);
-    store.put(catalog.export(), CATALOG_KEY);
-    for (const ps of programStores) {
-      store.put(ps.db.export(), programKey(ps.id));
-    }
-    store.put(1, MIGRATION_MARKER_KEY);
-    tx.oncomplete = () => resolve();
-    tx.onerror = (e) => reject((e.target as IDBTransaction).error);
-  });
-
-  // Only delete legacy after successful write
-  await idbDelete(LEGACY_V2_KEY);
-
-  // Clean up program DBs
-  for (const ps of programStores) {
-    ps.db.close();
-  }
-
-  // Set catalogDb
-  if (catalogDb) catalogDb.close();
-  catalogDb = catalog;
-}
-
-interface LegacyProgram {
-  id: number;
-  name: string;
-  notes: string | null;
-  created_at: string;
-}
-
-function readLegacyPrograms(legacyDb: import('sql.js').Database): LegacyProgram[] {
-  const rows: LegacyProgram[] = [];
-  const stmt = legacyDb.prepare('SELECT * FROM programs');
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject() as unknown as LegacyProgram);
-  }
-  stmt.free();
-  return rows;
-}
-
-function readAll(db: import('sql.js').Database, sql: string, params: SqlParams = []): SqlRow[] {
-  const rows: SqlRow[] = [];
-  const stmt = db.prepare(sql);
-  if (params.length) stmt.bind(params);
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
-}
-
 // ── Init ──
 
 async function initDatabase(): Promise<void> {
@@ -526,27 +330,10 @@ async function initDatabase(): Promise<void> {
   const migrationDone = await idbGet(MIGRATION_MARKER_KEY);
 
   if (!migrationDone) {
-    const legacyData = await idbGet(LEGACY_V2_KEY);
-    if (legacyData && legacyData instanceof Uint8Array) {
-      const legacyDb = new sql.Database(legacyData);
-      if (validateLegacyStructure(legacyDb)) {
-        try {
-          await migrateLegacyData(legacyDb);
-          legacyDb.close();
-        } catch (e) {
-          legacyDb.close();
-          throw new Error(`Legacy migration failed: ${(e as Error).message}. Original data preserved.`);
-        }
-      } else {
-        legacyDb.close();
-        throw new Error('Legacy database has invalid structure. Migration cannot proceed.');
-      }
-    } else {
-      catalogDb = new sql.Database();
-      catalogDb.run(createCatalogSQL);
-      await saveCatalog();
-      await idbPut(MIGRATION_MARKER_KEY, 1);
-    }
+    catalogDb = new sql.Database();
+    catalogDb.run(createCatalogSQL);
+    await saveCatalog();
+    await idbPut(MIGRATION_MARKER_KEY, 1);
   } else {
     const catalogData = await idbGet(CATALOG_KEY);
     if (catalogData && catalogData instanceof Uint8Array) {
@@ -776,7 +563,6 @@ export {
   replaceCatalogDb,
 
   validateProgramStructure,
-  validateLegacyStructure,
 
   exportProgramBackup,
   importProgramBackup,

@@ -6,7 +6,7 @@ import {
   createProgramStore, programKey, getCatalogDb, replaceCatalogDb,
 } from '../db/databaseService';
 
-const IDB_NAME = 'workout-programming-v3';
+const IDB_NAME = 'workout-programming-v4';
 const IDB_STORE = 'databases';
 const CATALOG_KEY = 'catalog-v1';
 

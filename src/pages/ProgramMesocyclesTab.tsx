@@ -17,7 +17,7 @@ interface PendingDelete {
 
 interface MesoForm {
   name: string;
-  microcycleLength: number;
+  mesocycleLength: number;
   startDate: string;
   notes: string;
 }
@@ -28,9 +28,9 @@ export default function ProgramMesocyclesTab() {
   const [program, setProgram] = useState<Program | null>(null);
   const [mesocycles, setMesocycles] = useState<MesocycleWithWorkoutCount[]>([]);
   const [alert, setAlert] = useState<Alert | null>(null);
-  const [form, setForm] = useState<MesoForm>({ name: '', microcycleLength: 7, startDate: today(), notes: '' });
+  const [form, setForm] = useState<MesoForm>({ name: '', mesocycleLength: 7, startDate: today(), notes: '' });
   const [editId, setEditId] = useState<number | null>(null);
-  const [editForm, setEditForm] = useState<MesoForm>({ name: '', microcycleLength: 7, startDate: '', notes: '' });
+  const [editForm, setEditForm] = useState<MesoForm>({ name: '', mesocycleLength: 7, startDate: '', notes: '' });
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
@@ -59,18 +59,18 @@ export default function ProgramMesocyclesTab() {
     if (!form.name.trim()) return;
     mesocyclesApi.create({
       name: form.name.trim(),
-      microcycleLength: form.microcycleLength,
+      mesocycleLength: form.mesocycleLength,
       startDate: form.startDate,
       notes: form.notes,
     });
     flash('success', `"${form.name}" added.`);
-    setForm({ name: '', microcycleLength: 7, startDate: today(), notes: '' });
+    setForm({ name: '', mesocycleLength: 7, startDate: today(), notes: '' });
     load();
   };
 
   const openEdit = (m: MesocycleWithWorkoutCount) => {
     setEditId(m.id);
-    setEditForm({ name: m.name, microcycleLength: m.microcycle_length, startDate: m.start_date, notes: m.notes || '' });
+    setEditForm({ name: m.name, mesocycleLength: m.mesocycle_length, startDate: m.start_date, notes: m.notes || '' });
     setShowEditModal(true);
   };
 
@@ -79,7 +79,7 @@ export default function ProgramMesocyclesTab() {
     if (editId === null) return;
     mesocyclesApi.update(editId, {
       name: editForm.name.trim(),
-      microcycleLength: editForm.microcycleLength,
+      mesocycleLength: editForm.mesocycleLength,
       startDate: editForm.startDate,
       notes: editForm.notes,
     });
@@ -113,7 +113,7 @@ export default function ProgramMesocyclesTab() {
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Length (days)</label>
-          <input type="number" value={form.microcycleLength} onChange={(e) => setForm({ ...form, microcycleLength: Number(e.target.value) })} min={1} max={120} />
+          <input type="number" value={form.mesocycleLength} onChange={(e) => setForm({ ...form, mesocycleLength: Number(e.target.value) })} min={1} max={120} />
         </div>
         <div className="form-group" style={{ marginBottom: 0 }}>
           <label>Start Date</label>
@@ -140,7 +140,7 @@ export default function ProgramMesocyclesTab() {
             {mesocycles.map((m) => (
               <tr key={m.id} className="hoverable-row" onClick={() => navigate(`/programs/${program.id}/mesocycles/${m.id}`)} style={{ cursor: 'pointer' }}>
                 <td data-label="Name"><strong>{m.name}</strong></td>
-                <td data-label="Length">{m.microcycle_length} days</td>
+                <td data-label="Length">{m.mesocycle_length} days</td>
                 <td data-label="Start Date">{new Date(m.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
                 <td data-label="Workouts"><span className="badge">{m.workout_count} workouts</span></td>
                 <td data-label="Actions" className="row-actions">
@@ -161,8 +161,8 @@ export default function ProgramMesocyclesTab() {
           <input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} required autoFocus />
         </div>
         <div className="form-group">
-          <label>Microcycle Length</label>
-          <input type="number" value={editForm.microcycleLength} onChange={(e) => setEditForm({ ...editForm, microcycleLength: Number(e.target.value) })} min={1} max={120} />
+          <label>Mesocycle Length (days)</label>
+          <input type="number" value={editForm.mesocycleLength} onChange={(e) => setEditForm({ ...editForm, mesocycleLength: Number(e.target.value) })} min={1} max={120} />
         </div>
         <div className="form-group">
           <label>Start Date</label>

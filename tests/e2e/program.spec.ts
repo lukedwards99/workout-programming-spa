@@ -32,7 +32,7 @@ test.describe('Program Page — Mesocycles', () => {
     await expect(page.locator('tbody')).toContainText('5 days');
   });
 
-  test('uses default microcycle length when not specified', async ({ page }) => {
+  test('uses default mesocycle length when not specified', async ({ page }) => {
     await page.locator('input[placeholder*="4-Week"]').fill('Default Block');
     await page.click('button:has-text("+ Add Mesocycle")');
     await page.waitForTimeout(500);
