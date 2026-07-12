@@ -42,6 +42,35 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await expect(page.locator('.exercise-block')).toHaveCount(2);
   });
 
+  test('adds an exercise using the bottom add-exercise button', async ({ page }) => {
+    await page.locator('button:has-text("+ Add Exercise")').last().click();
+    await page.waitForSelector('.modal-content');
+    const selects = page.locator('.modal-content select');
+    await selects.first().selectOption({ index: 1 });
+    await selects.nth(1).selectOption({ label: 'Barbell Bench Press' });
+    await page.locator('.modal-content button:has-text("Add")').click();
+
+    await expect(page.locator('.exercise-block h3').first()).toHaveText('Barbell Bench Press');
+  });
+
+  test('moves an exercise block up and persists its order', async ({ page }) => {
+    await addExerciseViaUI(page, 'Barbell Bench Press');
+    await addExerciseViaUI(page, 'Incline Dumbbell Press');
+
+    const blocks = page.locator('.exercise-block');
+    await expect(blocks.nth(0).locator('h3')).toHaveText('Barbell Bench Press');
+    await expect(blocks.nth(1).locator('h3')).toHaveText('Incline Dumbbell Press');
+    await expect(page.getByRole('button', { name: 'Move Barbell Bench Press up' })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Move Incline Dumbbell Press down' })).toBeDisabled();
+
+    await page.getByRole('button', { name: 'Move Incline Dumbbell Press up' }).click();
+    await expect(blocks.nth(0).locator('h3')).toHaveText('Incline Dumbbell Press');
+    await expect(blocks.nth(1).locator('h3')).toHaveText('Barbell Bench Press');
+
+    await page.reload();
+    await expect(blocks.nth(0).locator('h3')).toHaveText('Incline Dumbbell Press');
+  });
+
   test('a new exercise starts with one normal set', async ({ page }) => {
     await addExerciseViaUI(page, 'Barbell Bench Press');
     const rows = page.locator('.exercise-block').first().locator('.set-table tbody tr');

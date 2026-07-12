@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, type FormEvent, type ChangeEvent } fr
 import { useParams, Link } from 'react-router-dom';
 import type { Program, Workout, WorkoutSetWithNames, WorkoutExerciseBlock, Exercise, ExerciseGroupWithCount, WorkoutSetType, WorkoutTrainingSummary } from '../types/domain';
 import type { UpdateWorkoutSetInput } from '../types/api';
-import { activateProgram, deactivateProgram } from '../db/databaseService';
+import { activateProgram, deactivateProgram, saveNow } from '../db/databaseService';
 import { programsApi } from '../api/programsApi';
 import { workoutsApi } from '../api/workoutsApi';
 import { exercisesApi } from '../api/exercisesApi';
@@ -194,6 +194,34 @@ export default function WorkoutPage() {
     }
   };
 
+  const handleMoveExercise = async (blockId: string, direction: number) => {
+    const currentIndex = exerciseBlocks.findIndex((block) => block.blockId === blockId);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= exerciseBlocks.length) return;
+
+    const current = exerciseBlocks[currentIndex];
+    const target = exerciseBlocks[targetIndex];
+    try {
+      workoutSetsApi.swapExerciseOrder(
+        id,
+        {
+          exerciseId: current.exercise_id,
+          exerciseVariationId: current.variation_id,
+          exerciseOrder: current.exercise_order,
+        },
+        {
+          exerciseId: target.exercise_id,
+          exerciseVariationId: target.variation_id,
+          exerciseOrder: target.exercise_order,
+        }
+      );
+      await saveNow();
+      load();
+    } catch (error) {
+      flash('danger', `Could not reorder exercises: ${(error as Error).message}`);
+    }
+  };
+
   const toggleNote = (setId: number) => {
     setExpandedNotes((prev) => {
       const next = new Set(prev);
@@ -254,7 +282,7 @@ export default function WorkoutPage() {
       {exerciseBlocks.length === 0 ? (
         <div className="empty-state"><p>No exercises yet. Click "+ Add Exercise" to get started.</p></div>
       ) : (
-        exerciseBlocks.sort((a, b) => a.exercise_order - b.exercise_order).map((block) => (
+        exerciseBlocks.map((block, blockIndex) => (
           <div className="exercise-block" key={block.blockId}>
             <div className="exercise-header">
               <div>
@@ -265,6 +293,18 @@ export default function WorkoutPage() {
                 <div className="meta">{block.sets.filter((s) => s.set_type !== 'warmup').length} working sets</div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  className="btn btn-xs btn-outline"
+                  aria-label={`Move ${block.exercise_name} up`}
+                  disabled={blockIndex === 0}
+                  onClick={() => handleMoveExercise(block.blockId, -1)}
+                >▲</button>
+                <button
+                  className="btn btn-xs btn-outline"
+                  aria-label={`Move ${block.exercise_name} down`}
+                  disabled={blockIndex === exerciseBlocks.length - 1}
+                  onClick={() => handleMoveExercise(block.blockId, 1)}
+                >▼</button>
                 <button className="btn btn-outline btn-sm" onClick={() => handleAddSet(block.blockId, 'normal')}>+ Set</button>
                 <button className="btn btn-danger btn-sm" onClick={() => handleRemoveExercise(block.blockId)}>&times;</button>
               </div>
@@ -365,6 +405,10 @@ export default function WorkoutPage() {
           />
         </div>
       )}
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
+        <button className="btn btn-primary" onClick={() => setShowAddEx(true)}>+ Add Exercise</button>
+      </div>
 
       <ConfirmModal
         show={showRemoveConfirm}

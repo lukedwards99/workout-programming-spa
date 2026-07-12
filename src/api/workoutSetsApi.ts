@@ -105,4 +105,35 @@ export const workoutSetsApi = {
       [workoutId]
     )[0]?.max_order as number || 0;
   },
+  swapExerciseOrder(
+    workoutId: number,
+    first: { exerciseId: number; exerciseVariationId: number | null; exerciseOrder: number },
+    second: { exerciseId: number; exerciseVariationId: number | null; exerciseOrder: number }
+  ): void {
+    const updateOrder = (exerciseId: number, variationId: number | null, order: number) => {
+      const clause = variationId === null
+        ? 'exercise_variation_id IS NULL'
+        : 'exercise_variation_id = ?';
+      const params: SqlValue[] = variationId === null
+        ? [order, workoutId, exerciseId]
+        : [order, workoutId, exerciseId, variationId];
+      execSQL(
+        `UPDATE workout_sets SET exercise_order = ?
+         WHERE workout_id = ? AND exercise_id = ? AND ${clause}`,
+        params
+      );
+    };
+
+    const temporaryOrder = this.getMaxExerciseOrder(workoutId) + 1;
+    execSQL('BEGIN');
+    try {
+      updateOrder(first.exerciseId, first.exerciseVariationId, temporaryOrder);
+      updateOrder(second.exerciseId, second.exerciseVariationId, first.exerciseOrder);
+      updateOrder(first.exerciseId, first.exerciseVariationId, second.exerciseOrder);
+      execSQL('COMMIT');
+    } catch (error) {
+      execSQL('ROLLBACK');
+      throw error;
+    }
+  },
 };
