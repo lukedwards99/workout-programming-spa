@@ -91,22 +91,22 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await expect(page.locator('.empty-state')).toBeVisible();
   });
 
-  test('totals bar shows exercise count', async ({ page }) => {
+  test('summary stats show exercise count', async ({ page }) => {
     await addExerciseViaUI(page, 'Barbell Bench Press');
     await addExerciseViaUI(page, 'Incline Dumbbell Press');
-    await expect(page.locator('.totals-bar')).toBeVisible();
-    await expect(page.locator('.total-item .val').nth(0)).toHaveText('2');
+    await expect(page.locator('.stats-grid')).toBeVisible();
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Exercises' }).locator('.val')).toHaveText('2');
   });
 
-  test('totals bar updates working sets count', async ({ page }) => {
+  test('summary stats update working sets count', async ({ page }) => {
     await addExerciseViaUI(page, 'Barbell Bench Press');
-    await expect(page.locator('.totals-bar')).toBeVisible();
-    await expect(page.locator('.total-item .val').nth(1)).toHaveText('1');
+    await expect(page.locator('.stats-grid')).toBeVisible();
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('1');
     await addSetViaUI(page, 'warmup');
     await page.waitForTimeout(400);
-    await expect(page.locator('.total-item .val').nth(1)).toHaveText('1');
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('1');
     await addSetViaUI(page, 'normal');
     await page.waitForTimeout(400);
-    await expect(page.locator('.total-item .val').nth(1)).toHaveText('2');
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('2');
   });
 });

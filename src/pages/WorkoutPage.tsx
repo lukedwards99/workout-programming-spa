@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, type FormEvent, type ChangeEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import type { Program, Workout, WorkoutSetWithNames, WorkoutExerciseBlock, Exercise, ExerciseGroupWithCount, WorkoutSetType } from '../types/domain';
+import type { Program, Workout, WorkoutSetWithNames, WorkoutExerciseBlock, Exercise, ExerciseGroupWithCount, WorkoutSetType, WorkoutTrainingSummary } from '../types/domain';
 import type { UpdateWorkoutSetInput } from '../types/api';
 import { activateProgram, deactivateProgram } from '../db/databaseService';
 import { programsApi } from '../api/programsApi';
@@ -9,7 +9,9 @@ import { exercisesApi } from '../api/exercisesApi';
 import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
 import { workoutSetsApi } from '../api/workoutSetsApi';
+import { summaryApi } from '../api/summaryApi';
 import { FormModal, ConfirmModal } from '../components';
+import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
 
 const SET_TYPES = ['warmup', 'normal', 'dropset', 'failure'] as const;
 
@@ -49,6 +51,7 @@ export default function WorkoutPage() {
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [pendingRemove, setPendingRemove] = useState<PendingRemove | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [workoutSummary, setWorkoutSummary] = useState<WorkoutTrainingSummary | null>(null);
 
   const load = useCallback(() => {
     const w = workoutsApi.get(id);
@@ -60,6 +63,7 @@ export default function WorkoutPage() {
     setExerciseBlocks(workoutsApi.getExercisesWithSets(id));
     setAllExercises(exercisesApi.list(null));
     setAllGroups(exerciseGroupsApi.list());
+    setWorkoutSummary(summaryApi.getWorkoutSummary(id));
     setError(null);
   }, [id]);
 
@@ -201,11 +205,6 @@ export default function WorkoutPage() {
   const filteredExercises = addGroupId
     ? allExercises.filter((e) => e.exercise_group_id === Number(addGroupId))
     : [];
-
-  const workingSets = exerciseBlocks.reduce((sum, b) => sum + b.sets.filter((s) => s.set_type !== 'warmup').length, 0);
-  const totalVolume = exerciseBlocks.reduce((sum, b) =>
-    sum + b.sets.filter((s) => s.set_type !== 'warmup').reduce((s2, s) => s2 + ((s.reps || 0) * (s.weight || 0)), 0), 0
-  );
 
   return (
     <>
@@ -350,11 +349,15 @@ export default function WorkoutPage() {
         ))
       )}
 
-      {exerciseBlocks.length > 0 && (
-        <div className="totals-bar">
-          <div className="total-item"><div className="val">{exerciseBlocks.length}</div><div className="lbl">Exercises</div></div>
-          <div className="total-item"><div className="val">{workingSets}</div><div className="lbl">Working Sets</div></div>
-          <div className="total-item"><div className="val">{totalVolume.toLocaleString()}</div><div className="lbl">Total Volume</div></div>
+      {workoutSummary && (
+        <div style={{ marginTop: 24 }}>
+          <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>
+            Programmed statistics &mdash; calculated from your training plan, not completed sessions.
+          </p>
+          <SummaryStatGrid
+            stats={buildStatItems(workoutSummary.totals)}
+            caption="Workout training summary"
+          />
         </div>
       )}
 

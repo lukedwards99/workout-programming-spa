@@ -1,12 +1,16 @@
-import { useState, useEffect, type FormEvent, type MouseEvent } from 'react';
-import { useParams, Link } from 'react-router-dom';
-import type { Program, Mesocycle, Workout } from '../types/domain';
+import { useState, useEffect, useCallback, type FormEvent, type MouseEvent } from 'react';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
+import type { Program, Mesocycle, Workout, MesocycleTrainingSummary } from '../types/domain';
 import { activateProgram, deactivateProgram } from '../db/databaseService';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { workoutsApi } from '../api/workoutsApi';
+import { summaryApi } from '../api/summaryApi';
 import { FormModal, ConfirmModal, WorkoutEditModal } from '../components';
 import WorkoutGeneratorModal from '../components/workout-generator/WorkoutGeneratorModal';
+import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
+import SummaryBreakdownTables from '../components/summary/SummaryBreakdownTables';
+import { formatCount } from '../components/summary/formatSummary';
 
 interface Alert {
   type: string;
@@ -20,9 +24,13 @@ interface PendingDelete {
 
 export default function MesocyclePage() {
   const { programId, mesocycleId } = useParams<{ programId: string; mesocycleId: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawView = searchParams.get('view');
+  const view = rawView === 'summary' ? 'summary' : 'schedule';
   const [mesocycle, setMesocycle] = useState<Mesocycle | null>(null);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [program, setProgram] = useState<Program | null>(null);
+  const [summaryData, setSummaryData] = useState<MesocycleTrainingSummary | null>(null);
   const [alert, setAlert] = useState<Alert | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [addDay, setAddDay] = useState(0);
@@ -40,6 +48,22 @@ export default function MesocyclePage() {
   // ── Generator state ──
   const [showGenerator, setShowGenerator] = useState(false);
 
+  const load = useCallback(() => {
+    const m = mesocyclesApi.get(Number(mesocycleId));
+    if (!m) {
+      setError('Mesocycle not found in this program.');
+      return;
+    }
+    setMesocycle(m);
+    setWorkouts(workoutsApi.list(m.id));
+    setError(null);
+  }, [mesocycleId]);
+
+  const loadSummary = useCallback(() => {
+    const data = summaryApi.getMesocycleSummary(Number(mesocycleId));
+    setSummaryData(data);
+  }, [mesocycleId]);
+
   useEffect(() => {
     const pid = Number(programId);
     const p = programsApi.get(pid);
@@ -50,21 +74,15 @@ export default function MesocyclePage() {
     setProgram(p);
     activateProgram(pid)
       .then(() => {
-        const m = mesocyclesApi.get(Number(mesocycleId));
-        if (!m) {
-          setError('Mesocycle not found in this program.');
-          return;
-        }
-        setMesocycle(m);
-        setWorkouts(workoutsApi.list(m.id));
-        setError(null);
+        load();
+        if (view === 'summary') loadSummary();
       })
       .catch((e: Error) => setError(e.message));
 
     return () => {
       deactivateProgram().catch(console.error);
     };
-  }, [programId, mesocycleId]);
+  }, [programId, mesocycleId, load, loadSummary, view]);
 
   if (error) return <div className="empty-state"><p>{error}</p></div>;
   if (!mesocycle) return <div className="empty-state"><p>Loading...</p></div>;
@@ -75,7 +93,8 @@ export default function MesocyclePage() {
   };
 
   const refreshWorkouts = () => {
-    setWorkouts(workoutsApi.list(mesocycle.id));
+    setWorkouts(workoutsApi.list(mesocycle!.id));
+    if (view === 'summary') loadSummary();
   };
 
   const handleAdd = (e: FormEvent<HTMLFormElement>) => {
@@ -190,17 +209,57 @@ export default function MesocyclePage() {
 
       <div className="page-header">
         <h1>{mesocycle.name}</h1>
-        <button className="btn btn-outline" onClick={() => setShowGenerator(true)}>
-          Generate Workouts
-        </button>
+        {view === 'schedule' && (
+          <button className="btn btn-outline" onClick={() => setShowGenerator(true)}>
+            Generate Workouts
+          </button>
+        )}
       </div>
       <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 24 }}>
         Started {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} &middot; {mesocycle.mesocycle_length}-day mesocycle
       </p>
 
+      <div className="program-tabs" style={{ marginBottom: 24 }}>
+        <button
+          className={view === 'schedule' ? 'active' : ''}
+          onClick={() => setSearchParams({ view: 'schedule' })}
+        >Schedule</button>
+        <button
+          className={view === 'summary' ? 'active' : ''}
+          onClick={() => setSearchParams({ view: 'summary' })}
+        >Summary</button>
+      </div>
+
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
-      <div className="row g-3 mb-4">
+      {view === 'summary' ? (
+        <>
+          <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>
+            Programmed statistics &mdash; calculated from your training plan, not completed sessions.
+          </p>
+          {summaryData && (
+            <>
+              <SummaryStatGrid
+                stats={buildStatItems(summaryData.totals, [
+                  { label: 'Mesocycle Days', value: formatCount(summaryData.mesocycleLength) },
+                ])}
+                caption="Mesocycle training summary"
+              />
+              {summaryData.totals.totalSets === 0 ? (
+                <div className="empty-state">
+                  <p>No programmed training data yet for this mesocycle. Add workouts and sets to see statistics.</p>
+                </div>
+              ) : (
+                <SummaryBreakdownTables
+                  byExerciseGroup={summaryData.byExerciseGroup}
+                  byExercise={summaryData.byExercise}
+                />
+              )}
+            </>
+          )}
+        </>
+      ) : (
+        <div className="row g-3 mb-4">
         {Array.from({ length: mesocycle.mesocycle_length }, (_, i) => {
           const dayWorkouts = workouts.filter((w) => w.day_offset === i);
           return (
@@ -227,7 +286,8 @@ export default function MesocyclePage() {
             </div>
           );
         })}
-      </div>
+       </div>
+      )}
 
       <FormModal show={showModal} onHide={() => setShowModal(false)} title="Add Workout" onSubmit={handleAdd} submitLabel="Add">
         <div className="form-group">

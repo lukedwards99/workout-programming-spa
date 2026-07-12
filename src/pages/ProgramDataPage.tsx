@@ -273,14 +273,11 @@ export default function ProgramDataPage() {
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
       <div className="data-card">
-        <h2>Program Summary</h2>
+        <h2>Exercise Library</h2>
         <div className="stats-grid">
           {stats && <>
-            <div className="stat-card"><div className="val">{stats.mesocycles}</div><div className="lbl">Mesocycles</div></div>
-            <div className="stat-card"><div className="val">{stats.workouts}</div><div className="lbl">Workouts</div></div>
             <div className="stat-card"><div className="val">{stats.exerciseGroups}</div><div className="lbl">Groups</div></div>
             <div className="stat-card"><div className="val">{stats.exercises}</div><div className="lbl">Exercises</div></div>
-            <div className="stat-card"><div className="val">{stats.sets}</div><div className="lbl">Sets</div></div>
           </>}
         </div>
       </div>

@@ -105,10 +105,70 @@ export interface ExerciseCopySourceGroup {
   exercises: Exercise[];
 }
 
+// ── Inventory counts (Exercise Library) ──
+
 export interface ProgramSummaryStats {
   mesocycles: number;
   workouts: number;
   exerciseGroups: number;
   exercises: number;
   sets: number;
+}
+
+// ── Training Summary contracts ──
+
+export interface SummaryTotals {
+  workouts: number;
+  distinctExercises: number;
+  distinctVariations: number;
+  totalSets: number;
+  workingSets: number;
+  warmupSets: number;
+  programmedReps: number;
+  programmedVolume: number;
+  averageRepsPerWorkingSet: number | null;
+  averageRir: number | null;
+}
+
+export interface ExerciseGroupSummaryRow {
+  exerciseGroupId: number;
+  exerciseGroupName: string;
+  distinctExercises: number;
+  workingSets: number;
+  programmedReps: number;
+  programmedVolume: number;
+  averageRir: number | null;
+  workingSetPercentage: number;
+}
+
+export interface ExerciseSummaryRow {
+  exerciseId: number;
+  exerciseName: string;
+  exerciseGroupId: number;
+  exerciseGroupName: string;
+  workingSets: number;
+  programmedReps: number;
+  programmedVolume: number;
+  averageRir: number | null;
+  workingSetPercentage: number;
+}
+
+export interface ProgramTrainingSummary {
+  mesocycles: number;
+  totals: SummaryTotals;
+  byExerciseGroup: ExerciseGroupSummaryRow[];
+  byExercise: ExerciseSummaryRow[];
+}
+
+export interface MesocycleTrainingSummary {
+  mesocycleId: number;
+  mesocycleLength: number;
+  totals: SummaryTotals;
+  byExerciseGroup: ExerciseGroupSummaryRow[];
+  byExercise: ExerciseSummaryRow[];
+}
+
+export interface WorkoutTrainingSummary {
+  workoutId: number;
+  totals: Omit<SummaryTotals, 'workouts'>;
 }

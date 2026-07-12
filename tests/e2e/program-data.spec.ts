@@ -17,7 +17,7 @@ test.describe('Program Data Page', () => {
     await navigateTo(page, `/programs/${programId}/data`);
   });
 
-  test('displays program stats after seeding data', async ({ page }) => {
+  test('displays exercise library stats after seeding data', async ({ page }) => {
     await expect(page.locator('.stat-card').filter({ hasText: 'Exercises' }).locator('.val')).toHaveText('1');
     await expect(page.locator('.stat-card').filter({ hasText: 'Groups' }).locator('.val')).toHaveText('1');
   });

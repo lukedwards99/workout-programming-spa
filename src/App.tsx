@@ -7,6 +7,7 @@ import ProgramPage from './pages/ProgramPage';
 import ProgramMesocyclesTab from './pages/ProgramMesocyclesTab';
 import ProgramExercisesPage from './pages/ProgramExercisesPage';
 import ProgramDataPage from './pages/ProgramDataPage';
+import ProgramSummaryPage from './pages/ProgramSummaryPage';
 import MesocyclePage from './pages/MesocyclePage';
 import WorkoutPage from './pages/WorkoutPage';
 
@@ -45,6 +46,7 @@ export default function App() {
             <Route index element={<ProgramMesocyclesTab />} />
             <Route path="exercises" element={<ProgramExercisesPage />} />
             <Route path="data" element={<ProgramDataPage />} />
+            <Route path="summary" element={<ProgramSummaryPage />} />
           </Route>
           <Route path="/programs/:programId/mesocycles/:mesocycleId" element={<MesocyclePage />} />
           <Route path="/programs/:programId/workouts/:workoutId" element={<WorkoutPage />} />

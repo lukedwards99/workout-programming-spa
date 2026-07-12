@@ -86,13 +86,11 @@ test.describe('Regression Tests', () => {
 
       // Check Program A's stats
       await navigateTo(page, `/programs/${idA}/data`);
-      await expect(page.locator('.stat-card').filter({ hasText: 'Mesocycles' }).locator('.val')).toHaveText('1');
       await expect(page.locator('.stat-card').filter({ hasText: 'Exercises' }).locator('.val')).toHaveText('1');
       await expect(page.locator('.stat-card').filter({ hasText: 'Groups' }).locator('.val')).toHaveText('1');
 
       // Check Program B's stats
       await navigateTo(page, `/programs/${idB}/data`);
-      await expect(page.locator('.stat-card').filter({ hasText: 'Mesocycles' }).locator('.val')).toHaveText('1');
       await expect(page.locator('.stat-card').filter({ hasText: 'Exercises' }).locator('.val')).toHaveText('1');
       await expect(page.locator('.stat-card').filter({ hasText: 'Groups' }).locator('.val')).toHaveText('1');
     });
