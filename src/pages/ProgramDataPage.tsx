@@ -168,11 +168,11 @@ export default function ProgramDataPage() {
       }
 
       flash('success', `Exercises imported into "${program.name}".`);
+      load();
     } catch (err) {
       flash('danger', `Import failed: ${(err as Error).message}`);
+      throw err;
     }
-    cancelExerciseImport();
-    load();
   };
 
   const cancelExerciseImport = () => {
@@ -230,11 +230,8 @@ export default function ProgramDataPage() {
       load();
     } catch (err) {
       flash('danger', `Restore failed: ${(err as Error).message}`);
+      throw err;
     }
-    setShowRestoreConfirm(false);
-    setPendingRestore(null);
-    setPendingRestoreMeta(null);
-    if (fileRestoreRef.current) fileRestoreRef.current.value = '';
   };
 
   // ── Seed Default Exercises ──

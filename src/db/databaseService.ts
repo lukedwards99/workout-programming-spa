@@ -1,15 +1,12 @@
-import type { SqlValue, SqlRow, SqlParams, IDBBatchOp } from '../types/database';
+import type { SqlValue, SqlRow, SqlParams } from '../types/database';
 import type { BackupMetadata, BackupValidationResult } from '../types/api';
 import { createCatalogSQL, createProgramSQL, SCHEMA_VERSION } from './ddl';
+import { idbGet, idbPut, idbDelete, runTransaction, programKey } from './indexedDb';
+import { CATALOG_KEY } from './indexedDb';
+import { initSqlJs, getSQL } from './sqlRuntime';
 
-const IDB_NAME = 'workout-programming-v4';
-const IDB_STORE = 'databases';
-const CATALOG_KEY = 'catalog-v1';
-const PROGRAM_KEY_PREFIX = 'program-v1:';
-const MIGRATION_MARKER_KEY = 'migration-v4-complete';
-const SQL_WASM_URL = 'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.wasm';
+const MIGRATION_MARKER_KEY = 'migration-v5-complete';
 
-let SQL: import('sql.js').SqlJsStatic | null = null;
 let db: import('sql.js').Database | null = null;
 let catalogDb: import('sql.js').Database | null = null;
 let currentProgramId: number | null = null;
@@ -22,84 +19,6 @@ function getDb(): import('sql.js').Database {
 function getCatalogDb(): import('sql.js').Database {
   if (!catalogDb) throw new Error('Catalog not initialized.');
   return catalogDb;
-}
-
-async function loadSqlJs(): Promise<import('sql.js').SqlJsStatic> {
-  if (SQL) return SQL;
-  const initSqlJs = (await import('sql.js')).default;
-  SQL = await initSqlJs({
-    locateFile: () => SQL_WASM_URL,
-  });
-  window.__sqlJs = SQL as import('sql.js').SqlJsStatic | null;
-  return SQL;
-}
-
-function openIndexedDB(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = (e) => {
-      const idb = (e.target as IDBOpenDBRequest).result;
-      if (!idb.objectStoreNames.contains(IDB_STORE)) {
-        idb.createObjectStore(IDB_STORE);
-      }
-    };
-    req.onsuccess = (e) => resolve((e.target as IDBOpenDBRequest).result);
-    req.onerror = (e) => reject((e.target as IDBOpenDBRequest).error);
-  });
-}
-
-async function idbGet(key: string): Promise<Uint8Array | number | undefined> {
-  const idb = await openIndexedDB();
-  return new Promise((resolve, reject) => {
-    const tx = idb.transaction(IDB_STORE, 'readonly');
-    const store = tx.objectStore(IDB_STORE);
-    const req = store.get(key);
-    req.onsuccess = (e) => resolve((e.target as IDBRequest).result);
-    req.onerror = (e) => reject((e.target as IDBRequest).error);
-  });
-}
-
-async function idbPut(key: string, value: Uint8Array | number): Promise<void> {
-  const idb = await openIndexedDB();
-  return new Promise((resolve, reject) => {
-    const tx = idb.transaction(IDB_STORE, 'readwrite');
-    const store = tx.objectStore(IDB_STORE);
-    const req = store.put(value, key);
-    req.onsuccess = () => resolve();
-    req.onerror = (e) => reject((e.target as IDBRequest).error);
-  });
-}
-
-async function idbDelete(key: string): Promise<void> {
-  const idb = await openIndexedDB();
-  return new Promise((resolve, reject) => {
-    const tx = idb.transaction(IDB_STORE, 'readwrite');
-    const store = tx.objectStore(IDB_STORE);
-    const req = store.delete(key);
-    req.onsuccess = () => resolve();
-    req.onerror = (e) => reject((e.target as IDBRequest).error);
-  });
-}
-
-async function idbBatch(ops: IDBBatchOp[]): Promise<void> {
-  const idb = await openIndexedDB();
-  return new Promise((resolve, reject) => {
-    const tx = idb.transaction(IDB_STORE, 'readwrite');
-    const store = tx.objectStore(IDB_STORE);
-    for (const op of ops) {
-      if (op.type === 'put') {
-        store.put(op.value, op.key);
-      } else if (op.type === 'delete') {
-        store.delete(op.key);
-      }
-    }
-    tx.oncomplete = () => resolve();
-    tx.onerror = (e) => reject((e.target as IDBTransaction).error);
-  });
-}
-
-function programKey(programId: number): string {
-  return `${PROGRAM_KEY_PREFIX}${programId}`;
 }
 
 // ── Catalog operations ──
@@ -227,15 +146,13 @@ function validateProgramStructure(database: import('sql.js').Database): boolean 
   return true;
 }
 
-
-
 // ── Program store management ──
 
 async function openProgramStore(programId: number, retries: number = 5): Promise<import('sql.js').Database | null> {
   for (let i = 0; i < retries; i++) {
     const saved = await idbGet(programKey(programId));
     if (saved && saved instanceof Uint8Array) {
-      const sql = await loadSqlJs();
+      const sql = await initSqlJs();
       const progDb = new sql.Database(saved);
       progDb.run('PRAGMA foreign_keys = ON');
       return progDb;
@@ -291,7 +208,7 @@ async function activateProgram(programId: number | null, { skipSave = false }: {
     db = progDb;
     currentProgramId = programId;
   });
-  activationLock = op.catch(() => {}) as Promise<void>; // keep queue alive after rejection
+  activationLock = op.catch(() => {}) as Promise<void>;
   return op;
 }
 
@@ -305,13 +222,14 @@ async function deactivateProgram(): Promise<void> {
       currentProgramId = null;
     }
   });
-  activationLock = op.catch(() => {}) as Promise<void>; // keep queue alive after rejection
+  activationLock = op.catch(() => {}) as Promise<void>;
   return op;
 }
 
 // ── Catalog program store creation ──
 
 function createProgramStore(): import('sql.js').Database {
+  const SQL = getSQL();
   if (!SQL) throw new Error('SQL.js not initialized.');
   const s = new SQL.Database();
   s.run(createProgramSQL);
@@ -325,7 +243,7 @@ async function saveNewProgramStore(programId: number, database: import('sql.js')
 // ── Init ──
 
 async function initDatabase(): Promise<void> {
-  const sql = await loadSqlJs();
+  const sql = await initSqlJs();
 
   const migrationDone = await idbGet(MIGRATION_MARKER_KEY);
 
@@ -365,7 +283,7 @@ async function exportProgramBackup(programId: number): Promise<Uint8Array> {
   const program = catalogQueryOne('SELECT * FROM programs WHERE id = ?', [programId]);
   if (!program) throw new Error(`Program ${programId} not found in catalog.`);
 
-  const sql = await loadSqlJs();
+  const sql = await initSqlJs();
   const backupDb = new sql.Database(progData);
   backupDb.run('PRAGMA foreign_keys = ON');
 
@@ -394,7 +312,7 @@ async function exportProgramBackup(programId: number): Promise<Uint8Array> {
 }
 
 async function importProgramBackup(programId: number, buffer: ArrayBuffer): Promise<BackupMetadata> {
-  const sql = await loadSqlJs();
+  const sql = await initSqlJs();
 
   const arr = new Uint8Array(buffer);
   const header = new TextDecoder().decode(arr.slice(0, 16));
@@ -440,7 +358,6 @@ async function importProgramBackup(programId: number, buffer: ArrayBuffer): Prom
     }
   }
 
-  // Build updated catalog bytes
   let catalogData: Uint8Array | null = null;
   if (meta.program_name) {
     const catalogSnapshot = new sql.Database(getCatalogDb().export());
@@ -452,20 +369,14 @@ async function importProgramBackup(programId: number, buffer: ArrayBuffer): Prom
     catalogSnapshot.close();
   }
 
-  // Atomic write: program store + catalog in a single IDB transaction
-  const idb = await openIndexedDB();
-  await new Promise<void>((resolve, reject) => {
-    const tx = idb.transaction(IDB_STORE, 'readwrite');
-    const store = tx.objectStore(IDB_STORE);
-    store.put(data, programKey(programId));
-    if (catalogData) {
-      store.put(catalogData, CATALOG_KEY);
-    }
-    tx.oncomplete = () => resolve();
-    tx.onerror = (e) => reject((e.target as IDBTransaction).error);
-  });
+  const ops: Array<{ type: 'put'; key: string; value: Uint8Array }> = [
+    { type: 'put', key: programKey(programId), value: data },
+  ];
+  if (catalogData) {
+    ops.push({ type: 'put', key: CATALOG_KEY, value: catalogData });
+  }
+  await runTransaction(ops);
 
-  // Update in-memory catalog only after successful write
   if (meta.program_name) {
     catalogExecSQL(
       'UPDATE programs SET name = ?, notes = ?, created_at = ? WHERE id = ?',
@@ -477,7 +388,7 @@ async function importProgramBackup(programId: number, buffer: ArrayBuffer): Prom
 }
 
 async function validateProgramBackup(buffer: ArrayBuffer): Promise<BackupValidationResult> {
-  const sql = await loadSqlJs();
+  const sql = await initSqlJs();
 
   const arr = new Uint8Array(buffer);
   const header = new TextDecoder().decode(arr.slice(0, 16));
@@ -527,7 +438,7 @@ function getDatabaseSize(): number {
 
 async function replaceCatalogDb(newBytes: Uint8Array): Promise<void> {
   if (catalogDb) catalogDb.close();
-  const sql = await loadSqlJs();
+  const sql = await initSqlJs();
   catalogDb = new sql.Database(newBytes);
   catalogDb.run('PRAGMA foreign_keys = ON');
 }

@@ -3,36 +3,13 @@ import type { CreateProgramInput, UpdateProgramInput } from '../types/api';
 import type { SqlRow } from '../types/database';
 import {
   catalogQueryAll, catalogQueryOne,
-  createProgramStore, programKey, getCatalogDb, replaceCatalogDb,
+  createProgramStore, getCatalogDb, replaceCatalogDb, programKey,
 } from '../db/databaseService';
-
-const IDB_NAME = 'workout-programming-v4';
-const IDB_STORE = 'databases';
-const CATALOG_KEY = 'catalog-v1';
-
-async function idbOpen(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(IDB_NAME, 1);
-    req.onupgradeneeded = (e) => {
-      const idb = (e.target as IDBOpenDBRequest).result;
-      if (!idb.objectStoreNames.contains(IDB_STORE)) {
-        idb.createObjectStore(IDB_STORE);
-      }
-    };
-    req.onsuccess = (e) => resolve((e.target as IDBOpenDBRequest).result);
-    req.onerror = (e) => reject((e.target as IDBOpenDBRequest).error);
-  });
-}
-
-async function importSqlJs() {
-  const initSqlJs = (await import('sql.js')).default;
-  return initSqlJs({
-    locateFile: () => 'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.wasm',
-  });
-}
+import { CATALOG_KEY, runTransaction } from '../db/indexedDb';
+import { initSqlJs } from '../db/sqlRuntime';
 
 async function cloneCatalog() {
-  const SQL = await importSqlJs();
+  const SQL = await initSqlJs();
   const copy = new SQL.Database(getCatalogDb().export());
   copy.run('PRAGMA foreign_keys = ON');
   return copy;
@@ -74,15 +51,10 @@ export const programsApi = {
 
     if (!prog) throw new Error('Failed to create program record.');
 
-    const idb = await idbOpen();
-    await new Promise<void>((resolve, reject) => {
-      const tx = idb.transaction(IDB_STORE, 'readwrite');
-      const objStore = tx.objectStore(IDB_STORE);
-      objStore.put(catalogData, CATALOG_KEY);
-      objStore.put(storeData, programKey(prog.id));
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject((e.target as IDBTransaction).error);
-    });
+    await runTransaction([
+      { type: 'put', key: CATALOG_KEY, value: catalogData },
+      { type: 'put', key: programKey(prog.id), value: storeData },
+    ]);
 
     await replaceCatalogDb(catalogData);
 
@@ -94,14 +66,9 @@ export const programsApi = {
     const catalogData = clone.export();
     clone.close();
 
-    const idb = await idbOpen();
-    await new Promise<void>((resolve, reject) => {
-      const tx = idb.transaction(IDB_STORE, 'readwrite');
-      const objStore = tx.objectStore(IDB_STORE);
-      objStore.put(catalogData, CATALOG_KEY);
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject((e.target as IDBTransaction).error);
-    });
+    await runTransaction([
+      { type: 'put', key: CATALOG_KEY, value: catalogData },
+    ]);
 
     await replaceCatalogDb(catalogData);
     return this.get(id);
@@ -112,15 +79,10 @@ export const programsApi = {
     const catalogData = clone.export();
     clone.close();
 
-    const idb = await idbOpen();
-    await new Promise<void>((resolve, reject) => {
-      const tx = idb.transaction(IDB_STORE, 'readwrite');
-      const objStore = tx.objectStore(IDB_STORE);
-      objStore.put(catalogData, CATALOG_KEY);
-      objStore.delete(programKey(id));
-      tx.oncomplete = () => resolve();
-      tx.onerror = (e) => reject((e.target as IDBTransaction).error);
-    });
+    await runTransaction([
+      { type: 'put', key: CATALOG_KEY, value: catalogData },
+      { type: 'delete', key: programKey(id) },
+    ]);
 
     await replaceCatalogDb(catalogData);
   },

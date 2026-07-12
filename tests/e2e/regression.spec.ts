@@ -460,4 +460,28 @@ test.describe('Regression Tests', () => {
       await expect(page.locator('.ex-item:has-text("Bench Press")')).toHaveCount(1);
     });
   });
+
+  test.describe('P0-1: Date rendering', () => {
+    test('mesocycle start_date displays the calendar date entered, not one day early', async ({ page }) => {
+      await clearDatabase(page);
+      const programId = await seedProgramViaUI(page, 'Date Test');
+
+      await addMesocycleViaUI(page, 'July Block', 7, '2026-07-12');
+      await page.waitForTimeout(500);
+
+      const dateCell = page.locator('td[data-label="Start Date"]').first();
+      await expect(dateCell).toContainText('Jul 12, 2026');
+    });
+
+    test('mesocycle start_date displays correctly for a mid-month date', async ({ page }) => {
+      await clearDatabase(page);
+      const programId = await seedProgramViaUI(page, 'Date Test 2');
+
+      await addMesocycleViaUI(page, 'January Block', 14, '2026-01-15');
+      await page.waitForTimeout(500);
+
+      const dateCell = page.locator('td[data-label="Start Date"]').first();
+      await expect(dateCell).toContainText('Jan 15, 2026');
+    });
+  });
 });

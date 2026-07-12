@@ -80,10 +80,10 @@ export default function HomePage() {
     try {
       await programsApi.delete(pendingDelete.id);
       flash('success', `"${pendingDelete.name}" deleted.`);
-      setShowDeleteConfirm(false);
       load();
     } catch (err) {
       flash('danger', `Delete failed: ${(err as Error).message}`);
+      throw err;
     } finally {
       setSaving(false);
     }

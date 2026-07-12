@@ -4,6 +4,7 @@ import type { Program, MesocycleWithWorkoutCount } from '../types/domain';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { FormModal, ConfirmModal } from '../components';
+import { localToday, formatIsoDate } from '../utils/dates';
 
 interface Alert {
   type: string;
@@ -35,7 +36,7 @@ export default function ProgramMesocyclesTab() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
 
-  function today(): string { return new Date().toISOString().split('T')[0]; }
+  function today(): string { return localToday(); }
 
   const load = useCallback(() => {
     const p = programsApi.get(Number(programId));
@@ -141,7 +142,7 @@ export default function ProgramMesocyclesTab() {
               <tr key={m.id} className="hoverable-row" onClick={() => navigate(`/programs/${program.id}/mesocycles/${m.id}`)} style={{ cursor: 'pointer' }}>
                 <td data-label="Name"><strong>{m.name}</strong></td>
                 <td data-label="Length">{m.mesocycle_length} days</td>
-                <td data-label="Start Date">{new Date(m.start_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</td>
+                <td data-label="Start Date">{formatIsoDate(m.start_date)}</td>
                 <td data-label="Workouts"><span className="badge">{m.workout_count} workouts</span></td>
                 <td data-label="Actions" className="row-actions">
                   <button className="btn btn-outline btn-sm" onClick={(e: MouseEvent) => { e.stopPropagation(); navigate(`/programs/${program.id}/mesocycles/${m.id}`); }}>View</button>

@@ -6,6 +6,7 @@ import { mesocyclesApi } from './mesocyclesApi';
 import { workoutsApi } from './workoutsApi';
 import { workoutSetsApi } from './workoutSetsApi';
 import { activateProgram, deactivateProgram } from '../db/databaseService';
+import { localToday } from '../utils/dates';
 
 interface SetDef {
   exerciseName: string;
@@ -73,8 +74,7 @@ export async function createSampleProgram(): Promise<SampleProgramResult> {
       name: 'EZ Bar',
     });
 
-    const today = new Date();
-    const startDate = today.toISOString().split('T')[0];
+    const startDate = localToday();
 
     const meso = mesocyclesApi.create({
       name: 'Foundation Block',
