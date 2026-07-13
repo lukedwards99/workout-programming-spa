@@ -77,9 +77,9 @@ const TOTALS_COMMON = `
   COALESCE(COUNT(ws.id), 0) as total_sets,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN 1 ELSE 0 END), 0) as working_sets,
   COALESCE(SUM(CASE WHEN ws.set_type = 'warmup' THEN 1 ELSE 0 END), 0) as warmup_sets,
-  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.reps, 0) ELSE 0 END), 0) as programmed_reps,
-  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
-  COUNT(CASE WHEN ws.set_type <> 'warmup' AND ws.reps IS NOT NULL THEN 1 END) as working_sets_with_reps,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) ELSE 0 END), 0) as programmed_reps,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
+  COUNT(CASE WHEN ws.set_type <> 'warmup' AND ws.planned_reps IS NOT NULL THEN 1 END) as working_sets_with_reps,
   AVG(CASE WHEN ws.set_type <> 'warmup' AND ws.rir IS NOT NULL THEN ws.rir END) as average_rir
 `;
 
@@ -88,8 +88,8 @@ const BREAKDOWN_GROUP_COMMON = `
   eg.name as exercise_group_name,
   COUNT(DISTINCT e.id) as distinct_exercises,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN 1 ELSE 0 END), 0) as working_sets,
-  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.reps, 0) ELSE 0 END), 0) as programmed_reps,
-  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) ELSE 0 END), 0) as programmed_reps,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
   AVG(CASE WHEN ws.set_type <> 'warmup' AND ws.rir IS NOT NULL THEN ws.rir END) as average_rir
 `;
 
@@ -99,8 +99,8 @@ const BREAKDOWN_EX_COMMON = `
   eg.id as exercise_group_id,
   eg.name as exercise_group_name,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN 1 ELSE 0 END), 0) as working_sets,
-  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.reps, 0) ELSE 0 END), 0) as programmed_reps,
-  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) ELSE 0 END), 0) as programmed_reps,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
   AVG(CASE WHEN ws.set_type <> 'warmup' AND ws.rir IS NOT NULL THEN ws.rir END) as average_rir
 `;
 

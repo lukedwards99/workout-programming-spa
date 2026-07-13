@@ -142,7 +142,7 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await openWorkout(page, 'Deep Source');
     await addExerciseViaUI(page, 'Squat');
     await addSetViaUI(page, 'normal');
-    await fillSetRow(page, 0, 0, { reps: 10, weight: 100, rir: 2 });
+    await fillSetRow(page, 0, 0, { plannedReps: 10, actualReps: 9, weight: 100, rir: 2 });
 
     await page.goto(mesoUrl);
     await page.waitForSelector('.day-cell');
@@ -153,7 +153,8 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await openWorkout(page, 'Deep Source (Copy)');
     await expect(page.locator('.exercise-block')).toHaveCount(1);
     await expect(page.locator('.exercise-block').first()).toContainText('Squat');
-    await expect(page.locator('.exercise-block').first().locator('td[data-label="Reps"] input').first()).toHaveValue('10');
+    await expect(page.locator('.exercise-block').first().locator('td[data-label="Planned Reps"] input').first()).toHaveValue('10');
+    await expect(page.locator('.exercise-block').first().locator('td[data-label="Actual Reps"] input').first()).toHaveValue('9');
     await expect(page.locator('.exercise-block').first().locator('td[data-label="Weight"] input').first()).toHaveValue('100');
   });
 

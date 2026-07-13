@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, type FormEvent, type ChangeEvent } fr
 import { useParams, Link } from 'react-router-dom';
 import type { Program, Workout, WorkoutSetWithNames, WorkoutExerciseBlock, Exercise, ExerciseGroupWithCount, WorkoutSetType, WorkoutTrainingSummary } from '../types/domain';
 import type { UpdateWorkoutSetInput } from '../types/api';
-import { activateProgram, deactivateProgram } from '../db/databaseService';
+import { activateProgram, deactivateProgram, saveNow } from '../db/databaseService';
 import { programsApi } from '../api/programsApi';
 import { workoutsApi } from '../api/workoutsApi';
 import { exercisesApi } from '../api/exercisesApi';
@@ -13,10 +13,10 @@ import { summaryApi } from '../api/summaryApi';
 import { FormModal, ConfirmModal } from '../components';
 import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
 
-const SET_TYPES = ['warmup', 'normal', 'dropset', 'failure'] as const;
+const SET_TYPES = ['warmup', 'normal', 'dropset', 'failure', 'rest-pause'] as const;
 
 function setBadgeClass(type: string): string {
-  const map: Record<string, string> = { warmup: 'badge-warmup', normal: 'badge-normal', dropset: 'badge-dropset', failure: 'badge-failure' };
+  const map: Record<string, string> = { warmup: 'badge-warmup', normal: 'badge-normal', dropset: 'badge-dropset', failure: 'badge-failure', 'rest-pause': 'badge-rest-pause' };
   return map[type] || 'badge-normal';
 }
 
@@ -143,7 +143,7 @@ export default function WorkoutPage() {
   };
 
   const handleUpdateSet = (setId: number, field: string, value: string) => {
-    const numericFields = ['reps', 'weight', 'rir', 'set_number'];
+    const numericFields = ['planned_reps', 'actual_reps', 'weight', 'rir', 'set_number'];
     const s: Record<string, string | number | null> = {};
     if (value === '') {
       s[field] = null;
@@ -191,6 +191,34 @@ export default function WorkoutPage() {
       workoutSetsApi.update(b.id, { set_number: a.set_number });
       load();
       return;
+    }
+  };
+
+  const handleMoveExercise = async (blockId: string, direction: number) => {
+    const currentIndex = exerciseBlocks.findIndex((block) => block.blockId === blockId);
+    const targetIndex = currentIndex + direction;
+    if (currentIndex < 0 || targetIndex < 0 || targetIndex >= exerciseBlocks.length) return;
+
+    const current = exerciseBlocks[currentIndex];
+    const target = exerciseBlocks[targetIndex];
+    try {
+      workoutSetsApi.swapExerciseOrder(
+        id,
+        {
+          exerciseId: current.exercise_id,
+          exerciseVariationId: current.variation_id,
+          exerciseOrder: current.exercise_order,
+        },
+        {
+          exerciseId: target.exercise_id,
+          exerciseVariationId: target.variation_id,
+          exerciseOrder: target.exercise_order,
+        }
+      );
+      await saveNow();
+      load();
+    } catch (error) {
+      flash('danger', `Could not reorder exercises: ${(error as Error).message}`);
     }
   };
 
@@ -254,7 +282,7 @@ export default function WorkoutPage() {
       {exerciseBlocks.length === 0 ? (
         <div className="empty-state"><p>No exercises yet. Click "+ Add Exercise" to get started.</p></div>
       ) : (
-        exerciseBlocks.sort((a, b) => a.exercise_order - b.exercise_order).map((block) => (
+        exerciseBlocks.map((block, blockIndex) => (
           <div className="exercise-block" key={block.blockId}>
             <div className="exercise-header">
               <div>
@@ -265,6 +293,18 @@ export default function WorkoutPage() {
                 <div className="meta">{block.sets.filter((s) => s.set_type !== 'warmup').length} working sets</div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  className="btn btn-xs btn-outline"
+                  aria-label={`Move ${block.exercise_name} up`}
+                  disabled={blockIndex === 0}
+                  onClick={() => handleMoveExercise(block.blockId, -1)}
+                >▲</button>
+                <button
+                  className="btn btn-xs btn-outline"
+                  aria-label={`Move ${block.exercise_name} down`}
+                  disabled={blockIndex === exerciseBlocks.length - 1}
+                  onClick={() => handleMoveExercise(block.blockId, 1)}
+                >▼</button>
                 <button className="btn btn-outline btn-sm" onClick={() => handleAddSet(block.blockId, 'normal')}>+ Set</button>
                 <button className="btn btn-danger btn-sm" onClick={() => handleRemoveExercise(block.blockId)}>&times;</button>
               </div>
@@ -276,7 +316,8 @@ export default function WorkoutPage() {
                   <tr>
                     <th>#</th>
                     <th>Type</th>
-                    <th>Reps</th>
+                    <th>Planned Reps</th>
+                    <th>Actual Reps</th>
                     <th>Weight</th>
                     <th>RIR</th>
                     <th>Notes</th>
@@ -285,9 +326,9 @@ export default function WorkoutPage() {
                 </thead>
                 <tbody>
                   {block.sets.map((s, i, arr) => (
-                    <tr key={s.id}>
-                      <td data-label="Set">{s.set_number}</td>
-                      <td data-label="Type">
+                    <tr className="workout-set-row" key={s.id}>
+                      <td className="set-number-cell" data-label="Set">{s.set_number}</td>
+                      <td className="set-type-cell" data-label="Type">
                         <select
                           value={s.set_type}
                           onChange={(e: ChangeEvent<HTMLSelectElement>) => handleUpdateSet(s.id, 'set_type', e.target.value)}
@@ -296,19 +337,23 @@ export default function WorkoutPage() {
                           {SET_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
                         </select>
                       </td>
-                      <td data-label="Reps">
-                        <input type="number" value={s.reps ?? ''} placeholder="—"
-                          onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'reps', e.target.value)} />
+                      <td className="set-planned-reps-cell" data-label="Planned Reps">
+                        <input type="number" value={s.planned_reps ?? ''} placeholder="—"
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'planned_reps', e.target.value)} />
                       </td>
-                      <td data-label="Weight">
+                      <td className="set-actual-reps-cell" data-label="Actual Reps">
+                        <input type="number" value={s.actual_reps ?? ''} placeholder="—"
+                          onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'actual_reps', e.target.value)} />
+                      </td>
+                      <td className="set-weight-cell" data-label="Weight">
                         <input type="number" value={s.weight ?? ''} placeholder="—" step="any"
                           onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'weight', e.target.value)} />
                       </td>
-                      <td data-label="RIR">
+                      <td className="set-rir-cell" data-label="RIR">
                         <input type="number" value={s.rir ?? ''} placeholder="—"
                           onChange={(e: ChangeEvent<HTMLInputElement>) => handleUpdateSet(s.id, 'rir', e.target.value)} />
                       </td>
-                      <td data-label="Notes">
+                      <td className="set-notes-cell" data-label="Notes">
                         {expandedNotes.has(s.id) ? (
                           <>
                             <textarea
@@ -329,7 +374,7 @@ export default function WorkoutPage() {
                           </button>
                         )}
                       </td>
-                      <td data-label="Actions">
+                      <td className="set-actions-cell" data-label="Actions">
                         <span className="set-move-btns">
                           <button className="btn btn-xs btn-outline" disabled={i === 0} onClick={() => handleMoveSet(s.id, -1)}>▲</button>
                           <button className="btn btn-xs btn-outline" disabled={i === arr.length - 1} onClick={() => handleMoveSet(s.id, 1)}>▼</button>
@@ -360,6 +405,10 @@ export default function WorkoutPage() {
           />
         </div>
       )}
+
+      <div style={{ display: 'flex', justifyContent: 'center', marginTop: 24 }}>
+        <button className="btn btn-primary" onClick={() => setShowAddEx(true)}>+ Add Exercise</button>
+      </div>
 
       <ConfirmModal
         show={showRemoveConfirm}

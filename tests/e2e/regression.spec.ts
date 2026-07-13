@@ -10,7 +10,7 @@ import initSqlJs from 'sql.js';
 
 test.describe('Regression Tests', () => {
   test.describe('P1-1: Set field persistence after edit', () => {
-    test('edited reps survive a page reload', async ({ page }) => {
+    test('planned and actual reps survive a page reload independently', async ({ page }) => {
       await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Test PPL');
 
@@ -26,9 +26,10 @@ test.describe('Regression Tests', () => {
 
       await addExerciseViaUI(page, 'Bench Press');
 
-      // Fill reps
+      // Fill planned and actual reps
       const firstRow = page.locator('.exercise-block').first().locator('.set-table tbody tr').first();
-      await firstRow.locator('input').nth(0).fill('12');
+      await firstRow.locator('td[data-label="Planned Reps"] input').fill('12');
+      await firstRow.locator('td[data-label="Actual Reps"] input').fill('10');
       await page.waitForTimeout(500);
 
       // Reload and verify
@@ -37,7 +38,8 @@ test.describe('Regression Tests', () => {
       await page.waitForSelector('.exercise-block', { timeout: 10000 });
       await page.waitForTimeout(500);
 
-      await expect(firstRow.locator('input').nth(0)).toHaveValue('12');
+      await expect(firstRow.locator('td[data-label="Planned Reps"] input')).toHaveValue('12');
+      await expect(firstRow.locator('td[data-label="Actual Reps"] input')).toHaveValue('10');
     });
   });
 

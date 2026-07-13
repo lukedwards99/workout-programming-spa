@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION: number = 5;
+export const SCHEMA_VERSION: number = 6;
 
 export const createCatalogSQL: string = `
 PRAGMA foreign_keys = ON;
@@ -76,8 +76,9 @@ CREATE TABLE IF NOT EXISTS workout_sets (
     exercise_variation_id INTEGER,
     exercise_order        INTEGER NOT NULL CHECK(exercise_order >= 0),
     set_number            INTEGER NOT NULL CHECK(set_number >= 1),
-    set_type              TEXT    NOT NULL DEFAULT 'normal' CHECK(set_type IN ('warmup', 'normal', 'dropset', 'failure')),
-    reps                  INTEGER CHECK(reps >= 0),
+    set_type              TEXT    NOT NULL DEFAULT 'normal' CHECK(set_type IN ('warmup', 'normal', 'dropset', 'failure', 'rest-pause')),
+    planned_reps          INTEGER CHECK(planned_reps >= 0),
+    actual_reps           INTEGER CHECK(actual_reps >= 0),
     weight                REAL CHECK(weight >= 0),
     rir                   INTEGER,
     notes                 TEXT,

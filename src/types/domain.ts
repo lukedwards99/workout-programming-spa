@@ -53,7 +53,7 @@ export interface ExerciseVariation {
   notes: string | null;
 }
 
-export type WorkoutSetType = 'warmup' | 'normal' | 'dropset' | 'failure';
+export type WorkoutSetType = 'warmup' | 'normal' | 'dropset' | 'failure' | 'rest-pause';
 
 export interface WorkoutSet {
   id: EntityId;
@@ -63,7 +63,8 @@ export interface WorkoutSet {
   exercise_order: number;
   set_number: number;
   set_type: WorkoutSetType;
-  reps: number | null;
+  planned_reps: number | null;
+  actual_reps: number | null;
   weight: number | null;
   rir: number | null;
   notes: string | null;

@@ -29,11 +29,11 @@ test.describe('Summary Statistics', () => {
     await addExerciseViaUI(page, 'Bench Press');
     await addSetViaUI(page, 'warmup');
     await addSetViaUI(page, 'normal');
-    await fillSetRow(page, 0, 0, { reps: 10, weight: 45 });
-    await fillSetRow(page, 0, 1, { reps: 10, weight: 135 });
+    await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 45 });
+    await fillSetRow(page, 0, 1, { plannedReps: 10, weight: 135 });
 
     await addExerciseViaUI(page, 'Incline Press');
-    await fillSetRow(page, 1, 0, { reps: 12, weight: 0 });
+    await fillSetRow(page, 1, 0, { plannedReps: 12, weight: 0 });
     await page.locator('.exercise-block').nth(1).locator('td[data-label="Weight"] input').clear();
     await page.waitForTimeout(300);
 
@@ -43,9 +43,9 @@ test.describe('Summary Statistics', () => {
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('3');
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Warm-up Sets' }).locator('.val')).toHaveText('1');
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('22');
-    // Bench: initial normal (reps=10) + un-filled normal (reps=null) = 2 working sets, 1 with reps
-    // Incline: initial normal (reps=12) = 1 working set, 1 with reps
-    // Total working sets: 3, working sets with reps: 2, total reps: 22
+    // Bench: initial normal (planned reps=10) + un-filled normal = 2 working sets, 1 with planned reps
+    // Incline: initial normal (planned reps=12) = 1 working set, 1 with planned reps
+    // Total working sets: 3, working sets with planned reps: 2, total planned reps: 22
     // avg = 22/2 = 11.0
     await expect(page.locator('.stat-card').filter({ hasText: 'Avg Reps' }).locator('.val')).toHaveText('11.0');
     await expect(page.locator('.stat-card').filter({ hasText: 'Avg RIR' }).locator('.val')).toHaveText('\u2014');
@@ -80,7 +80,7 @@ test.describe('Summary Statistics', () => {
 
   test('program summary shows data from workout sets', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
-    await fillSetRow(page, 0, 0, { reps: 10, weight: 100 });
+    await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 100 });
 
     const programId = page.url().match(/\/programs\/(\d+)/)?.[1];
     await navigateTo(page, `/programs/${programId}/summary`);
@@ -110,9 +110,9 @@ test.describe('Summary Statistics', () => {
 
   test('mesocycle summary displays stats and breakdowns', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
-    await fillSetRow(page, 0, 0, { reps: 10, weight: 100 });
+    await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 100 });
     await addSetViaUI(page, 'normal');
-    await fillSetRow(page, 0, 1, { reps: 8, weight: 120 });
+    await fillSetRow(page, 0, 1, { plannedReps: 8, weight: 120 });
     await page.waitForTimeout(300);
 
     // Get mesocycle link from breadcrumb
@@ -154,20 +154,33 @@ test.describe('Summary Statistics', () => {
 
   test('workout summary updates after editing set data', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
-    await fillSetRow(page, 0, 0, { reps: 10, weight: 100 });
+    await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 100 });
     await page.waitForTimeout(300);
 
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('10');
 
-    await page.locator('.exercise-block').first().locator('td[data-label="Reps"] input').fill('15');
+    await page.locator('.exercise-block').first().locator('td[data-label="Planned Reps"] input').fill('15');
     await page.waitForTimeout(500);
 
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('15');
   });
 
-  test('null reps/weight are handled without NaN', async ({ page }) => {
+  test('actual reps do not change programmed summary statistics', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
-    await page.locator('.exercise-block').first().locator('td[data-label="Reps"] input').clear();
+    await fillSetRow(page, 0, 0, { plannedReps: 10, actualReps: 7, weight: 100 });
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('10');
+
+    await page.locator('.exercise-block').first().locator('td[data-label="Actual Reps"] input').fill('12');
+    await page.waitForTimeout(500);
+
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('10');
+  });
+
+  test('null planned reps/weight are handled without NaN', async ({ page }) => {
+    await addExerciseViaUI(page, 'Bench Press');
+    await page.locator('.exercise-block').first().locator('td[data-label="Planned Reps"] input').clear();
     await page.waitForTimeout(500);
 
     await expect(page.locator('.stats-grid')).toBeVisible();
@@ -177,12 +190,12 @@ test.describe('Summary Statistics', () => {
 
   test('program summary breakdown shows exercise group percentages', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
-    await fillSetRow(page, 0, 0, { reps: 10, weight: 100 });
+    await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 100 });
     await addSetViaUI(page, 'normal');
-    await fillSetRow(page, 0, 1, { reps: 8, weight: 120 });
+    await fillSetRow(page, 0, 1, { plannedReps: 8, weight: 120 });
 
     await addExerciseViaUI(page, 'Incline Press');
-    await fillSetRow(page, 1, 0, { reps: 12 });
+    await fillSetRow(page, 1, 0, { plannedReps: 12 });
     await page.locator('.exercise-block').nth(1).locator('td[data-label="Weight"] input').clear();
     await page.waitForTimeout(300);
 

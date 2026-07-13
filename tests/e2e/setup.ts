@@ -124,10 +124,11 @@ export async function addSetViaUI(page: Page, type: string = 'normal'): Promise<
   await page.waitForTimeout(300);
 }
 
-export async function fillSetRow(page: Page, exerciseIndex: number, setIndex: number, { reps, weight, rir }: { reps?: number; weight?: number; rir?: number }): Promise<void> {
+export async function fillSetRow(page: Page, exerciseIndex: number, setIndex: number, { plannedReps, actualReps, weight, rir }: { plannedReps?: number; actualReps?: number; weight?: number; rir?: number }): Promise<void> {
   const rows = page.locator('.exercise-block').nth(exerciseIndex).locator('.set-table tbody tr');
   const row = rows.nth(setIndex);
-  if (reps !== undefined) await row.locator('td[data-label="Reps"] input').fill(String(reps));
+  if (plannedReps !== undefined) await row.locator('td[data-label="Planned Reps"] input').fill(String(plannedReps));
+  if (actualReps !== undefined) await row.locator('td[data-label="Actual Reps"] input').fill(String(actualReps));
   if (weight !== undefined) await row.locator('td[data-label="Weight"] input').fill(String(weight));
   if (rir !== undefined) await row.locator('td[data-label="RIR"] input').fill(String(rir));
   await page.waitForTimeout(500);
