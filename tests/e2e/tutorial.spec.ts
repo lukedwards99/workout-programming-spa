@@ -47,12 +47,6 @@ test.describe('Tutorial', () => {
     await expect(page.locator('.workout-chip')).toHaveCount(3);
     await expect(page.locator('.workout-chip').first()).toContainText('Push Day');
 
-    // Each exercise/variation block starts its own set numbering.
-    await page.locator('.workout-chip', { hasText: 'Push Day' }).click();
-    await page.waitForSelector('.exercise-block');
-    const closeGripBlock = page.locator('.exercise-block', { hasText: 'Close Grip' });
-    await expect(closeGripBlock.locator('td[data-label="Set"]').first()).toHaveText('1');
-
     // Navigate to Summary tab to verify stats
     await page.locator('.program-tabs button').filter({ hasText: 'Summary' }).click();
     await page.waitForTimeout(300);
@@ -60,6 +54,16 @@ test.describe('Tutorial', () => {
     // Should have non-zero working sets
     const wsVal = page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val');
     await expect(wsVal).not.toHaveText('0');
+
+    // Return to Schedule tab
+    await page.locator('.program-tabs button').filter({ hasText: 'Schedule' }).click();
+    await page.waitForTimeout(300);
+
+    // Each exercise/variation block starts its own set numbering.
+    await page.locator('.workout-chip', { hasText: 'Push Day' }).click();
+    await page.waitForSelector('.exercise-block');
+    const closeGripBlock = page.locator('.exercise-block', { hasText: 'Close Grip' });
+    await expect(closeGripBlock.locator('td[data-label="Set"]').first()).toHaveText('1');
   });
 
   test('burger menu opens and navigates to about', async ({ page }) => {
