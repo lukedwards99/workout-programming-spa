@@ -138,6 +138,8 @@ export interface ExerciseGroupSummaryRow {
   workingSets: number;
   programmedReps: number;
   programmedVolume: number;
+  actualReps: number;
+  actualVolume: number;
   averageRir: number | null;
   workingSetPercentage: number;
 }
@@ -150,6 +152,8 @@ export interface ExerciseSummaryRow {
   workingSets: number;
   programmedReps: number;
   programmedVolume: number;
+  actualReps: number;
+  actualVolume: number;
   averageRir: number | null;
   workingSetPercentage: number;
 }

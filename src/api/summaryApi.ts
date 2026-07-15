@@ -21,6 +21,8 @@ function mapGroupRow(r: SqlRow, scopeWorkingSets: number): ExerciseGroupSummaryR
     workingSets,
     programmedReps: asNumber(r.programmed_reps),
     programmedVolume: asNumber(r.programmed_volume),
+    actualReps: asNumber(r.actual_reps),
+    actualVolume: asNumber(r.actual_volume),
     averageRir: asNullNumber(r.average_rir),
     workingSetPercentage: scopeWorkingSets > 0 ? workingSets / scopeWorkingSets : 0,
   };
@@ -36,6 +38,8 @@ function mapExerciseRow(r: SqlRow, scopeWorkingSets: number): ExerciseSummaryRow
     workingSets,
     programmedReps: asNumber(r.programmed_reps),
     programmedVolume: asNumber(r.programmed_volume),
+    actualReps: asNumber(r.actual_reps),
+    actualVolume: asNumber(r.actual_volume),
     averageRir: asNullNumber(r.average_rir),
     workingSetPercentage: scopeWorkingSets > 0 ? workingSets / scopeWorkingSets : 0,
   };
@@ -79,6 +83,8 @@ const TOTALS_COMMON = `
   COALESCE(SUM(CASE WHEN ws.set_type = 'warmup' THEN 1 ELSE 0 END), 0) as warmup_sets,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) ELSE 0 END), 0) as programmed_reps,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' AND ws.actual_reps IS NOT NULL THEN ws.actual_reps ELSE 0 END), 0) as actual_reps,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' AND ws.actual_reps IS NOT NULL THEN ws.actual_reps * COALESCE(ws.weight, 0) ELSE 0 END), 0) as actual_volume,
   COUNT(CASE WHEN ws.set_type <> 'warmup' AND ws.planned_reps IS NOT NULL THEN 1 END) as working_sets_with_reps,
   AVG(CASE WHEN ws.set_type <> 'warmup' AND ws.rir IS NOT NULL THEN ws.rir END) as average_rir
 `;
@@ -90,6 +96,8 @@ const BREAKDOWN_GROUP_COMMON = `
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN 1 ELSE 0 END), 0) as working_sets,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) ELSE 0 END), 0) as programmed_reps,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' AND ws.actual_reps IS NOT NULL THEN ws.actual_reps ELSE 0 END), 0) as actual_reps,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' AND ws.actual_reps IS NOT NULL THEN ws.actual_reps * COALESCE(ws.weight, 0) ELSE 0 END), 0) as actual_volume,
   AVG(CASE WHEN ws.set_type <> 'warmup' AND ws.rir IS NOT NULL THEN ws.rir END) as average_rir
 `;
 
@@ -101,6 +109,8 @@ const BREAKDOWN_EX_COMMON = `
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN 1 ELSE 0 END), 0) as working_sets,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) ELSE 0 END), 0) as programmed_reps,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN COALESCE(ws.planned_reps, 0) * COALESCE(ws.weight, 0) ELSE 0 END), 0) as programmed_volume,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' AND ws.actual_reps IS NOT NULL THEN ws.actual_reps ELSE 0 END), 0) as actual_reps,
+  COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' AND ws.actual_reps IS NOT NULL THEN ws.actual_reps * COALESCE(ws.weight, 0) ELSE 0 END), 0) as actual_volume,
   AVG(CASE WHEN ws.set_type <> 'warmup' AND ws.rir IS NOT NULL THEN ws.rir END) as average_rir
 `;
 
