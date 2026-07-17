@@ -4,8 +4,10 @@ import { exercisesApi } from './exercisesApi';
 import { exerciseVariationsApi } from './exerciseVariationsApi';
 import { execSQL, queryAll, saveNow } from '../db/databaseService';
 
-const FORMAT_VERSION = 1;
+const FORMAT_VERSION = 2;
 const WORKBOOK_TYPE = 'mesocycle-export';
+const WORKOUT_SHEET_TYPE = 'workout';
+const WORKOUT_SET_HEADER_ROW = 10;
 const SET_TYPES: WorkoutSetType[] = ['warmup', 'normal', 'dropset', 'failure', 'rest-pause'];
 const MAX_VALIDATION_ROWS = 1000;
 const NAVY = '17365D';
@@ -55,6 +57,23 @@ function safeFileName(value: string): string {
   return value.replace(/[^a-z0-9]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'mesocycle';
 }
 
+function uniqueWorksheetName(day: number, workoutName: string, usedNames: Set<string>): string {
+  const sanitized = `Day ${day} - ${workoutName}`
+    .replace(/[\\/?*\[\]:]/g, ' ')
+    .replace(/[\u0000-\u001f]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^'+|'+$/g, '')
+    .trim() || `Day ${day} - Workout`;
+  let name = sanitized.slice(0, 31).trim();
+  let suffixNumber = 2;
+  while (usedNames.has(name.toLowerCase())) {
+    const suffix = ` (${suffixNumber++})`;
+    name = `${sanitized.slice(0, 31 - suffix.length).trim()}${suffix}`;
+  }
+  usedNames.add(name.toLowerCase());
+  return name;
+}
+
 async function loadExcelJS(): Promise<typeof ExcelJS> {
   return (await import('exceljs')).default as unknown as typeof ExcelJS;
 }
@@ -75,13 +94,13 @@ function styleHeader(row: ExcelJS.Row): void {
   });
 }
 
-function styleTable(sheet: ExcelJS.Worksheet, header: string[], widths: number[], referenceColumns: number[], editableColumns: number[]): void {
-  sheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: false }];
+function styleTable(sheet: ExcelJS.Worksheet, header: string[], widths: number[], referenceColumns: number[], editableColumns: number[], headerRow = 1): void {
+  sheet.views = [{ state: 'frozen', ySplit: headerRow, showGridLines: false }];
   sheet.columns = widths.map((width) => ({ width }));
-  sheet.getRow(1).values = header;
-  styleHeader(sheet.getRow(1));
-  sheet.autoFilter = { from: 'A1', to: `${sheet.getColumn(header.length).letter}1` };
-  for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
+  sheet.getRow(headerRow).values = header;
+  styleHeader(sheet.getRow(headerRow));
+  sheet.autoFilter = { from: `A${headerRow}`, to: `${sheet.getColumn(header.length).letter}${headerRow}` };
+  for (let rowNumber = headerRow + 1; rowNumber <= sheet.rowCount; rowNumber++) {
     const row = sheet.getRow(rowNumber);
     row.height = 24;
     row.eachCell({ includeEmpty: true }, (cell, column) => {
@@ -95,8 +114,8 @@ function styleTable(sheet: ExcelJS.Worksheet, header: string[], widths: number[]
   }
 }
 
-function applyValidation(sheet: ExcelJS.Worksheet, column: number, validation: ExcelJS.DataValidation): void {
-  for (let row = 2; row <= MAX_VALIDATION_ROWS; row++) sheet.getCell(row, column).dataValidation = validation;
+function applyValidation(sheet: ExcelJS.Worksheet, column: number, validation: ExcelJS.DataValidation, startRow = 2): void {
+  for (let row = startRow; row <= MAX_VALIDATION_ROWS; row++) sheet.getCell(row, column).dataValidation = validation;
 }
 
 function setTypeFill(type: WorkoutSetType): string {
@@ -119,16 +138,42 @@ export async function exportMesocycleWorkbook(programId: number, programName: st
   workbook.created = new Date();
   workbook.properties.date1904 = false;
 
+  const workoutRows: ExportWorkoutRow[] = queryAll(
+    'SELECT id, name, day_offset, notes, sort_order FROM workouts WHERE mesocycle_id = ? ORDER BY day_offset, sort_order, id', [mesocycle.id]
+  ).map((row) => ({
+    'Workout Ref': `workout-${row.id as number}`, Day: (row.day_offset as number) + 1, Name: row.name as string,
+    Notes: (row.notes as string | null) || '', 'Sort Order': row.sort_order as number,
+  }));
+  const setRows: ExportSetRow[] = queryAll(
+    `SELECT ws.*, w.id AS workout_source_id, e.name AS exercise_name, ev.name AS variation_name
+     FROM workout_sets ws JOIN workouts w ON w.id = ws.workout_id JOIN exercises e ON e.id = ws.exercise_id
+     LEFT JOIN exercise_variations ev ON ev.id = ws.exercise_variation_id WHERE w.mesocycle_id = ?
+     ORDER BY w.day_offset, w.sort_order, w.id, ws.exercise_order, ws.set_number, ws.id`, [mesocycle.id]
+  ).map((row) => ({
+    'Workout Ref': `workout-${row.workout_source_id as number}`, Exercise: row.exercise_name as string,
+    Variation: (row.variation_name as string | null) || '', 'Exercise Order': row.exercise_order as number,
+    'Set #': row.set_number as number, 'Set Type': row.set_type as WorkoutSetType,
+    'Planned Reps': row.planned_reps as number | null, 'Actual Reps': row.actual_reps as number | null,
+    Weight: row.weight as number | null, RIR: row.rir as number | null, Notes: (row.notes as string | null) || '',
+    'Exercise ID': row.exercise_id as number, 'Variation ID': row.exercise_variation_id as number | null,
+  }));
+  const setsByWorkout = new Map<string, ExportSetRow[]>();
+  for (const setRow of setRows) {
+    const rows = setsByWorkout.get(setRow['Workout Ref']) ?? [];
+    rows.push(setRow);
+    setsByWorkout.set(setRow['Workout Ref'], rows);
+  }
+
   const metadata = workbook.addWorksheet('Mesocycle', { views: [{ showGridLines: false }] });
-  metadata.columns = [{ width: 24 }, { width: 96 }];
-  metadata.mergeCells('A1:B1');
-  metadata.getCell('A1').value = 'Workout Programming — Mesocycle Editor';
+  metadata.columns = [{ width: 18 }, { width: 14 }, { width: 32 }, { width: 14 }, { width: 12 }, { width: 50 }];
+  metadata.mergeCells('A1:F1');
+  metadata.getCell('A1').value = `${programName} — ${mesocycle.name}`;
   metadata.getCell('A1').font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
   metadata.getCell('A1').fill = fill(NAVY);
   metadata.getCell('A1').alignment = { vertical: 'middle' };
   metadata.getRow(1).height = 28;
-  metadata.mergeCells('A2:B2');
-  metadata.getCell('A2').value = 'Edit the highlighted cells on this sheet, Workouts, and Sets, then import this workbook back into this same mesocycle.';
+  metadata.mergeCells('A2:F2');
+  metadata.getCell('A2').value = 'Edit the highlighted mesocycle fields and workout tabs, then import this workbook back into this same mesocycle.';
   metadata.getCell('A2').font = { name: 'Arial', size: 10, color: { argb: `FF${NAVY}` } };
   metadata.getCell('A2').alignment = { vertical: 'middle', wrapText: true };
   metadata.getCell('A2').fill = fill('E9F1FB');
@@ -157,61 +202,109 @@ export async function exportMesocycleWorkbook(programId: number, programName: st
   metadata.getCell('A13').value = 'Legend';
   metadata.getCell('A13').font = { name: 'Arial', bold: true, color: { argb: 'FFFFFFFF' } };
   metadata.getCell('A13').fill = fill(CORAL);
+  metadata.mergeCells('B13:F13');
   metadata.getCell('B13').value = 'Pale coral cells are editable. Gray cells are reference-only.';
   metadata.getCell('B13').font = { name: 'Arial', size: 10 };
   metadata.getCell('B13').alignment = { wrapText: true };
   metadata.getCell('B13').fill = fill(PALE_EDITABLE);
 
-  const workoutRows: ExportWorkoutRow[] = queryAll(
-    'SELECT id, name, day_offset, notes, sort_order FROM workouts WHERE mesocycle_id = ? ORDER BY day_offset, sort_order, id', [mesocycle.id]
-  ).map((row) => ({
-    'Workout Ref': `workout-${row.id as number}`, Day: (row.day_offset as number) + 1, Name: row.name as string,
-    Notes: (row.notes as string | null) || '', 'Sort Order': row.sort_order as number,
-  }));
-  const workouts = workbook.addWorksheet('Workouts');
-  const workoutHeader = ['Workout Ref', 'Day', 'Name', 'Notes', 'Sort Order'];
-  workouts.addRow(workoutHeader);
-  workoutRows.forEach((row) => workouts.addRow(workoutHeader.map((header) => row[header as keyof ExportWorkoutRow])));
-  styleTable(workouts, workoutHeader, [18, 10, 30, 50, 14], [1], [2, 3, 4, 5]);
-  applyValidation(workouts, 2, { type: 'whole', operator: 'between', formulae: [1, mesocycle.mesocycle_length], allowBlank: false, showErrorMessage: true, error: `Day must be an integer from 1 through ${mesocycle.mesocycle_length}.` });
-  applyValidation(workouts, 5, { type: 'whole', operator: 'greaterThanOrEqual', formulae: [0], allowBlank: false, showErrorMessage: true, error: 'Sort Order must be a non-negative integer.' });
-  workouts.getColumn(2).numFmt = '0';
-  workouts.getColumn(5).numFmt = '0';
+  metadata.mergeCells('A15:F15');
+  metadata.getCell('A15').value = 'Workout Overview';
+  metadata.getCell('A15').font = { name: 'Arial', size: 13, bold: true, color: { argb: 'FFFFFFFF' } };
+  metadata.getCell('A15').fill = fill(NAVY);
+  metadata.getRow(16).values = ['Day', 'Date', 'Workout', 'Exercises', 'Sets', 'Notes'];
+  styleHeader(metadata.getRow(16));
+  workoutRows.forEach((workout, index) => {
+    const workoutSets = setsByWorkout.get(workout['Workout Ref']) ?? [];
+    const exerciseBlocks = new Set(workoutSets.map((set) => `${set['Exercise ID']}:${set['Variation ID'] ?? ''}`));
+    const workoutDate = new Date(startDate);
+    workoutDate.setUTCDate(workoutDate.getUTCDate() + workout.Day - 1);
+    const row = metadata.getRow(17 + index);
+    row.values = [workout.Day, workoutDate, workout.Name, exerciseBlocks.size, workoutSets.length, workout.Notes];
+    row.height = 24;
+    row.eachCell({ includeEmpty: true }, (cell) => {
+      cell.font = { name: 'Arial', size: 10 };
+      cell.alignment = { vertical: 'top', wrapText: true };
+      cell.border = bottomBorder;
+      cell.fill = fill(index % 2 === 0 ? PALE_REFERENCE : PALE_ALTERNATE);
+    });
+    row.getCell(1).numFmt = '0';
+    row.getCell(2).numFmt = 'yyyy-mm-dd';
+    row.getCell(4).numFmt = '0';
+    row.getCell(5).numFmt = '0';
+  });
+  metadata.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+  metadata.pageSetup.printArea = `A1:F${Math.max(17, 16 + workoutRows.length)}`;
+  metadata.pageSetup.printTitlesRow = '16:16';
 
-  const setRows: ExportSetRow[] = queryAll(
-    `SELECT ws.*, w.id AS workout_source_id, e.name AS exercise_name, ev.name AS variation_name
-     FROM workout_sets ws JOIN workouts w ON w.id = ws.workout_id JOIN exercises e ON e.id = ws.exercise_id
-     LEFT JOIN exercise_variations ev ON ev.id = ws.exercise_variation_id WHERE w.mesocycle_id = ?
-     ORDER BY w.day_offset, w.sort_order, w.id, ws.exercise_order, ws.set_number, ws.id`, [mesocycle.id]
-  ).map((row) => ({
-    'Workout Ref': `workout-${row.workout_source_id as number}`, Exercise: row.exercise_name as string,
-    Variation: (row.variation_name as string | null) || '', 'Exercise Order': row.exercise_order as number,
-    'Set #': row.set_number as number, 'Set Type': row.set_type as WorkoutSetType,
-    'Planned Reps': row.planned_reps as number | null, 'Actual Reps': row.actual_reps as number | null,
-    Weight: row.weight as number | null, RIR: row.rir as number | null, Notes: (row.notes as string | null) || '',
-    'Exercise ID': row.exercise_id as number, 'Variation ID': row.exercise_variation_id as number | null,
-  }));
-  const sets = workbook.addWorksheet('Sets');
-  const setHeader = ['Workout Ref', 'Exercise', 'Variation', 'Exercise Order', 'Set #', 'Set Type', 'Planned Reps', 'Actual Reps', 'Weight', 'RIR', 'Notes', 'Exercise ID', 'Variation ID'];
-  sets.addRow(setHeader);
-  setRows.forEach((row) => sets.addRow(setHeader.map((header) => row[header as keyof ExportSetRow])));
-  styleTable(sets, setHeader, [18, 30, 24, 14, 10, 14, 14, 14, 12, 10, 42, 14, 14], [1, 2, 3, 12, 13], [4, 5, 6, 7, 8, 9, 10, 11]);
-  sets.views = [{ state: 'frozen', xSplit: 3, ySplit: 1, showGridLines: false }];
-  sets.getColumn(12).hidden = true;
-  sets.getColumn(13).hidden = true;
-  for (let rowNumber = 2; rowNumber <= sets.rowCount; rowNumber++) {
-    const setType = sets.getCell(rowNumber, 6).value as WorkoutSetType;
-    sets.getCell(rowNumber, 6).fill = fill(setTypeFill(setType));
-    sets.getCell(rowNumber, 6).font = { name: 'Arial', size: 10, bold: true, color: { argb: `FF${NAVY}` } };
+  const usedSheetNames = new Set<string>(['mesocycle']);
+  const setHeader = ['Exercise', 'Variation', 'Exercise Order', 'Set #', 'Set Type', 'Planned Reps', 'Actual Reps', 'Weight', 'RIR', 'Notes', 'Exercise ID', 'Variation ID'];
+  for (const workout of workoutRows) {
+    const sheetName = uniqueWorksheetName(workout.Day, workout.Name, usedSheetNames);
+    const sheet = workbook.addWorksheet(sheetName, { views: [{ showGridLines: false }] });
+    sheet.mergeCells('A1:L1');
+    sheet.getCell('A1').value = workout.Name;
+    sheet.getCell('A1').font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+    sheet.getCell('A1').fill = fill(NAVY);
+    sheet.getCell('A1').alignment = { vertical: 'middle' };
+    sheet.getRow(1).height = 28;
+    sheet.mergeCells('A2:L2');
+    sheet.getCell('A2').value = 'Edit the highlighted workout fields and set values. Exercise names and hidden IDs are reference-only.';
+    sheet.getCell('A2').font = { name: 'Arial', size: 10, color: { argb: `FF${NAVY}` } };
+    sheet.getCell('A2').alignment = { vertical: 'middle', wrapText: true };
+    sheet.getCell('A2').fill = fill('E9F1FB');
+    sheet.getRow(2).height = 32;
+    sheet.getRow(3).values = ['Field', 'Value'];
+    styleHeader(sheet.getRow(3));
+    const workoutMetadata: Array<[string, CellValue]> = [
+      ['Name', workout.Name], ['Day', workout.Day], ['Notes', workout.Notes], ['Sort Order', workout['Sort Order']],
+      ['Workout Ref', workout['Workout Ref']], ['Sheet Type', WORKOUT_SHEET_TYPE],
+    ];
+    workoutMetadata.forEach(([field, value], index) => {
+      const row = sheet.getRow(index + 4);
+      row.values = [field, value];
+      row.height = field === 'Notes' ? 36 : 22;
+      row.eachCell({ includeEmpty: true }, (cell, column) => {
+        cell.font = { name: 'Arial', size: 10, bold: column === 1 };
+        cell.alignment = { vertical: 'top', wrapText: true };
+        cell.border = bottomBorder;
+        cell.fill = fill(index < 4 ? (column === 1 ? PALE_REFERENCE : PALE_EDITABLE) : PALE_REFERENCE);
+      });
+    });
+    sheet.getRow(8).hidden = true;
+    sheet.getRow(9).hidden = true;
+    sheet.getCell('B5').numFmt = '0';
+    sheet.getCell('B7').numFmt = '0';
+    sheet.getCell('B5').dataValidation = { type: 'whole', operator: 'between', formulae: [1, mesocycle.mesocycle_length], allowBlank: false, showErrorMessage: true, error: `Day must be an integer from 1 through ${mesocycle.mesocycle_length}.` };
+    sheet.getCell('B7').dataValidation = { type: 'whole', operator: 'greaterThanOrEqual', formulae: [0], allowBlank: false, showErrorMessage: true, error: 'Sort Order must be a non-negative integer.' };
+
+    const workoutSets = setsByWorkout.get(workout['Workout Ref']) ?? [];
+    sheet.getRow(WORKOUT_SET_HEADER_ROW).values = setHeader;
+    workoutSets.forEach((set) => sheet.addRow([
+      set.Exercise, set.Variation, set['Exercise Order'], set['Set #'], set['Set Type'], set['Planned Reps'],
+      set['Actual Reps'], set.Weight, set.RIR, set.Notes, set['Exercise ID'], set['Variation ID'],
+    ]));
+    styleTable(sheet, setHeader, [30, 24, 14, 10, 14, 14, 14, 12, 10, 42, 14, 14], [1, 2, 11, 12], [3, 4, 5, 6, 7, 8, 9, 10], WORKOUT_SET_HEADER_ROW);
+    sheet.views = [{ state: 'frozen', xSplit: 2, ySplit: WORKOUT_SET_HEADER_ROW, showGridLines: false }];
+    sheet.getColumn(11).hidden = true;
+    sheet.getColumn(12).hidden = true;
+    for (let rowNumber = WORKOUT_SET_HEADER_ROW + 1; rowNumber <= sheet.rowCount; rowNumber++) {
+      const setType = sheet.getCell(rowNumber, 5).value as WorkoutSetType;
+      sheet.getCell(rowNumber, 5).fill = fill(setTypeFill(setType));
+      sheet.getCell(rowNumber, 5).font = { name: 'Arial', size: 10, bold: true, color: { argb: `FF${NAVY}` } };
+    }
+    applyValidation(sheet, 3, { type: 'whole', operator: 'greaterThanOrEqual', formulae: [0], allowBlank: false, showErrorMessage: true, error: 'Exercise Order must be a non-negative integer.' }, WORKOUT_SET_HEADER_ROW + 1);
+    applyValidation(sheet, 4, { type: 'whole', operator: 'greaterThanOrEqual', formulae: [1], allowBlank: false, showErrorMessage: true, error: 'Set # must be an integer of at least 1.' }, WORKOUT_SET_HEADER_ROW + 1);
+    applyValidation(sheet, 5, { type: 'list', formulae: [`"${SET_TYPES.join(',')}"`], allowBlank: false, showErrorMessage: true, error: 'Choose a supported Set Type.' }, WORKOUT_SET_HEADER_ROW + 1);
+    for (const column of [6, 7]) applyValidation(sheet, column, { type: 'whole', operator: 'greaterThanOrEqual', formulae: [0], allowBlank: true, showErrorMessage: true, error: 'Reps must be a non-negative integer.' }, WORKOUT_SET_HEADER_ROW + 1);
+    applyValidation(sheet, 8, { type: 'decimal', operator: 'greaterThanOrEqual', formulae: [0], allowBlank: true, showErrorMessage: true, error: 'Weight must be a non-negative number.' }, WORKOUT_SET_HEADER_ROW + 1);
+    applyValidation(sheet, 9, { type: 'whole', allowBlank: true, formulae: [], showErrorMessage: true, error: 'RIR must be an integer.' }, WORKOUT_SET_HEADER_ROW + 1);
+    for (const column of [3, 4, 6, 7, 9, 11, 12]) sheet.getColumn(column).numFmt = '0';
+    sheet.getColumn(8).numFmt = '0.##';
+    sheet.pageSetup = { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
+    sheet.pageSetup.printArea = `A1:J${Math.max(WORKOUT_SET_HEADER_ROW + 1, WORKOUT_SET_HEADER_ROW + workoutSets.length)}`;
+    sheet.pageSetup.printTitlesRow = `${WORKOUT_SET_HEADER_ROW}:${WORKOUT_SET_HEADER_ROW}`;
   }
-  applyValidation(sets, 4, { type: 'whole', operator: 'greaterThanOrEqual', formulae: [0], allowBlank: false, showErrorMessage: true, error: 'Exercise Order must be a non-negative integer.' });
-  applyValidation(sets, 5, { type: 'whole', operator: 'greaterThanOrEqual', formulae: [1], allowBlank: false, showErrorMessage: true, error: 'Set # must be an integer of at least 1.' });
-  applyValidation(sets, 6, { type: 'list', formulae: [`"${SET_TYPES.join(',')}"`], allowBlank: false, showErrorMessage: true, error: 'Choose a supported Set Type.' });
-  for (const column of [7, 8]) applyValidation(sets, column, { type: 'whole', operator: 'greaterThanOrEqual', formulae: [0], allowBlank: true, showErrorMessage: true, error: 'Reps must be a non-negative integer.' });
-  applyValidation(sets, 9, { type: 'decimal', operator: 'greaterThanOrEqual', formulae: [0], allowBlank: true, showErrorMessage: true, error: 'Weight must be a non-negative number.' });
-  applyValidation(sets, 10, { type: 'whole', allowBlank: true, formulae: [], showErrorMessage: true, error: 'RIR must be an integer.' });
-  for (const column of [4, 5, 7, 8, 10, 12, 13]) sets.getColumn(column).numFmt = '0';
-  sets.getColumn(9).numFmt = '0.##';
 
   const buffer = await workbook.xlsx.writeBuffer();
   downloadWorkbook(buffer as unknown as ArrayBuffer, `mesocycle-${safeFileName(programName)}-${safeFileName(mesocycle.name)}-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -296,35 +389,52 @@ export async function validateMesocycleWorkbook(file: File, programId: number, m
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(await file.arrayBuffer() as never);
   const metadataSheet = workbook.getWorksheet('Mesocycle');
-  const workoutsSheet = workbook.getWorksheet('Workouts');
-  const setsSheet = workbook.getWorksheet('Sets');
-  if (!metadataSheet || !workoutsSheet || !setsSheet) throw new Error('Workbook must include Mesocycle, Workouts, and Sets sheets.');
-  rejectFormulas(metadataSheet, 'Mesocycle sheet'); rejectFormulas(workoutsSheet, 'Workouts sheet'); rejectFormulas(setsSheet, 'Sets sheet');
+  if (!metadataSheet) throw new Error('Workbook must include a Mesocycle sheet.');
+  rejectFormulas(metadataSheet, 'Mesocycle sheet');
   const metadata = getRows(metadataSheet, 'Mesocycle', 3);
   if (asText(metadataValue(metadata, 'Workbook Type')) !== WORKBOOK_TYPE || asInteger(metadataValue(metadata, 'Format Version'), 'Format Version', 1) !== FORMAT_VERSION) throw new Error('This is not a supported mesocycle export workbook.');
   if (asInteger(metadataValue(metadata, 'Source Program ID'), 'Source Program ID', 1) !== programId || asInteger(metadataValue(metadata, 'Source Mesocycle ID'), 'Source Mesocycle ID', 1) !== mesocycleId) throw new Error('This workbook belongs to a different mesocycle.');
   const importedMesocycle = { name: asRequiredText(metadataValue(metadata, 'Name'), 'Mesocycle name'), startDate: asIsoDate(metadataValue(metadata, 'Start Date')), mesocycleLength: asInteger(metadataValue(metadata, 'Mesocycle Length'), 'Mesocycle Length', 1), notes: asText(metadataValue(metadata, 'Notes')) };
-  const workouts = getRows(workoutsSheet, 'Workouts').map((row, index) => ({ ref: asRequiredText(row['Workout Ref'], `Workouts row ${index + 2} Workout Ref`), dayOffset: asInteger(row.Day, `Workouts row ${index + 2} Day`, 1) - 1, name: asRequiredText(row.Name, `Workouts row ${index + 2} Name`), notes: asText(row.Notes), sortOrder: asInteger(row['Sort Order'], `Workouts row ${index + 2} Sort Order`, 0) }));
+  const workoutSheets = workbook.worksheets.filter((sheet) => sheet.name !== 'Mesocycle');
+  const workouts: ImportedMesocycleWorkbook['workouts'] = [];
+  const sets: ImportedMesocycleWorkbook['sets'] = [];
   const refs = new Set<string>();
-  for (const workout of workouts) { if (workout.dayOffset >= importedMesocycle.mesocycleLength) throw new Error(`Workout "${workout.name}" is outside the mesocycle length.`); if (refs.has(workout.ref)) throw new Error(`Workout Ref "${workout.ref}" is duplicated.`); refs.add(workout.ref); }
-  const sets = getRows(setsSheet, 'Sets').map((row, index) => {
-    const workoutRef = asRequiredText(row['Workout Ref'], `Sets row ${index + 2} Workout Ref`);
-    if (!refs.has(workoutRef)) throw new Error(`Sets row ${index + 2} references an unknown workout.`);
-    const exerciseId = asInteger(row['Exercise ID'], `Sets row ${index + 2} Exercise ID`, 1);
-    const exerciseName = asText(row.Exercise);
-    const variationId = asNullableNumber(row['Variation ID'], `Sets row ${index + 2} Variation ID`, true, 1);
-    const variationName = asText(row.Variation);
-    const exercise = exercisesApi.get(exerciseId);
-    if (!exercise && !exerciseName) throw new Error(`Sets row ${index + 2} references a missing exercise without an exercise name.`);
-    if (variationId != null) {
-      const variation = exerciseVariationsApi.get(variationId);
-      if (variation && exercise && variation.exercise_id !== exerciseId) throw new Error(`Sets row ${index + 2} references an invalid exercise variation.`);
-      if (!variation && !variationName) throw new Error(`Sets row ${index + 2} references a missing exercise variation without a variation name.`);
-    }
-    const setType = asRequiredText(row['Set Type'], `Sets row ${index + 2} Set Type`) as WorkoutSetType;
-    if (!SET_TYPES.includes(setType)) throw new Error(`Sets row ${index + 2} has an unsupported Set Type.`);
-    return { workoutRef, exerciseId, exerciseName, variationId, variationName, exerciseOrder: asInteger(row['Exercise Order'], `Sets row ${index + 2} Exercise Order`, 0), setNumber: asInteger(row['Set #'], `Sets row ${index + 2} Set #`, 1), setType, plannedReps: asNullableNumber(row['Planned Reps'], `Sets row ${index + 2} Planned Reps`, true, 0), actualReps: asNullableNumber(row['Actual Reps'], `Sets row ${index + 2} Actual Reps`, true, 0), weight: asNullableNumber(row.Weight, `Sets row ${index + 2} Weight`, false, 0), rir: asNullableNumber(row.RIR, `Sets row ${index + 2} RIR`, true), notes: asText(row.Notes) };
-  });
+  for (const sheet of workoutSheets) {
+    rejectFormulas(sheet, `${sheet.name} sheet`);
+    const workoutMetadata = getRows(sheet, sheet.name, 3);
+    if (asText(metadataValue(workoutMetadata, 'Sheet Type')) !== WORKOUT_SHEET_TYPE) throw new Error(`Workbook contains unsupported worksheet "${sheet.name}".`);
+    const ref = asRequiredText(metadataValue(workoutMetadata, 'Workout Ref'), `${sheet.name} Workout Ref`);
+    const workout = {
+      ref,
+      dayOffset: asInteger(metadataValue(workoutMetadata, 'Day'), `${sheet.name} Day`, 1) - 1,
+      name: asRequiredText(metadataValue(workoutMetadata, 'Name'), `${sheet.name} Name`),
+      notes: asText(metadataValue(workoutMetadata, 'Notes')),
+      sortOrder: asInteger(metadataValue(workoutMetadata, 'Sort Order'), `${sheet.name} Sort Order`, 0),
+    };
+    if (workout.dayOffset >= importedMesocycle.mesocycleLength) throw new Error(`Workout "${workout.name}" is outside the mesocycle length.`);
+    if (refs.has(workout.ref)) throw new Error(`Workout Ref "${workout.ref}" is duplicated.`);
+    refs.add(workout.ref);
+    workouts.push(workout);
+
+    getRows(sheet, sheet.name, WORKOUT_SET_HEADER_ROW).forEach((row, index) => {
+      const rowNumber = WORKOUT_SET_HEADER_ROW + index + 1;
+      const label = `${sheet.name} row ${rowNumber}`;
+      const exerciseId = asInteger(row['Exercise ID'], `${label} Exercise ID`, 1);
+      const exerciseName = asText(row.Exercise);
+      const variationId = asNullableNumber(row['Variation ID'], `${label} Variation ID`, true, 1);
+      const variationName = asText(row.Variation);
+      const exercise = exercisesApi.get(exerciseId);
+      if (!exercise && !exerciseName) throw new Error(`${label} references a missing exercise without an exercise name.`);
+      if (variationId != null) {
+        const variation = exerciseVariationsApi.get(variationId);
+        if (variation && exercise && variation.exercise_id !== exerciseId) throw new Error(`${label} references an invalid exercise variation.`);
+        if (!variation && !variationName) throw new Error(`${label} references a missing exercise variation without a variation name.`);
+      }
+      const setType = asRequiredText(row['Set Type'], `${label} Set Type`) as WorkoutSetType;
+      if (!SET_TYPES.includes(setType)) throw new Error(`${label} has an unsupported Set Type.`);
+      sets.push({ workoutRef: ref, exerciseId, exerciseName, variationId, variationName, exerciseOrder: asInteger(row['Exercise Order'], `${label} Exercise Order`, 0), setNumber: asInteger(row['Set #'], `${label} Set #`, 1), setType, plannedReps: asNullableNumber(row['Planned Reps'], `${label} Planned Reps`, true, 0), actualReps: asNullableNumber(row['Actual Reps'], `${label} Actual Reps`, true, 0), weight: asNullableNumber(row.Weight, `${label} Weight`, false, 0), rir: asNullableNumber(row.RIR, `${label} RIR`, true), notes: asText(row.Notes) });
+    });
+  }
   validateExerciseOrders(sets);
   return { mesocycle: importedMesocycle, workouts, sets };
 }

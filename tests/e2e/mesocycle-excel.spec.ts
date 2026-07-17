@@ -33,6 +33,7 @@ test.describe('Mesocycle Excel round trip', () => {
     await fillSetRow(page, 0, 1, { plannedReps: 6, actualReps: 5, weight: 110, rir: 1 });
     await page.goto(mesocycleUrl);
     await page.waitForSelector('.day-cell');
+    await addWorkoutViaUI(page, 1, 'Recovery / Mobility: A Very Long Workout Name');
   });
 
   async function readDownload(download: import('@playwright/test').Download): Promise<ExcelJS.Workbook> {
@@ -51,29 +52,45 @@ test.describe('Mesocycle Excel round trip', () => {
     ]);
     expect(download.suggestedFilename()).toMatch(/\.xlsx$/);
     const workbook = await readDownload(download);
-    expect(workbook.worksheets.map((sheet) => sheet.name)).toEqual(['Mesocycle', 'Workouts', 'Sets']);
+    expect(workbook.worksheets).toHaveLength(3);
+    expect(workbook.worksheets[0].name).toBe('Mesocycle');
+    expect(workbook.worksheets[1].name).toBe('Day 1 - Push A');
+    expect(workbook.worksheets[2].name.length).toBeLessThanOrEqual(31);
+    expect(workbook.worksheets[2].name).not.toMatch(/[\\/?*\[\]:]/);
     const metadata = workbook.getWorksheet('Mesocycle')!;
-    const workouts = workbook.getWorksheet('Workouts')!;
-    const sets = workbook.getWorksheet('Sets')!;
+    const workout = workbook.worksheets[1];
+    const emptyWorkout = workbook.worksheets[2];
     expect(metadata.getCell('A1').font.bold).toBe(true);
     expect(metadata.getCell('A1').fill).toMatchObject({ fgColor: { argb: 'FF17365D' } });
     expect(metadata.getCell('B5').numFmt).toBe('yyyy-mm-dd');
     expect((metadata.getCell('B5').value as Date).toISOString()).toBe('2026-01-01T00:00:00.000Z');
     expect(metadata.getRow(8).hidden).toBe(true);
-    expect(workouts.autoFilter).toBeTruthy();
-    expect(workouts.views[0]).toMatchObject({ state: 'frozen', ySplit: 1 });
-    expect(workouts.getColumn(1).width).toBe(18);
-    expect(sets.views[0]).toMatchObject({ state: 'frozen', xSplit: 3, ySplit: 1 });
-    expect(sets.getColumn(12).hidden).toBe(true);
-    expect(sets.getCell('F2').dataValidation).toMatchObject({ type: 'list' });
-    expect(sets.getCell('G2').numFmt).toBe('0');
-    expect(sets.getCell('I2').numFmt).toBe('0.##');
+    expect(metadata.getCell('A16').value).toBe('Day');
+    expect(metadata.getCell('C17').value).toBe('Push A');
+    expect(metadata.getCell('D17').value).toBe(1);
+    expect(metadata.getCell('E17').value).toBe(2);
+    expect(metadata.getCell('C18').value).toBe('Recovery / Mobility: A Very Long Workout Name');
+    expect(metadata.getCell('D18').value).toBe(0);
+    expect(metadata.getCell('E18').value).toBe(0);
+    expect(metadata.pageSetup).toMatchObject({ orientation: 'landscape', fitToPage: true, fitToWidth: 1 });
+    expect(workout.getCell('B4').value).toBe('Push A');
+    expect(workout.getCell('B9').value).toBe('workout');
+    expect(workout.autoFilter).toBeTruthy();
+    expect(workout.views[0]).toMatchObject({ state: 'frozen', xSplit: 2, ySplit: 10 });
+    expect(workout.getColumn(11).hidden).toBe(true);
+    expect(workout.getColumn(12).hidden).toBe(true);
+    expect(workout.getCell('E11').dataValidation).toMatchObject({ type: 'list' });
+    expect(workout.getCell('F11').numFmt).toBe('0');
+    expect(workout.getCell('H11').numFmt).toBe('0.##');
+    expect(workout.pageSetup).toMatchObject({ orientation: 'landscape', fitToPage: true, fitToWidth: 1, printArea: 'A1:J12' });
+    expect(emptyWorkout.getCell('A10').value).toBe('Exercise');
+    expect(emptyWorkout.getCell('A11').value).toBeNull();
 
     metadata.getCell('B4').value = 'Imported Block';
     metadata.getCell('B5').value = new Date('2026-01-15T00:00:00.000Z');
     metadata.getCell('B6').value = 3;
-    workouts.getCell('C2').value = 'Imported Push';
-    sets.getCell('G2').value = 10;
+    workout.getCell('B4').value = 'Imported Push';
+    workout.getCell('F11').value = 10;
     const edited = await workbook.xlsx.writeBuffer();
 
     await page.locator('input[type="file"]').setInputFiles({
@@ -87,6 +104,7 @@ test.describe('Mesocycle Excel round trip', () => {
     await expect(page.getByText(/Started Jan 15, 2026/)).toBeVisible();
     await expect(page.locator('.day-cell')).toHaveCount(3);
     await expect(page.locator('.day-cell').first()).toContainText('Imported Push');
+    await expect(page.locator('.day-cell').nth(1)).toContainText('Recovery / Mobility: A Very Long Workout Name');
 
     await openWorkout(page, 'Imported Push');
     await expect(page.locator('.exercise-block')).toHaveCount(1);
@@ -146,10 +164,11 @@ test.describe('Mesocycle Excel round trip', () => {
       page.getByRole('button', { name: 'Export Excel' }).click(),
     ]);
     const workbook = await readDownload(download);
-    const sets = workbook.getWorksheet('Sets')!;
+    const workout = workbook.getWorksheet('Day 1 - Push A')!;
     for (const row of [2, 3]) {
-      sets.getCell(`C${row}`).value = 'Paused';
-      sets.getCell(`M${row}`).value = 999999;
+      const setRow = row + 9;
+      workout.getCell(`B${setRow}`).value = 'Paused';
+      workout.getCell(`L${setRow}`).value = 999999;
     }
     const edited = await workbook.xlsx.writeBuffer();
 
@@ -177,6 +196,37 @@ test.describe('Mesocycle Excel round trip', () => {
     await expect(page.locator('.day-cell').first()).toContainText('Push A');
   });
 
+  test('creates unique worksheet names for duplicate workouts', async ({ page }) => {
+    await addWorkoutViaUI(page, 1, 'Recovery / Mobility: A Very Long Workout Name');
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Export Excel' }).click(),
+    ]);
+    const workbook = await readDownload(download);
+    const workoutNames = workbook.worksheets.slice(1).map((sheet) => sheet.name);
+
+    expect(new Set(workoutNames.map((name) => name.toLowerCase())).size).toBe(workoutNames.length);
+    expect(workoutNames.every((name) => name.length <= 31)).toBe(true);
+    expect(workoutNames.every((name) => !/[\\/?*\[\]:]/.test(name))).toBe(true);
+    expect(workoutNames.some((name) => name.endsWith('(2)'))).toBe(true);
+  });
+
+  test('rejects the old combined Workouts and Sets layout', async ({ page }) => {
+    const [download] = await Promise.all([
+      page.waitForEvent('download'),
+      page.getByRole('button', { name: 'Export Excel' }).click(),
+    ]);
+    const workbook = await readDownload(download);
+    for (const sheet of workbook.worksheets.slice(1)) workbook.removeWorksheet(sheet.id);
+    workbook.addWorksheet('Workouts');
+    workbook.addWorksheet('Sets');
+    const oldLayout = await workbook.xlsx.writeBuffer();
+
+    await page.locator('input[type="file"]').setInputFiles({ name: 'old-layout.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(oldLayout) });
+    await expect(page.locator('.alert-danger')).toContainText('unsupported worksheet "Workouts"');
+    await expect(page.locator('.page-header h1')).toHaveText('Original Block');
+  });
+
   test('rejects inconsistent or reused exercise orders without changing the plan', async ({ page }) => {
     const mesocycleUrl = page.url();
     const programId = mesocycleUrl.match(/\/programs\/(\d+)/)?.[1];
@@ -195,13 +245,13 @@ test.describe('Mesocycle Excel round trip', () => {
       page.getByRole('button', { name: 'Export Excel' }).click(),
     ]);
     const workbook = await readDownload(download);
-    const sets = workbook.getWorksheet('Sets')!;
-    const firstExerciseOrder = sets.getCell('D2').value as number;
+    const workout = workbook.getWorksheet('Day 1 - Push A')!;
+    const firstExerciseOrder = workout.getCell('C11').value as number;
 
-    sets.getCell('D3').value = firstExerciseOrder + 10;
+    workout.getCell('C12').value = firstExerciseOrder + 10;
     const inconsistentBlock = await workbook.xlsx.writeBuffer();
-    sets.getCell('D3').value = firstExerciseOrder;
-    sets.getCell('D4').value = firstExerciseOrder;
+    workout.getCell('C12').value = firstExerciseOrder;
+    workout.getCell('C13').value = firstExerciseOrder;
     const reusedOrder = await workbook.xlsx.writeBuffer();
 
     await page.locator('input[type="file"]').setInputFiles({ name: 'inconsistent-block.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: Buffer.from(inconsistentBlock) });
