@@ -128,6 +128,8 @@ test.describe('Summary Statistics', () => {
 
     await expect(page.locator('.data-card h2').filter({ hasText: 'By Exercise Group' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'By Exercise', exact: true })).toBeVisible();
+    await expect(page.locator('table').first().locator('th', { hasText: 'Actual Reps' })).toHaveCount(1);
+    await expect(page.locator('table').nth(1).locator('th', { hasText: 'Actual Volume' })).toHaveCount(1);
   });
 
   test('mesocycle Schedule and Summary tabs are navigable', async ({ page }) => {
@@ -209,6 +211,51 @@ test.describe('Summary Statistics', () => {
     const chestRow = groupsTable.locator('tbody tr').filter({ hasText: 'Chest' });
     await expect(chestRow.locator('td[data-label="Working Sets"]')).toHaveText('3');
     await expect(chestRow.locator('td[data-label="% of Sets"]')).toHaveText('100%');
+  });
+
+  test('summary breakdowns show actual metrics and persist independent column choices', async ({ page }) => {
+    await addExerciseViaUI(page, 'Bench Press');
+    await fillSetRow(page, 0, 0, { plannedReps: 10, actualReps: 8, weight: 100 });
+    await addSetViaUI(page, 'normal');
+    await fillSetRow(page, 0, 1, { plannedReps: 8, actualReps: 6, weight: 120 });
+    await addSetViaUI(page, 'warmup');
+    await fillSetRow(page, 0, 2, { plannedReps: 12, actualReps: 12, weight: 45 });
+
+    await addExerciseViaUI(page, 'Incline Press');
+    await fillSetRow(page, 1, 0, { plannedReps: 12, actualReps: 10 });
+
+    const programId = page.url().match(/\/programs\/(\d+)/)?.[1];
+    await navigateTo(page, `/programs/${programId}/summary`);
+
+    const groupsTable = page.locator('table').first();
+    const chestGroup = groupsTable.locator('tbody tr').filter({ hasText: 'Chest' });
+    await expect(chestGroup.locator('td[data-label="Actual Reps"]')).toHaveText('24');
+    await expect(chestGroup.locator('td[data-label="Actual Volume"]')).toHaveText('1520');
+
+    const exercisesTable = page.locator('table').nth(1);
+    const benchRow = exercisesTable.locator('tbody tr').filter({ hasText: 'Bench Press' });
+    await expect(benchRow.locator('td[data-label="Actual Reps"]')).toHaveText('14');
+    await expect(benchRow.locator('td[data-label="Actual Volume"]')).toHaveText('1520');
+
+    const groupControls = page.getByTestId('exercise-group-columns');
+    await groupControls.locator('summary').click();
+    await groupControls.getByLabel('Actual Volume').uncheck();
+    await expect(groupsTable.locator('th', { hasText: 'Actual Volume' })).toHaveCount(0);
+
+    const exerciseControls = page.getByTestId('exercise-columns');
+    await exerciseControls.locator('summary').click();
+    await exerciseControls.getByLabel('Group').uncheck();
+    await expect(exercisesTable.locator('th').filter({ hasText: /^Group$/ })).toHaveCount(0);
+    await expect(groupsTable.locator('th', { hasText: 'Actual Reps' })).toHaveCount(1);
+
+    await page.reload();
+    await expect(page.locator('table').first().locator('th', { hasText: 'Actual Volume' })).toHaveCount(0);
+    await expect(page.locator('table').nth(1).locator('th').filter({ hasText: /^Group$/ })).toHaveCount(0);
+
+    await page.evaluate(() => {
+      localStorage.removeItem('summary-breakdown-columns:exercise-group');
+      localStorage.removeItem('summary-breakdown-columns:exercise');
+    });
   });
 
   test('exercises used only for warm-up sets are still counted', async ({ page }) => {
