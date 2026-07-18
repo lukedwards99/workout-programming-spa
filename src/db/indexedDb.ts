@@ -1,4 +1,8 @@
-export const IDB_NAME = 'workout-programming-v5';
+// Dev and prod are paths on the same github.io origin, so IndexedDB must be
+// namespaced explicitly to prevent development builds from modifying prod data.
+export const IDB_NAME = import.meta.env.VITE_APP_ENV === 'development'
+  ? 'workout-programming-v5-dev'
+  : 'workout-programming-v5';
 export const IDB_STORE = 'databases';
 export const CATALOG_KEY = 'catalog-v1';
 export const PROGRAM_KEY_PREFIX = 'program-v1:';

@@ -5,8 +5,12 @@
   <title>Redirecting...</title>
   <script>
     var path = location.pathname + location.search + location.hash;
+    var devBase = '/workout-programming-spa/dev/';
+    var base = location.pathname.indexOf(devBase) === 0
+      ? devBase
+      : '/workout-programming-spa/';
     sessionStorage.setItem('gh-redirect', path);
-    location.replace('/workout-programming-spa/');
+    location.replace(base);
   </script>
 </head>
 </html>
