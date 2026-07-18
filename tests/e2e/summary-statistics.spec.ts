@@ -42,12 +42,10 @@ test.describe('Summary Statistics', () => {
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Exercises' }).locator('.val')).toHaveText('2');
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('3');
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Warm-up Sets' }).locator('.val')).toHaveText('1');
-    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('22');
-    // Bench: initial normal (planned reps=10) + un-filled normal = 2 working sets, 1 with planned reps
-    // Incline: initial normal (planned reps=12) = 1 working set, 1 with planned reps
-    // Total working sets: 3, working sets with planned reps: 2, total planned reps: 22
-    // avg = 22/2 = 11.0
-    await expect(page.locator('.stat-card').filter({ hasText: 'Avg Reps' }).locator('.val')).toHaveText('11.0');
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('32');
+    // Selected set types include warm-ups. Three sets have planned reps: Bench normal (10),
+    // Bench warm-up (10), and Incline normal (12), so avg = 32/3 = 10.7.
+    await expect(page.locator('.stat-card').filter({ hasText: 'Avg Reps' }).locator('.val')).toHaveText('10.7');
     await expect(page.locator('.stat-card').filter({ hasText: 'Avg RIR' }).locator('.val')).toHaveText('\u2014');
   });
 
@@ -229,13 +227,13 @@ test.describe('Summary Statistics', () => {
 
     const groupsTable = page.locator('table').first();
     const chestGroup = groupsTable.locator('tbody tr').filter({ hasText: 'Chest' });
-    await expect(chestGroup.locator('td[data-label="Actual Reps"]')).toHaveText('24');
-    await expect(chestGroup.locator('td[data-label="Actual Volume"]')).toHaveText('1520');
+    await expect(chestGroup.locator('td[data-label="Actual Reps"]')).toHaveText('36');
+    await expect(chestGroup.locator('td[data-label="Actual Volume"]')).toHaveText('2060');
 
     const exercisesTable = page.locator('table').nth(1);
     const benchRow = exercisesTable.locator('tbody tr').filter({ hasText: 'Bench Press' });
-    await expect(benchRow.locator('td[data-label="Actual Reps"]')).toHaveText('14');
-    await expect(benchRow.locator('td[data-label="Actual Volume"]')).toHaveText('1520');
+    await expect(benchRow.locator('td[data-label="Actual Reps"]')).toHaveText('26');
+    await expect(benchRow.locator('td[data-label="Actual Volume"]')).toHaveText('2060');
 
     const groupControls = page.getByTestId('exercise-group-columns');
     await groupControls.locator('summary').click();
@@ -305,5 +303,36 @@ test.describe('Summary Statistics', () => {
     await page.waitForTimeout(300);
     await expect(page.locator('.stats-grid')).toBeVisible();
     await expect(page.url()).toContain('view=summary');
+  });
+
+  test('set-type filters recalculate summaries and expandable rows show each selected type', async ({ page }) => {
+    await addExerciseViaUI(page, 'Bench Press');
+    await fillSetRow(page, 0, 0, { plannedReps: 10, actualReps: 8, weight: 100, rir: 2 });
+    await addSetViaUI(page, 'warmup');
+    await fillSetRow(page, 0, 1, { plannedReps: 6, actualReps: 6, weight: 45, rir: 3 });
+
+    const filter = page.getByTestId('summary-set-type-filter');
+    for (const label of ['Warm-up', 'Normal', 'Dropset', 'Failure', 'Rest-pause']) {
+      await expect(filter.getByLabel(label)).toBeChecked();
+    }
+
+    await filter.getByLabel('Normal').uncheck();
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Sets' }).locator('.val')).toHaveText('1');
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('0');
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('6');
+
+    const programId = page.url().match(/\/programs\/(\d+)/)?.[1];
+    await navigateTo(page, `/programs/${programId}/summary`);
+    // Direct navigation reloads the SPA, so the in-memory selection returns to its all-selected default.
+    const programFilter = page.getByTestId('summary-set-type-filter');
+    await expect(programFilter.getByLabel('Normal')).toBeChecked();
+    await programFilter.getByLabel('Normal').uncheck();
+    await page.getByRole('button', { name: 'Show details: Chest' }).click();
+
+    const detail = page.getByRole('table', { name: 'Set type breakdown' }).first();
+    await expect(detail.locator('tbody tr')).toHaveCount(4);
+    await expect(detail.locator('tbody')).toContainText('Warm-up');
+    await expect(detail.locator('tbody')).toContainText('6');
+    await expect(detail.locator('tbody')).not.toContainText('Normal');
   });
 });

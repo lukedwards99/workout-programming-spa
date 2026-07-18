@@ -131,10 +131,21 @@ export interface SummaryTotals {
   averageRir: number | null;
 }
 
+export interface SetTypeSummary {
+  setType: WorkoutSetType;
+  totalSets: number;
+  programmedReps: number;
+  programmedVolume: number;
+  actualReps: number;
+  actualVolume: number;
+  averageRir: number | null;
+}
+
 export interface ExerciseGroupSummaryRow {
   exerciseGroupId: number;
   exerciseGroupName: string;
   distinctExercises: number;
+  totalSets: number;
   workingSets: number;
   programmedReps: number;
   programmedVolume: number;
@@ -142,6 +153,7 @@ export interface ExerciseGroupSummaryRow {
   actualVolume: number;
   averageRir: number | null;
   workingSetPercentage: number;
+  setTypeBreakdown: SetTypeSummary[];
 }
 
 export interface ExerciseSummaryRow {
@@ -149,6 +161,7 @@ export interface ExerciseSummaryRow {
   exerciseName: string;
   exerciseGroupId: number;
   exerciseGroupName: string;
+  totalSets: number;
   workingSets: number;
   programmedReps: number;
   programmedVolume: number;
@@ -156,6 +169,7 @@ export interface ExerciseSummaryRow {
   actualVolume: number;
   averageRir: number | null;
   workingSetPercentage: number;
+  setTypeBreakdown: SetTypeSummary[];
 }
 
 export interface ProgramTrainingSummary {
