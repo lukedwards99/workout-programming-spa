@@ -5,7 +5,9 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import App from './App';
 import './App.css';
 
-const basename = import.meta.env.MODE === 'production' ? '/workout-programming-spa' : undefined;
+// Vite normalizes BASE_URL with a trailing slash. Deriving the router basename
+// from it keeps local, production, and /dev deployments aligned.
+const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined;
 
 const sessionRedirectKey = 'gh-redirect';
 

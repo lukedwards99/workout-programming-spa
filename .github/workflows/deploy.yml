@@ -1,29 +1,90 @@
-name: Deploy to GitHub Pages
+name: Deploy development and production to GitHub Pages
 
 on:
   push:
-    branches: [beta-v3]
+    branches: [main, develop]
+  workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
 
 jobs:
-  build-and-deploy:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out production
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: production
 
-      - uses: actions/setup-node@v4
+      - name: Check out development
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          path: development
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
+          cache-dependency-path: |
+            production/package-lock.json
+            development/package-lock.json
 
-      - run: npm ci
+      - name: Install production dependencies
+        working-directory: production
+        run: npm ci
 
-      - run: npm run build
+      - name: Build production
+        working-directory: production
+        env:
+          VITE_APP_ENV: production
+        run: npm run build -- --base=/workout-programming-spa/
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Install development dependencies
+        working-directory: development
+        run: npm ci
+
+      - name: Build development
+        working-directory: development
+        env:
+          VITE_APP_ENV: development
+        run: npm run build -- --base=/workout-programming-spa/dev/
+
+      - name: Add development build to the Pages artifact
+        run: |
+          mkdir -p production/dist/dev
+          cp -R development/dist/. production/dist/dev/
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./dist
+          path: production/dist
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+      - name: Publish environment URLs
+        run: |
+          echo "### GitHub Pages environments" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Production: https://lukedwards99.github.io/workout-programming-spa/" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Development: https://lukedwards99.github.io/workout-programming-spa/dev/" >> "$GITHUB_STEP_SUMMARY"
