@@ -12,6 +12,7 @@ import TutorialPage from './pages/TutorialPage';
 import AboutPage from './pages/AboutPage';
 import MesocyclePage from './pages/MesocyclePage';
 import WorkoutPage from './pages/WorkoutPage';
+import { SummarySetTypeFilterProvider } from './components/summary/SummarySetTypeFilter';
 
 export default function App() {
   const [ready, setReady] = useState(false);
@@ -40,9 +41,10 @@ export default function App() {
 
   return (
     <div className="app">
-      <Navigation />
-      <div className="container">
-        <Routes>
+      <SummarySetTypeFilterProvider>
+        <Navigation />
+        <div className="container">
+          <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/tutorial" element={<TutorialPage />} />
           <Route path="/about" element={<AboutPage />} />
@@ -57,8 +59,9 @@ export default function App() {
           {/* Legacy route redirects */}
           <Route path="/mesocycles/:mesocycleId" element={<MesocycleFallback />} />
           <Route path="/workouts/:workoutId" element={<WorkoutFallback />} />
-        </Routes>
-      </div>
+          </Routes>
+        </div>
+      </SummarySetTypeFilterProvider>
     </div>
   );
 }

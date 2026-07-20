@@ -3,15 +3,17 @@ import type { ProgramTrainingSummary } from '../types/domain';
 import { summaryApi } from '../api/summaryApi';
 import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
 import SummaryBreakdownTables from '../components/summary/SummaryBreakdownTables';
+import SummarySetTypeFilterControls, { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
 import { formatCount } from '../components/summary/formatSummary';
 
 export default function ProgramSummaryPage() {
   const [data, setData] = useState<ProgramTrainingSummary | null>(null);
+  const { selectedSetTypes } = useSummarySetTypeFilter();
 
   useEffect(() => {
-    const summary = summaryApi.getProgramSummary();
+    const summary = summaryApi.getProgramSummary(selectedSetTypes);
     setData(summary);
-  }, []);
+  }, [selectedSetTypes]);
 
   if (!data) return <div className="empty-state"><p>Loading...</p></div>;
 
@@ -23,6 +25,8 @@ export default function ProgramSummaryPage() {
         Programmed statistics &mdash; calculated from your training plan, not completed sessions.
       </p>
 
+      <SummarySetTypeFilterControls />
+
       <SummaryStatGrid
         stats={buildStatItems(data.totals, [
           { label: 'Mesocycles', value: formatCount(data.mesocycles) },
@@ -32,7 +36,7 @@ export default function ProgramSummaryPage() {
 
       {!hasData && (
         <div className="empty-state">
-          <p>No programmed training data yet. Add mesocycles, workouts, and sets to see statistics.</p>
+          <p>{selectedSetTypes.length === 0 ? 'Select at least one set type to see summary data.' : 'No programmed training data matches the selected set types.'}</p>
         </div>
       )}
 

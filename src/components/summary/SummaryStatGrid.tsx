@@ -54,7 +54,7 @@ export function buildStatItems(
     { value: formatCount(data.warmupSets), label: 'Programmed Warm-up Sets' },
     { value: formatCount(data.programmedReps), label: 'Programmed Reps' },
     { value: formatVolume(data.programmedVolume), label: 'Programmed Volume' },
-    { value: formatAverage(data.averageRepsPerWorkingSet), label: 'Avg Reps / Working Set' },
+    { value: formatAverage(data.averageRepsPerWorkingSet), label: 'Avg Reps / Selected Set' },
     { value: formatAverage(data.averageRir), label: 'Avg RIR' },
   );
 

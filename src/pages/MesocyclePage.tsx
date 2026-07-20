@@ -11,6 +11,7 @@ import { FormModal, ConfirmModal, WorkoutEditModal } from '../components';
 import WorkoutGeneratorModal from '../components/workout-generator/WorkoutGeneratorModal';
 import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
 import SummaryBreakdownTables from '../components/summary/SummaryBreakdownTables';
+import SummarySetTypeFilterControls, { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
 import { formatCount } from '../components/summary/formatSummary';
 
 interface Alert {
@@ -53,6 +54,7 @@ export default function MesocyclePage() {
   const [showImportConfirm, setShowImportConfirm] = useState(false);
   const [importBusy, setImportBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
+  const { selectedSetTypes } = useSummarySetTypeFilter();
 
   const load = useCallback(() => {
     const m = mesocyclesApi.get(Number(mesocycleId));
@@ -66,9 +68,9 @@ export default function MesocyclePage() {
   }, [mesocycleId]);
 
   const loadSummary = useCallback(() => {
-    const data = summaryApi.getMesocycleSummary(Number(mesocycleId));
+    const data = summaryApi.getMesocycleSummary(Number(mesocycleId), selectedSetTypes);
     setSummaryData(data);
-  }, [mesocycleId]);
+  }, [mesocycleId, selectedSetTypes]);
 
   useEffect(() => {
     const pid = Number(programId);
@@ -299,6 +301,7 @@ export default function MesocyclePage() {
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>
             Programmed statistics &mdash; calculated from your training plan, not completed sessions.
           </p>
+          <SummarySetTypeFilterControls />
           {summaryData && (
             <>
               <SummaryStatGrid
@@ -309,7 +312,7 @@ export default function MesocyclePage() {
               />
               {summaryData.totals.totalSets === 0 ? (
                 <div className="empty-state">
-                  <p>No programmed training data yet for this mesocycle. Add workouts and sets to see statistics.</p>
+                  <p>{selectedSetTypes.length === 0 ? 'Select at least one set type to see summary data.' : 'No programmed training data matches the selected set types in this mesocycle.'}</p>
                 </div>
               ) : (
                 <SummaryBreakdownTables

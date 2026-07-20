@@ -12,6 +12,7 @@ import { workoutSetsApi } from '../api/workoutSetsApi';
 import { summaryApi } from '../api/summaryApi';
 import { FormModal, ConfirmModal } from '../components';
 import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
+import SummarySetTypeFilterControls, { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
 
 const SET_TYPES = ['warmup', 'normal', 'dropset', 'failure', 'rest-pause'] as const;
 
@@ -52,6 +53,7 @@ export default function WorkoutPage() {
   const [pendingRemove, setPendingRemove] = useState<PendingRemove | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [workoutSummary, setWorkoutSummary] = useState<WorkoutTrainingSummary | null>(null);
+  const { selectedSetTypes } = useSummarySetTypeFilter();
 
   const load = useCallback(() => {
     const w = workoutsApi.get(id);
@@ -63,9 +65,9 @@ export default function WorkoutPage() {
     setExerciseBlocks(workoutsApi.getExercisesWithSets(id));
     setAllExercises(exercisesApi.list(null));
     setAllGroups(exerciseGroupsApi.list());
-    setWorkoutSummary(summaryApi.getWorkoutSummary(id));
+    setWorkoutSummary(summaryApi.getWorkoutSummary(id, selectedSetTypes));
     setError(null);
-  }, [id]);
+  }, [id, selectedSetTypes]);
 
   useEffect(() => {
     const pid = Number(programId);
@@ -399,6 +401,7 @@ export default function WorkoutPage() {
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>
             Programmed statistics &mdash; calculated from your training plan, not completed sessions.
           </p>
+          <SummarySetTypeFilterControls />
           <SummaryStatGrid
             stats={buildStatItems(workoutSummary.totals)}
             caption="Workout training summary"
