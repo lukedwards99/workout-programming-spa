@@ -7,8 +7,6 @@ import type {
   SetTypeSummary,
   WorkoutSetType,
   WorkoutTrainingSummary,
-  CardioTrainingSummary,
-  CardioSessionSummaryRow,
 } from '../types/domain';
 import type { SqlParams, SqlRow } from '../types/database';
 import { queryAll, queryOne, queryValue } from '../db/databaseService';
@@ -22,30 +20,6 @@ function asNullNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const number = Number(value);
   return Number.isFinite(number) ? number : null;
-}
-
-function mapCardioSession(row: SqlRow): CardioSessionSummaryRow {
-  return {
-    id: asNumber(row.id), mesocycle_id: asNumber(row.mesocycle_id), name: row.name as string,
-    modality: row.modality as string, day_offset: asNumber(row.day_offset),
-    planned_duration_minutes: asNumber(row.planned_duration_minutes), planned_distance: asNullNumber(row.planned_distance),
-    target_rpe: asNumber(row.target_rpe), completed_duration_minutes: asNullNumber(row.completed_duration_minutes),
-    completed_distance: asNullNumber(row.completed_distance), actual_rpe: asNullNumber(row.actual_rpe),
-    notes: row.notes as string | null, sort_order: asNumber(row.sort_order),
-    mesocycle_name: row.mesocycle_name as string | undefined,
-  };
-}
-
-function cardioSummary(where = '', params: SqlParams = []): CardioTrainingSummary {
-  const totals = queryOne(`SELECT COUNT(*) AS sessions, COALESCE(SUM(planned_duration_minutes), 0) AS planned_duration_minutes,
-    COALESCE(SUM(planned_distance), 0) AS planned_distance, COALESCE(SUM(completed_duration_minutes), 0) AS completed_duration_minutes,
-    COALESCE(SUM(completed_distance), 0) AS completed_distance FROM cardio_sessions ${where}`, params) ?? {};
-  const sessions = queryAll(`SELECT cs.*, m.name AS mesocycle_name FROM cardio_sessions cs JOIN mesocycles m ON m.id = cs.mesocycle_id ${where.replace('WHERE ', 'WHERE cs.')}
-    ORDER BY m.sort_order, m.start_date, cs.day_offset, cs.sort_order, cs.id`, params).map(mapCardioSession);
-  return { totals: {
-    sessions: asNumber(totals.sessions), plannedDurationMinutes: asNumber(totals.planned_duration_minutes), plannedDistance: asNumber(totals.planned_distance),
-    completedDurationMinutes: asNumber(totals.completed_duration_minutes), completedDistance: asNumber(totals.completed_distance),
-  }, sessions };
 }
 
 function typeFilter(selectedSetTypes: WorkoutSetType[], column = 'ws.set_type') {
@@ -211,14 +185,6 @@ export const summaryApi = {
       exercises: asNumber(queryValue('SELECT COUNT(*) FROM exercises')),
       sets: asNumber(queryValue('SELECT COUNT(*) FROM workout_sets')),
     };
-  },
-
-  getProgramCardioSummary(): CardioTrainingSummary {
-    return cardioSummary();
-  },
-
-  getMesocycleCardioSummary(mesocycleId: number): CardioTrainingSummary {
-    return cardioSummary('WHERE mesocycle_id = ?', [mesocycleId]);
   },
 
   getProgramSummary(selectedSetTypes: WorkoutSetType[] = SUMMARY_SET_TYPES): ProgramTrainingSummary {

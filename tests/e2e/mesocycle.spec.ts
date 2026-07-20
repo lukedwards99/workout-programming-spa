@@ -74,7 +74,7 @@ test.describe('Mesocycle Page — Calendar View', () => {
   });
 
   test('closes add workout modal with Cancel', async ({ page }) => {
-    await page.locator('.day-cell').first().locator('button:has-text("+ Add session")').click();
+    await page.locator('.day-cell').first().locator('button:has-text("+ Add workout")').click();
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content button:has-text("Cancel")').click();
     await page.waitForTimeout(300);

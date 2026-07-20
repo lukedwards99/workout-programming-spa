@@ -8,7 +8,6 @@ import ProgramMesocyclesTab from './pages/ProgramMesocyclesTab';
 import ProgramExercisesPage from './pages/ProgramExercisesPage';
 import ProgramDataPage from './pages/ProgramDataPage';
 import ProgramSummaryPage from './pages/ProgramSummaryPage';
-import ProgramCardioSummaryPage from './pages/ProgramCardioSummaryPage';
 import TutorialPage from './pages/TutorialPage';
 import AboutPage from './pages/AboutPage';
 import MesocyclePage from './pages/MesocyclePage';
@@ -54,7 +53,6 @@ export default function App() {
             <Route path="exercises" element={<ProgramExercisesPage />} />
             <Route path="data" element={<ProgramDataPage />} />
             <Route path="summary" element={<ProgramSummaryPage />} />
-            <Route path="cardio-summary" element={<ProgramCardioSummaryPage />} />
           </Route>
           <Route path="/programs/:programId/mesocycles/:mesocycleId" element={<MesocyclePage />} />
           <Route path="/programs/:programId/workouts/:workoutId" element={<WorkoutPage />} />
