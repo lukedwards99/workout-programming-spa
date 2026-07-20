@@ -6,6 +6,25 @@ import { CATALOG_KEY } from './indexedDb';
 import { initSqlJs, getSQL } from './sqlRuntime';
 
 const MIGRATION_MARKER_KEY = 'migration-v5-complete';
+const CARDIO_SESSION_MIGRATION_SQL = `
+  CREATE TABLE IF NOT EXISTS cardio_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mesocycle_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    modality TEXT NOT NULL,
+    day_offset INTEGER NOT NULL CHECK(day_offset >= 0),
+    planned_duration_minutes INTEGER NOT NULL CHECK(planned_duration_minutes >= 0),
+    planned_distance REAL CHECK(planned_distance >= 0),
+    target_rpe INTEGER NOT NULL CHECK(target_rpe BETWEEN 1 AND 10),
+    completed_duration_minutes INTEGER CHECK(completed_duration_minutes >= 0),
+    completed_distance REAL CHECK(completed_distance >= 0),
+    actual_rpe INTEGER CHECK(actual_rpe BETWEEN 1 AND 10),
+    notes TEXT,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (mesocycle_id) REFERENCES mesocycles(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_cardio_sessions_mesocycle_day ON cardio_sessions(mesocycle_id, day_offset, sort_order);
+`;
 
 let db: import('sql.js').Database | null = null;
 let catalogDb: import('sql.js').Database | null = null;
@@ -126,6 +145,7 @@ function validateProgramStructure(database: import('sql.js').Database): boolean 
   const requiredTables: Record<string, string[]> = {
     mesocycles: ['id', 'name', 'mesocycle_length', 'start_date', 'notes', 'sort_order'],
     workouts: ['id', 'mesocycle_id', 'name', 'day_offset', 'notes', 'sort_order'],
+    cardio_sessions: ['id', 'mesocycle_id', 'name', 'modality', 'day_offset', 'planned_duration_minutes', 'planned_distance', 'target_rpe', 'completed_duration_minutes', 'completed_distance', 'actual_rpe', 'notes', 'sort_order'],
     exercise_groups: ['id', 'name', 'notes'],
     exercises: ['id', 'exercise_group_id', 'name', 'tutorial_url', 'notes'],
     exercise_variations: ['id', 'exercise_id', 'name', 'is_primary', 'tutorial_url', 'notes'],
@@ -146,6 +166,28 @@ function validateProgramStructure(database: import('sql.js').Database): boolean 
   return true;
 }
 
+function programSchemaVersion(database: import('sql.js').Database): number {
+  const result = database.exec('SELECT MAX(version) FROM schema_version');
+  return result.length > 0 && result[0].values.length > 0 ? Number(result[0].values[0][0]) : 0;
+}
+
+function migrateProgramStore(database: import('sql.js').Database): boolean {
+  const version = programSchemaVersion(database);
+  if (version === SCHEMA_VERSION) return false;
+  if (version !== 6) throw new Error(`Program store schema version mismatch: expected ${SCHEMA_VERSION}, got ${version}`);
+  database.run('PRAGMA foreign_keys = ON');
+  database.run('BEGIN');
+  try {
+    database.run(CARDIO_SESSION_MIGRATION_SQL);
+    database.run('UPDATE schema_version SET version = ?', [SCHEMA_VERSION]);
+    database.run('COMMIT');
+    return true;
+  } catch (error) {
+    database.run('ROLLBACK');
+    throw error;
+  }
+}
+
 // ── Program store management ──
 
 async function openProgramStore(programId: number, retries: number = 5): Promise<import('sql.js').Database | null> {
@@ -153,9 +195,11 @@ async function openProgramStore(programId: number, retries: number = 5): Promise
     const saved = await idbGet(programKey(programId));
     if (saved && saved instanceof Uint8Array) {
       const sql = await initSqlJs();
-      const progDb = new sql.Database(saved);
-      progDb.run('PRAGMA foreign_keys = ON');
-      return progDb;
+    const progDb = new sql.Database(saved);
+    progDb.run('PRAGMA foreign_keys = ON');
+    const migrated = migrateProgramStore(progDb);
+    if (migrated) await saveProgramStore(programId, progDb);
+    return progDb;
     }
     if (i < retries - 1) {
       await new Promise((r) => setTimeout(r, 200));
@@ -192,13 +236,6 @@ async function activateProgram(programId: number | null, { skipSave = false }: {
 
     const progDb = await openProgramStore(programId);
     if (!progDb) throw new Error(`Program store not found for program ${programId}`);
-
-    const ver = progDb.exec('SELECT MAX(version) FROM schema_version');
-    const version = ver.length > 0 && ver[0].values.length > 0 ? (ver[0].values[0][0] as number) : 0;
-    if (version !== SCHEMA_VERSION) {
-      progDb.close();
-      throw new Error(`Program store schema version mismatch: expected ${SCHEMA_VERSION}, got ${version}`);
-    }
 
     if (!validateProgramStructure(progDb)) {
       progDb.close();
@@ -335,6 +372,8 @@ async function importProgramBackup(programId: number, buffer: ArrayBuffer): Prom
   const importDb = new sql.Database(arr);
   importDb.run('PRAGMA foreign_keys = ON');
 
+  migrateProgramStore(importDb);
+
   if (!validateProgramStructure(importDb)) {
     importDb.close();
     throw new Error('Backup file is missing required program tables or columns.');
@@ -353,7 +392,7 @@ async function importProgramBackup(programId: number, buffer: ArrayBuffer): Prom
     throw new Error('File is not a valid program backup.');
   }
 
-  if (meta.format_version !== String(SCHEMA_VERSION)) {
+  if (meta.format_version !== '6' && meta.format_version !== String(SCHEMA_VERSION)) {
     importDb.close();
     throw new Error(`Backup format version ${meta.format_version || 'unknown'} is not compatible (expected ${SCHEMA_VERSION}).`);
   }
@@ -415,6 +454,13 @@ async function validateProgramBackup(buffer: ArrayBuffer): Promise<BackupValidat
     return { valid: false, error: 'File appears to be corrupted.' };
   }
 
+  try {
+    migrateProgramStore(checkDb);
+  } catch (error) {
+    checkDb.close();
+    return { valid: false, error: (error as Error).message };
+  }
+
   if (!validateProgramStructure(checkDb)) {
     checkDb.close();
     return { valid: false, error: 'File is missing required program tables or columns.' };
@@ -434,7 +480,7 @@ async function validateProgramBackup(buffer: ArrayBuffer): Promise<BackupValidat
     return { valid: false, error: 'File is not a valid program backup.' };
   }
 
-  if (meta.format_version !== String(SCHEMA_VERSION)) {
+  if (meta.format_version !== '6' && meta.format_version !== String(SCHEMA_VERSION)) {
     return { valid: false, error: `Backup format version ${meta.format_version || 'unknown'} is not compatible (expected ${SCHEMA_VERSION}).` };
   }
 
