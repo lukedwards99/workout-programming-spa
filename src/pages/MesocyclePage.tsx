@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef, type ChangeEvent, type FormEvent, type MouseEvent } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
-import type { Program, Mesocycle, Workout, MesocycleTrainingSummary } from '../types/domain';
+import type { Program, Mesocycle, Workout, MesocycleTrainingSummary, CardioSession, CardioTrainingSummary } from '../types/domain';
+import type { CreateCardioSessionInput } from '../types/api';
 import { activateProgram, deactivateProgram } from '../db/databaseService';
 import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { workoutsApi } from '../api/workoutsApi';
+import { cardioSessionsApi } from '../api/cardioSessionsApi';
 import { summaryApi } from '../api/summaryApi';
 import { exportMesocycleWorkbook, replaceMesocycleFromWorkbook, validateMesocycleWorkbook, type ImportedMesocycleWorkbook } from '../api/mesocycleSpreadsheetApi';
 import { FormModal, ConfirmModal, WorkoutEditModal } from '../components';
@@ -13,6 +15,7 @@ import SummaryStatGrid, { buildStatItems } from '../components/summary/SummarySt
 import SummaryBreakdownTables from '../components/summary/SummaryBreakdownTables';
 import SummarySetTypeFilterControls, { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
 import { formatCount } from '../components/summary/formatSummary';
+import CardioSummary from '../components/summary/CardioSummary';
 
 interface Alert {
   type: string;
@@ -28,15 +31,20 @@ export default function MesocyclePage() {
   const { programId, mesocycleId } = useParams<{ programId: string; mesocycleId: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const rawView = searchParams.get('view');
-  const view = rawView === 'summary' ? 'summary' : 'schedule';
+  const view = rawView === 'summary' || rawView === 'cardio' ? rawView : 'schedule';
   const [mesocycle, setMesocycle] = useState<Mesocycle | null>(null);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [cardioSessions, setCardioSessions] = useState<CardioSession[]>([]);
   const [program, setProgram] = useState<Program | null>(null);
   const [summaryData, setSummaryData] = useState<MesocycleTrainingSummary | null>(null);
+  const [cardioSummaryData, setCardioSummaryData] = useState<CardioTrainingSummary | null>(null);
   const [alert, setAlert] = useState<Alert | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [addDay, setAddDay] = useState(0);
   const [woName, setWoName] = useState('');
+  const [sessionType, setSessionType] = useState<'workout' | 'cardio'>('workout');
+  const [cardioForm, setCardioForm] = useState<Omit<CreateCardioSessionInput, 'mesocycleId'>>({ name: '', modality: '', dayOffset: 0, plannedDurationMinutes: 30, plannedDistance: null, targetRpe: 5, completedDurationMinutes: null, completedDistance: null, actualRpe: null, notes: '' });
+  const [editingCardio, setEditingCardio] = useState<CardioSession | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<PendingDelete | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +72,7 @@ export default function MesocyclePage() {
     }
     setMesocycle(m);
     setWorkouts(workoutsApi.list(m.id));
+    setCardioSessions(cardioSessionsApi.list(m.id));
     setError(null);
   }, [mesocycleId]);
 
@@ -71,6 +80,10 @@ export default function MesocyclePage() {
     const data = summaryApi.getMesocycleSummary(Number(mesocycleId), selectedSetTypes);
     setSummaryData(data);
   }, [mesocycleId, selectedSetTypes]);
+
+  const loadCardioSummary = useCallback(() => {
+    setCardioSummaryData(summaryApi.getMesocycleCardioSummary(Number(mesocycleId)));
+  }, [mesocycleId]);
 
   useEffect(() => {
     const pid = Number(programId);
@@ -84,13 +97,14 @@ export default function MesocyclePage() {
       .then(() => {
         load();
         if (view === 'summary') loadSummary();
+        if (view === 'cardio') loadCardioSummary();
       })
       .catch((e: Error) => setError(e.message));
 
     return () => {
       deactivateProgram().catch(console.error);
     };
-  }, [programId, mesocycleId, load, loadSummary, view]);
+  }, [programId, mesocycleId, load, loadSummary, loadCardioSummary, view]);
 
   if (error) return <div className="empty-state"><p>{error}</p></div>;
   if (!mesocycle) return <div className="empty-state"><p>Loading...</p></div>;
@@ -102,11 +116,21 @@ export default function MesocyclePage() {
 
   const refreshWorkouts = () => {
     setWorkouts(workoutsApi.list(mesocycle!.id));
+    setCardioSessions(cardioSessionsApi.list(mesocycle!.id));
     if (view === 'summary') loadSummary();
+    if (view === 'cardio') loadCardioSummary();
   };
 
   const handleAdd = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (sessionType === 'cardio') {
+      if (!cardioForm.name.trim() || !cardioForm.modality.trim()) return;
+      cardioSessionsApi.create({ ...cardioForm, mesocycleId: mesocycle.id, name: cardioForm.name.trim(), modality: cardioForm.modality.trim() });
+      flash('success', `"${cardioForm.name}" added.`);
+      setShowModal(false);
+      refreshWorkouts();
+      return;
+    }
     if (!woName.trim()) return;
     workoutsApi.create({
       mesocycleId: mesocycle.id,
@@ -196,8 +220,33 @@ export default function MesocyclePage() {
   const openAdd = (dayOffset: number) => {
     setAddDay(dayOffset);
     setWoName('');
+    setSessionType('workout');
+    setCardioForm({ name: '', modality: '', dayOffset, plannedDurationMinutes: 30, plannedDistance: null, targetRpe: 5, completedDurationMinutes: null, completedDistance: null, actualRpe: null, notes: '' });
     setShowModal(true);
   };
+
+  const openEditCardio = (session: CardioSession) => {
+    setEditingCardio(session);
+    setCardioForm({ name: session.name, modality: session.modality, dayOffset: session.day_offset, plannedDurationMinutes: session.planned_duration_minutes, plannedDistance: session.planned_distance, targetRpe: session.target_rpe, completedDurationMinutes: session.completed_duration_minutes, completedDistance: session.completed_distance, actualRpe: session.actual_rpe, notes: session.notes || '' });
+  };
+
+  const handleCardioEdit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingCardio || !cardioForm.name.trim() || !cardioForm.modality.trim()) return;
+    cardioSessionsApi.update(editingCardio.id, { ...cardioForm, name: cardioForm.name.trim(), modality: cardioForm.modality.trim() });
+    flash('success', `"${cardioForm.name}" updated.`);
+    setEditingCardio(null);
+    refreshWorkouts();
+  };
+
+  const cardioFields = () => <>
+    <div className="form-group"><label htmlFor="cardio-name">Session name</label><input id="cardio-name" value={cardioForm.name} onChange={(e) => setCardioForm({ ...cardioForm, name: e.target.value })} placeholder="e.g. Easy Run" required autoFocus /></div>
+    <div className="form-group"><label htmlFor="cardio-modality">Modality</label><input id="cardio-modality" value={cardioForm.modality} onChange={(e) => setCardioForm({ ...cardioForm, modality: e.target.value })} placeholder="e.g. Running, cycling, rowing" required /></div>
+    <div className="generator-fields"><div className="form-group"><label htmlFor="cardio-day">Day</label><select id="cardio-day" value={cardioForm.dayOffset} onChange={(e) => setCardioForm({ ...cardioForm, dayOffset: Number(e.target.value) })}>{Array.from({ length: mesocycle.mesocycle_length }, (_, i) => <option key={i} value={i}>Day {i + 1} — {dayName(i)}</option>)}</select></div><div className="form-group"><label htmlFor="cardio-planned-minutes">Planned minutes</label><input id="cardio-planned-minutes" type="number" min={0} value={cardioForm.plannedDurationMinutes} onChange={(e) => setCardioForm({ ...cardioForm, plannedDurationMinutes: Number(e.target.value) })} required /></div></div>
+    <div className="generator-fields"><div className="form-group"><label htmlFor="cardio-planned-distance">Planned distance (mi)</label><input id="cardio-planned-distance" type="number" min={0} step="0.1" value={cardioForm.plannedDistance ?? ''} onChange={(e) => setCardioForm({ ...cardioForm, plannedDistance: e.target.value === '' ? null : Number(e.target.value) })} /></div><div className="form-group"><label htmlFor="cardio-target-rpe">Target RPE (1–10)</label><input id="cardio-target-rpe" type="number" min={1} max={10} value={cardioForm.targetRpe} onChange={(e) => setCardioForm({ ...cardioForm, targetRpe: Number(e.target.value) })} required /></div></div>
+    <div className="generator-fields"><div className="form-group"><label htmlFor="cardio-completed-minutes">Completed minutes</label><input id="cardio-completed-minutes" type="number" min={0} value={cardioForm.completedDurationMinutes ?? ''} onChange={(e) => setCardioForm({ ...cardioForm, completedDurationMinutes: e.target.value === '' ? null : Number(e.target.value) })} /></div><div className="form-group"><label htmlFor="cardio-completed-distance">Completed distance (mi)</label><input id="cardio-completed-distance" type="number" min={0} step="0.1" value={cardioForm.completedDistance ?? ''} onChange={(e) => setCardioForm({ ...cardioForm, completedDistance: e.target.value === '' ? null : Number(e.target.value) })} /></div><div className="form-group"><label htmlFor="cardio-actual-rpe">Actual RPE</label><input id="cardio-actual-rpe" type="number" min={1} max={10} value={cardioForm.actualRpe ?? ''} onChange={(e) => setCardioForm({ ...cardioForm, actualRpe: e.target.value === '' ? null : Number(e.target.value) })} /></div></div>
+    <div className="form-group"><label htmlFor="cardio-notes">Notes</label><textarea id="cardio-notes" value={cardioForm.notes || ''} onChange={(e) => setCardioForm({ ...cardioForm, notes: e.target.value })} /></div>
+  </>;
 
   const handleExport = async () => {
     if (!program) return;
@@ -291,7 +340,11 @@ export default function MesocyclePage() {
         <button
           className={view === 'summary' ? 'active' : ''}
           onClick={() => setSearchParams({ view: 'summary' })}
-        >Summary</button>
+        >Strength Summary</button>
+        <button
+          className={view === 'cardio' ? 'active' : ''}
+          onClick={() => setSearchParams({ view: 'cardio' })}
+        >Cardio Summary</button>
       </div>
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
@@ -323,6 +376,8 @@ export default function MesocyclePage() {
             </>
           )}
         </>
+      ) : view === 'cardio' ? (
+        cardioSummaryData && <><p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>Planned and completed cardio for this mesocycle.</p><CardioSummary data={cardioSummaryData} /></>
       ) : (
         <div className="row g-3 mb-4">
         {Array.from({ length: mesocycle.mesocycle_length }, (_, i) => {
@@ -346,7 +401,15 @@ export default function MesocyclePage() {
                   >&#9998;</button>
                 </div>
               ))}
-              <button className="add-chip" onClick={() => openAdd(i)}>+ Add workout</button>
+              {cardioSessions.filter((session) => session.day_offset === i).map((session) => (
+                <div key={session.id} className="workout-chip" style={{ borderColor: 'var(--accent)', background: 'var(--accent-light, #eef6ff)' }}>
+                  <button className="workout-chip-link" style={{ border: 0, background: 'transparent', textAlign: 'left' }} onClick={() => openEditCardio(session)}>
+                    {session.name} <small>({session.modality} · {session.planned_duration_minutes} min)</small>
+                  </button>
+                  <button className="chip-edit-btn" aria-label={`Edit ${session.name}`} onClick={() => openEditCardio(session)}>&#9998;</button>
+                </div>
+              ))}
+              <button className="add-chip" onClick={() => openAdd(i)}>+ Add session</button>
               </div>
             </div>
           );
@@ -354,15 +417,14 @@ export default function MesocyclePage() {
        </div>
       )}
 
-      <FormModal show={showModal} onHide={() => setShowModal(false)} title="Add Workout" onSubmit={handleAdd} submitLabel="Add">
-        <div className="form-group">
-          <label>Workout Name</label>
-          <input
-            value={woName} onChange={(e) => setWoName(e.target.value)}
-            placeholder={`e.g. ${dayName(addDay)} Workout`}
-            required autoFocus
-          />
-        </div>
+      <FormModal show={showModal} onHide={() => setShowModal(false)} title="Add Session" onSubmit={handleAdd} submitLabel="Add">
+        <div className="form-group"><label>Session type</label><select value={sessionType} onChange={(e) => setSessionType(e.target.value as 'workout' | 'cardio')}><option value="workout">Strength workout</option><option value="cardio">Cardio session</option></select></div>
+        {sessionType === 'workout' ? <div className="form-group"><label>Workout Name</label><input value={woName} onChange={(e) => setWoName(e.target.value)} placeholder={`e.g. ${dayName(addDay)} Workout`} required autoFocus /></div> : cardioFields()}
+      </FormModal>
+
+      <FormModal show={!!editingCardio} onHide={() => setEditingCardio(null)} title="Edit Cardio Session" onSubmit={handleCardioEdit} submitLabel="Save Changes">
+        {cardioFields()}
+        {editingCardio && <button type="button" className="btn btn-danger" onClick={() => { cardioSessionsApi.delete(editingCardio.id); setEditingCardio(null); refreshWorkouts(); }}>Delete</button>}
       </FormModal>
 
       <ConfirmModal
@@ -378,7 +440,7 @@ export default function MesocyclePage() {
         onHide={cancelImport}
         onConfirm={confirmImport}
         title="Replace Mesocycle from Excel"
-        message={`Importing this workbook will replace all workouts and sets in "${mesocycle.name}". This cannot be undone.`}
+        message={`Importing this workbook will replace all strength workouts and sets in "${mesocycle.name}". Cardio sessions will be preserved.`}
         confirmLabel={importBusy ? 'Importing...' : 'Replace Mesocycle'}
         variant="danger"
       />

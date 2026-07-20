@@ -1,4 +1,4 @@
-export const SCHEMA_VERSION: number = 6;
+export const SCHEMA_VERSION: number = 7;
 
 export const createCatalogSQL: string = `
 PRAGMA foreign_keys = ON;
@@ -40,6 +40,23 @@ CREATE TABLE IF NOT EXISTS workouts (
     day_offset    INTEGER NOT NULL CHECK(day_offset >= 0),
     notes         TEXT,
     sort_order    INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (mesocycle_id) REFERENCES mesocycles(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS cardio_sessions (
+    id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+    mesocycle_id               INTEGER NOT NULL,
+    name                       TEXT    NOT NULL,
+    modality                   TEXT    NOT NULL,
+    day_offset                 INTEGER NOT NULL CHECK(day_offset >= 0),
+    planned_duration_minutes   INTEGER NOT NULL CHECK(planned_duration_minutes >= 0),
+    planned_distance           REAL    CHECK(planned_distance >= 0),
+    target_rpe                 INTEGER NOT NULL CHECK(target_rpe BETWEEN 1 AND 10),
+    completed_duration_minutes INTEGER CHECK(completed_duration_minutes >= 0),
+    completed_distance         REAL    CHECK(completed_distance >= 0),
+    actual_rpe                 INTEGER CHECK(actual_rpe BETWEEN 1 AND 10),
+    notes                      TEXT,
+    sort_order                 INTEGER NOT NULL DEFAULT 0,
     FOREIGN KEY (mesocycle_id) REFERENCES mesocycles(id) ON DELETE CASCADE
 );
 
@@ -91,6 +108,7 @@ CREATE TABLE IF NOT EXISTS workout_sets (
 CREATE INDEX IF NOT EXISTS idx_mesocycles_sort_start ON mesocycles(sort_order, start_date);
 CREATE INDEX IF NOT EXISTS idx_workouts_mesocycle_id ON workouts(mesocycle_id);
 CREATE INDEX IF NOT EXISTS idx_workouts_mesocycle_sort ON workouts(mesocycle_id, sort_order);
+CREATE INDEX IF NOT EXISTS idx_cardio_sessions_mesocycle_day ON cardio_sessions(mesocycle_id, day_offset, sort_order);
 CREATE INDEX IF NOT EXISTS idx_exercises_group_id ON exercises(exercise_group_id);
 CREATE INDEX IF NOT EXISTS idx_exercise_variations_exercise_id ON exercise_variations(exercise_id);
 CREATE INDEX IF NOT EXISTS idx_workout_sets_workout_id ON workout_sets(workout_id);

@@ -30,6 +30,22 @@ export interface Workout {
   sort_order: number;
 }
 
+export interface CardioSession {
+  id: EntityId;
+  mesocycle_id: EntityId;
+  name: string;
+  modality: string;
+  day_offset: number;
+  planned_duration_minutes: number;
+  planned_distance: number | null;
+  target_rpe: number;
+  completed_duration_minutes: number | null;
+  completed_distance: number | null;
+  actual_rpe: number | null;
+  notes: string | null;
+  sort_order: number;
+}
+
 export interface ExerciseGroup {
   id: EntityId;
   name: string;
@@ -114,6 +130,23 @@ export interface ProgramSummaryStats {
   exerciseGroups: number;
   exercises: number;
   sets: number;
+}
+
+export interface CardioSummaryTotals {
+  sessions: number;
+  plannedDurationMinutes: number;
+  plannedDistance: number;
+  completedDurationMinutes: number;
+  completedDistance: number;
+}
+
+export interface CardioSessionSummaryRow extends CardioSession {
+  mesocycle_name?: string;
+}
+
+export interface CardioTrainingSummary {
+  totals: CardioSummaryTotals;
+  sessions: CardioSessionSummaryRow[];
 }
 
 // ── Training Summary contracts ──
