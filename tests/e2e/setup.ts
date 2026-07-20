@@ -85,7 +85,7 @@ export async function viewMesocycle(page: Page, name: string): Promise<void> {
 
 export async function addWorkoutViaUI(page: Page, dayIndex: number, name: string): Promise<void> {
   const cells = page.locator('.day-cell');
-  await cells.nth(dayIndex).locator('button:has-text("+ Add session")').click();
+  await cells.nth(dayIndex).locator('button:has-text("+ Add workout")').click();
   await page.waitForSelector('.modal-content');
   await page.locator('.modal-content input').fill(name);
   await page.locator('.modal-content button:has-text("Add")').click();

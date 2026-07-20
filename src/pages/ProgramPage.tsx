@@ -48,7 +48,6 @@ export default function ProgramPage() {
         <NavLink to={`/programs/${program.id}/exercises`}>Exercises</NavLink>
         <NavLink to={`/programs/${program.id}/data`}>Data</NavLink>
         <NavLink to={`/programs/${program.id}/summary`}>Summary</NavLink>
-        <NavLink to={`/programs/${program.id}/cardio-summary`}>Cardio Summary</NavLink>
       </div>
 
       <Outlet />

@@ -48,24 +48,6 @@ export interface CopyWorkoutInput {
   dayOffset: number;
 }
 
-// ── Cardio session ──
-
-export interface CreateCardioSessionInput {
-  mesocycleId: EntityId;
-  name: string;
-  modality: string;
-  dayOffset: number;
-  plannedDurationMinutes: number;
-  plannedDistance?: number | null;
-  targetRpe: number;
-  completedDurationMinutes?: number | null;
-  completedDistance?: number | null;
-  actualRpe?: number | null;
-  notes?: string;
-}
-
-export type UpdateCardioSessionInput = Omit<CreateCardioSessionInput, 'mesocycleId'>;
-
 // ── Workout Set ──
 
 export interface CreateWorkoutSetInput {
