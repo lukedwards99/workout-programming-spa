@@ -9,6 +9,8 @@ export const PROGRAM_KEY_PREFIX = 'program-v1:';
 
 let idbPromise: Promise<IDBDatabase> | null = null;
 
+export type IDBStoredValue = Uint8Array | number | string | FileSystemDirectoryHandle;
+
 export function openIndexedDB(): Promise<IDBDatabase> {
   if (idbPromise) return idbPromise;
   idbPromise = new Promise((resolve, reject) => {
@@ -26,18 +28,18 @@ export function openIndexedDB(): Promise<IDBDatabase> {
   return idbPromise;
 }
 
-export async function idbGet(key: string): Promise<Uint8Array | number | undefined> {
+export async function idbGet<T extends IDBStoredValue = IDBStoredValue>(key: string): Promise<T | undefined> {
   const idb = await openIndexedDB();
   return new Promise((resolve, reject) => {
     const tx = idb.transaction(IDB_STORE, 'readonly');
     const store = tx.objectStore(IDB_STORE);
     const req = store.get(key);
-    req.onsuccess = (e) => resolve((e.target as IDBRequest).result);
+    req.onsuccess = (e) => resolve((e.target as IDBRequest<T>).result);
     req.onerror = (e) => reject((e.target as IDBRequest).error);
   });
 }
 
-export async function idbPut(key: string, value: Uint8Array | number): Promise<void> {
+export async function idbPut(key: string, value: IDBStoredValue): Promise<void> {
   const idb = await openIndexedDB();
   return new Promise((resolve, reject) => {
     const tx = idb.transaction(IDB_STORE, 'readwrite');
@@ -60,7 +62,7 @@ export async function idbDelete(key: string): Promise<void> {
 }
 
 export type IDBTxOp =
-  | { type: 'put'; key: string; value: Uint8Array | number }
+  | { type: 'put'; key: string; value: IDBStoredValue }
   | { type: 'delete'; key: string };
 
 export async function runTransaction(ops: IDBTxOp[]): Promise<void> {

@@ -129,6 +129,8 @@ export interface BackupMetadata {
   backup_type?: string;
   source_program_id?: string;
   exported_at?: string;
+  folder_backup_id?: string;
+  folder_backup_filename?: string;
   [key: string]: string | undefined;
 }
 
