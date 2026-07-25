@@ -66,19 +66,6 @@ Cloudflare Pages is the primary deployment platform:
 - Pull requests from branches in this repository include a preview deployment
   check and URL. Pull requests from forks do not receive automatic previews.
 
-Cloudflare builds from the repository root with Node.js 20, forces the root
-base path, removes the legacy GitHub-only fallback from the artifact, and
-publishes `dist`. The production branch is `main`, and preview deployment
-controls include all non-production branches.
-
-During the migration period, the GitHub Actions workflow continues deploying
-`main` and `develop` to the legacy GitHub Pages URLs. It checks out both
-branches, builds them with their GitHub-specific base paths, combines the
-outputs, and adds the GitHub-only SPA fallback page to the artifact. Keep the
-legacy site available through August 24, 2026, then retire it after confirming
-that required browser-local backups have been migrated.
-
-Browser data is isolated by origin. Data stored at the legacy GitHub Pages URL
-does not automatically appear at the Cloudflare production URL. Export a
-backup from the legacy site and import it into the Cloudflare site before the
-legacy deployment is retired.
+Cloudflare builds from the repository root with Node.js 20, uses the root base
+path, and publishes `dist`. The production branch is `main`, and preview
+deployment controls include all non-production branches.

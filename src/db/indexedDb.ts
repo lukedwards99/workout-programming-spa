@@ -1,6 +1,4 @@
-// The legacy GitHub Pages dev and prod builds share one origin, so they need
-// distinct names. Cloudflare branch previews use separate origins and therefore
-// remain isolated even when they use the production name.
+// Support an optional isolated database for development builds.
 export const IDB_NAME = import.meta.env.VITE_APP_ENV === 'development'
   ? 'workout-programming-v5-dev'
   : 'workout-programming-v5';
