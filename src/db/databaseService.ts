@@ -276,7 +276,15 @@ async function initDatabase(): Promise<void> {
 
 // ── Program backup/restore ──
 
-async function exportProgramBackup(programId: number): Promise<Uint8Array> {
+interface FolderBackupExportMetadata {
+  id: string;
+  filename: string;
+}
+
+async function exportProgramBackup(
+  programId: number,
+  folderBackup?: FolderBackupExportMetadata,
+): Promise<Uint8Array> {
   const progData = await idbGet(programKey(programId));
   if (!progData || !(progData instanceof Uint8Array)) throw new Error(`No data found for program ${programId}`);
 
@@ -302,6 +310,10 @@ async function exportProgramBackup(programId: number): Promise<Uint8Array> {
     ['source_program_id', String(programId)],
     ['exported_at', new Date().toISOString()],
   ];
+  if (folderBackup) {
+    meta.push(['folder_backup_id', folderBackup.id]);
+    meta.push(['folder_backup_filename', folderBackup.filename]);
+  }
   for (const [k, v] of meta) {
     backupDb.run('INSERT OR REPLACE INTO backup_metadata (key, value) VALUES (?, ?)', [k, v]);
   }

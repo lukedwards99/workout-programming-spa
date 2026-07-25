@@ -6,6 +6,15 @@ import {
   getDatabaseSize, saveNow, exportProgramBackup, importProgramBackup, validateProgramBackup,
   activateProgram,
 } from '../db/databaseService';
+import {
+  adoptProgramBackupIdentity,
+  getBackupDirectory,
+  getBackupDirectoryPermission,
+  getOrCreateProgramBackupIdentity,
+  isFolderBackupSupported,
+  selectBackupDirectory,
+  writeProgramBackupFile,
+} from '../db/backupFolderService';
 import { programsApi } from '../api/programsApi';
 import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exercisesApi } from '../api/exercisesApi';
@@ -28,6 +37,8 @@ interface PendingRestore {
   buffer: ArrayBuffer;
 }
 
+type FolderPermission = 'granted' | 'denied' | 'prompt' | 'none';
+
 export default function ProgramDataPage() {
   const { programId } = useParams<{ programId: string }>();
   const pid = Number(programId);
@@ -46,6 +57,10 @@ export default function ProgramDataPage() {
   const [pendingRestore, setPendingRestore] = useState<PendingRestore | null>(null);
   const [pendingRestoreMeta, setPendingRestoreMeta] = useState<BackupMetadata | null>(null);
   const fileRestoreRef = useRef<HTMLInputElement>(null);
+  const folderBackupSupported = isFolderBackupSupported();
+  const [backupDirectory, setBackupDirectory] = useState<FileSystemDirectoryHandle | null>(null);
+  const [folderPermission, setFolderPermission] = useState<FolderPermission>('none');
+  const [folderAction, setFolderAction] = useState<'selecting' | 'saving' | null>(null);
 
   const load = useCallback(() => {
     const p = programsApi.get(pid);
@@ -56,11 +71,78 @@ export default function ProgramDataPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (!folderBackupSupported) return;
+    let active = true;
+
+    const loadBackupDirectory = async () => {
+      try {
+        const handle = await getBackupDirectory();
+        if (!active || !handle) return;
+        const permission = await getBackupDirectoryPermission(handle);
+        if (!active) return;
+        setBackupDirectory(handle);
+        setFolderPermission(permission);
+      } catch (error) {
+        console.error('Could not load backup folder:', error);
+      }
+    };
+
+    loadBackupDirectory();
+    return () => { active = false; };
+  }, [folderBackupSupported]);
+
   if (!program) return <div className="empty-state"><p>Program not found.</p></div>;
 
   const flash = (type: string, msg: string) => {
     setAlert({ type, msg });
     setTimeout(() => setAlert(null), 5000);
+  };
+
+  const handleSelectBackupDirectory = async () => {
+    setFolderAction('selecting');
+    try {
+      const handle = await selectBackupDirectory();
+      const permission = await getBackupDirectoryPermission(handle);
+      setBackupDirectory(handle);
+      setFolderPermission(permission);
+      flash('success', `Backup folder “${handle.name}” selected.`);
+    } catch (error) {
+      if ((error as DOMException).name !== 'AbortError') {
+        flash('danger', `Could not select backup folder: ${(error as Error).message}`);
+      }
+    } finally {
+      setFolderAction(null);
+    }
+  };
+
+  const handleFolderBackup = async () => {
+    if (!backupDirectory) return;
+    setFolderAction('saving');
+    try {
+      const permission = await getBackupDirectoryPermission(backupDirectory, true);
+      setFolderPermission(permission);
+      if (permission !== 'granted') {
+        flash('danger', 'Backup folder access was denied. Choose the folder again or download a backup instead.');
+        return;
+      }
+
+      await saveNow();
+      const identity = await getOrCreateProgramBackupIdentity(pid, program.name);
+      const data = await exportProgramBackup(pid, identity);
+      await writeProgramBackupFile(backupDirectory, identity.filename, data);
+      flash('success', `Program backup saved as “${identity.filename}”.`);
+    } catch (error) {
+      const name = (error as DOMException).name;
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        setFolderPermission('denied');
+        flash('danger', 'Backup folder access is no longer available. Choose the folder again or download a backup instead.');
+      } else {
+        flash('danger', `Folder backup failed: ${(error as Error).message}`);
+      }
+    } finally {
+      setFolderAction(null);
+    }
   };
 
   // ── Exercise JSON Export ──
@@ -225,8 +307,20 @@ export default function ProgramDataPage() {
     try {
       await saveNow();
       const meta = await importProgramBackup(pid, pendingRestore.buffer);
+      let identityAdopted = true;
+      try {
+        await adoptProgramBackupIdentity(pid, meta);
+      } catch (identityError) {
+        identityAdopted = false;
+        console.error('Could not adopt folder backup identity:', identityError);
+      }
       await activateProgram(pid, { skipSave: true });
-      flash('success', `Program restored from backup: "${meta.program_name || program.name}".`);
+      flash(
+        identityAdopted ? 'success' : 'warning',
+        identityAdopted
+          ? `Program restored from backup: "${meta.program_name || program.name}".`
+          : `Program restored, but its folder backup identity could not be saved. Choose a backup folder before the next backup.`,
+      );
       load();
     } catch (err) {
       flash('danger', `Restore failed: ${(err as Error).message}`);
@@ -303,8 +397,36 @@ export default function ProgramDataPage() {
 
       <div className="data-card">
         <h2>Program Backup</h2>
-        <p>Download a complete SQLite backup of this program including all mesocycles, workouts, exercise library, and workout sets. Use the restore option to revert this program to a previous state.</p>
+        <p>Save a complete SQLite backup of this program including all mesocycles, workouts, exercise library, and workout sets. Use the restore option to revert this program to a previous state.</p>
         <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Current database size: {(dbSize / 1024).toFixed(1)} KB</p>
+        {folderBackupSupported ? (
+          <>
+            <p style={{ fontSize: 12, color: folderPermission === 'denied' ? 'var(--danger)' : 'var(--text-muted)' }}>
+              {!backupDirectory && 'No backup folder selected.'}
+              {backupDirectory && folderPermission === 'granted' && `Connected folder: ${backupDirectory.name}`}
+              {backupDirectory && folderPermission === 'prompt' && `Folder selected: ${backupDirectory.name}. Access will be requested when you back up.`}
+              {backupDirectory && folderPermission === 'denied' && `Access to ${backupDirectory.name} is no longer available. Choose the folder again.`}
+            </p>
+            <div className="d-flex gap-2 flex-wrap" style={{ marginBottom: 10 }}>
+              <button className="btn btn-outline" disabled={folderAction !== null} onClick={handleSelectBackupDirectory}>
+                {folderAction === 'selecting'
+                  ? 'Choosing…'
+                  : backupDirectory ? 'Change Backup Folder' : 'Choose Backup Folder'}
+              </button>
+              <button
+                className="btn btn-primary"
+                disabled={!backupDirectory || folderPermission === 'denied' || folderAction !== null}
+                onClick={handleFolderBackup}
+              >
+                {folderAction === 'saving' ? 'Backing Up…' : 'Back Up to Folder'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+            Direct folder backups are not supported by this browser. Download a backup and save it to your synced folder instead.
+          </p>
+        )}
         <div className="d-flex gap-2 flex-wrap">
           <button className="btn btn-outline" onClick={handleProgramBackup}>&#x2193; Download Program Backup</button>
           <button className="btn btn-outline" onClick={() => fileRestoreRef.current?.click()}>Restore Program Backup</button>
