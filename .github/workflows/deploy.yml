@@ -63,6 +63,7 @@ jobs:
         run: |
           mkdir -p production/dist/dev
           cp -R development/dist/. production/dist/dev/
+          cp production/.github/pages/404.html production/dist/404.html
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

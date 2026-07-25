@@ -52,11 +52,33 @@ The client is React with Vite and TypeScript. Each program has an isolated brows
 
 Run `npm run typecheck` and `npm run build` for every code change. Run `npm run test:e2e` when a change affects a user workflow, persistence, imports/exports, routing, or UI behavior.
 
-## GitHub Pages deployments
+## Deployments
 
-The GitHub Actions workflow deploys both branches on pushes to `main` or `develop`:
+Cloudflare Pages is the primary deployment platform:
 
-- `main` is built as the production site at `https://lukedwards99.github.io/workout-programming-spa/`.
-- `develop` is built into the development site at `https://lukedwards99.github.io/workout-programming-spa/dev/`.
+- `main` deploys to `https://liftlog-lukedwards99.pages.dev/`.
+- `develop` deploys to `https://develop.liftlog-lukedwards99.pages.dev/`
+  after its next push.
+- Every non-production branch gets a stable preview alias and an immutable
+  commit-specific deployment.
+- Branch aliases are lowercased and non-alphanumeric characters become hyphens,
+  so `feat/example` becomes `feat-example.<project>.pages.dev`.
+- Pull requests from branches in this repository include a preview deployment
+  check and URL. Pull requests from forks do not receive automatic previews.
 
-The workflow checks out both branches, installs dependencies with `npm ci`, builds each one with its matching base path, combines the output, and publishes it to GitHub Pages. The repository's router and fallback page are configured to work beneath both paths.
+Cloudflare builds from the repository root with Node.js 20, forces the root
+base path, removes the legacy GitHub-only fallback from the artifact, and
+publishes `dist`. The production branch is `main`, and preview deployment
+controls include all non-production branches.
+
+During the migration period, the GitHub Actions workflow continues deploying
+`main` and `develop` to the legacy GitHub Pages URLs. It checks out both
+branches, builds them with their GitHub-specific base paths, combines the
+outputs, and adds the GitHub-only SPA fallback page to the artifact. Keep the
+legacy site available through August 24, 2026, then retire it after confirming
+that required browser-local backups have been migrated.
+
+Browser data is isolated by origin. Data stored at the legacy GitHub Pages URL
+does not automatically appear at the Cloudflare production URL. Export a
+backup from the legacy site and import it into the Cloudflare site before the
+legacy deployment is retired.

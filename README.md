@@ -6,8 +6,15 @@ Your training data is stored in your browser using IndexedDB and SQLite compiled
 
 ## Try LiftLog
 
-- [Production app](https://lukedwards99.github.io/workout-programming-spa/)
-- [Development app](https://lukedwards99.github.io/workout-programming-spa/dev/)
+- [Production app](https://liftlog-lukedwards99.pages.dev/)
+- Development app: `https://develop.liftlog-lukedwards99.pages.dev/`
+  (available after the next push to `develop`)
+- [Legacy GitHub Pages app](https://lukedwards99.github.io/workout-programming-spa/)
+  (temporary migration access through August 24, 2026)
+
+LiftLog data is stored in the browser and does not move automatically between
+site addresses. Existing users should export a backup from the legacy app and
+import it into the new production app.
 
 ## What it does
 
@@ -54,7 +61,7 @@ If Playwright has not installed its browser binary on your machine, run `npx pla
 src/             React application, domain APIs, and browser-local data layer
 tests/e2e/       Playwright end-to-end coverage
 docs/            User and developer documentation
-.github/         GitHub Pages deployment workflow
+.github/         Temporary legacy GitHub Pages deployment workflow
 ```
 
 For implementation details, testing expectations, and deployment behavior, see the [development guide](docs/development.md).
