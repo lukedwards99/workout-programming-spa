@@ -10,7 +10,7 @@ LiftLog is a private, browser-local workout programming app. This documentation 
 
 ## For working on the project
 
-- [Development guide](development.md) covers setup, commands, architecture, tests, and GitHub Pages deployments.
+- [Development guide](development.md) covers setup, commands, architecture, tests, and Cloudflare Pages deployments.
 
 ## Start safely
 
