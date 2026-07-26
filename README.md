@@ -1,6 +1,6 @@
 # LiftLog
 
-LiftLog is a browser-based workout programming tool for building strength-training programs, mesocycles, workouts, and exercise libraries. It runs entirely on your device: there are no accounts, servers, or cloud storage.
+LiftLog is a browser-based workout programming tool for building strength and cardio programs, mesocycles, workouts, and exercise libraries. It runs entirely on your device: there are no accounts, servers, or cloud storage.
 
 Your training data is stored in your browser using IndexedDB and SQLite compiled to WebAssembly. Keep backups of anything you want to preserve outside that browser.
 
@@ -13,17 +13,16 @@ Your training data is stored in your browser using IndexedDB and SQLite compiled
 ## What it does
 
 - Organize training programs into dated mesocycles and scheduled workouts.
-- Build a separate exercise library for each program, including variations and notes.
-- Plan and record sets with type, planned and actual reps, weight, RIR, and notes.
+- Build a separate typed Strength/Cardio exercise library for each program, including variations and notes.
+- Plan and record strength sets with type, reps, weight, and RIR, plus cardio sets with duration, distance, and RPE.
 - Copy workouts, generate repeated workout schedules, and review programmed training summaries.
-- Export and restore program backups, exchange exercise libraries as JSON, and edit a mesocycle in Excel.
+- Export and restore program backups and exchange exercise libraries as JSON.
 
 ## Documentation
 
 - [Documentation overview](docs/index.md)
 - [Using LiftLog](docs/using-liftlog.md)
 - [Data management and backups](docs/data-management.md)
-- [Mesocycle spreadsheets](docs/mesocycle-spreadsheets.md)
 - [Development guide](docs/development.md)
 
 ## Develop locally

@@ -97,13 +97,19 @@ export async function openWorkout(page: Page, name: string): Promise<void> {
   await page.waitForSelector('.exercise-block, .empty-state', { timeout: 5000 });
 }
 
-export async function addExerciseViaUI(page: Page, exerciseName: string, variationName: string | null = null): Promise<void> {
+export async function addExerciseViaUI(
+  page: Page,
+  exerciseName: string,
+  variationName: string | null = null,
+  groupName: string | null = null,
+): Promise<void> {
   await page.click('button:has-text("+ Add Exercise")');
   await page.waitForSelector('.modal-content');
   const selects = page.locator('.modal-content select');
   const selectCount = await selects.count();
   if (selectCount >= 2) {
-    await selects.first().selectOption({ index: 1 });
+    if (groupName) await selects.first().selectOption({ label: groupName });
+    else await selects.first().selectOption({ index: 1 });
     await page.waitForTimeout(300);
     await selects.nth(1).selectOption({ label: exerciseName });
   } else {
@@ -143,11 +149,24 @@ export async function addExerciseGroupViaUI(page: Page, name: string, notes: str
   await page.waitForTimeout(400);
 }
 
-export async function addExerciseToLibraryViaUI(page: Page, groupName: string, exerciseName: string, notes: string = '', tutorialUrl: string = ''): Promise<void> {
+export async function addExerciseToLibraryViaUI(
+  page: Page,
+  groupName: string,
+  exerciseName: string,
+  notes: string = '',
+  tutorialUrl: string = '',
+  exerciseType: 'strength' | 'cardio' = 'strength',
+): Promise<void> {
   await page.click('button:has-text("+ Add Exercise")');
   await page.waitForSelector('.modal-content');
   await page.locator('.modal-content select').selectOption(groupName);
+  if (exerciseType === 'cardio') {
+    await page.getByRole('radio', { name: 'Cardio' }).check();
+  }
   await page.locator('.modal-content input[required]').fill(exerciseName);
+  if (tutorialUrl) {
+    await page.locator('.modal-content input[placeholder="https://..."]').fill(tutorialUrl);
+  }
   if (notes) await page.locator('.modal-content textarea').fill(notes);
   await page.locator('.modal-content button:has-text("Save")').click();
   await page.waitForTimeout(400);

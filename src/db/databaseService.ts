@@ -5,8 +5,6 @@ import { idbGet, idbPut, idbDelete, runTransaction, programKey } from './indexed
 import { CATALOG_KEY } from './indexedDb';
 import { initSqlJs, getSQL } from './sqlRuntime';
 
-const MIGRATION_MARKER_KEY = 'migration-v5-complete';
-
 let db: import('sql.js').Database | null = null;
 let catalogDb: import('sql.js').Database | null = null;
 let currentProgramId: number | null = null;
@@ -127,9 +125,11 @@ function validateProgramStructure(database: import('sql.js').Database): boolean 
     mesocycles: ['id', 'name', 'mesocycle_length', 'start_date', 'notes', 'sort_order'],
     workouts: ['id', 'mesocycle_id', 'name', 'day_offset', 'notes', 'sort_order'],
     exercise_groups: ['id', 'name', 'notes'],
-    exercises: ['id', 'exercise_group_id', 'name', 'tutorial_url', 'notes'],
+    exercises: ['id', 'exercise_group_id', 'name', 'exercise_type', 'tutorial_url', 'notes'],
     exercise_variations: ['id', 'exercise_id', 'name', 'is_primary', 'tutorial_url', 'notes'],
-    workout_sets: ['id', 'workout_id', 'exercise_id', 'exercise_variation_id', 'exercise_order', 'set_number', 'set_type', 'planned_reps', 'actual_reps', 'weight', 'rir', 'notes'],
+    workout_exercises: ['id', 'workout_id', 'exercise_id', 'exercise_variation_id', 'exercise_order'],
+    strength_sets: ['id', 'workout_exercise_id', 'set_number', 'set_type', 'planned_reps', 'actual_reps', 'weight', 'rir', 'notes'],
+    cardio_sets: ['id', 'workout_exercise_id', 'set_number', 'planned_duration_seconds', 'actual_duration_seconds', 'planned_distance', 'actual_distance', 'distance_unit', 'target_rpe', 'actual_rpe', 'notes'],
   };
   for (const [table, columns] of Object.entries(requiredTables)) {
     try {
@@ -144,6 +144,23 @@ function validateProgramStructure(database: import('sql.js').Database): boolean 
     }
   }
   return true;
+}
+
+function validateCatalogStructure(database: import('sql.js').Database): boolean {
+  try {
+    const versionResult = database.exec('SELECT MAX(version) FROM schema_version');
+    const version = versionResult.length > 0 && versionResult[0].values.length > 0
+      ? Number(versionResult[0].values[0][0])
+      : 0;
+    if (version !== SCHEMA_VERSION) return false;
+
+    const tableInfo = database.exec('PRAGMA table_info(programs)');
+    if (!tableInfo.length || !tableInfo[0].values.length) return false;
+    const columns = tableInfo[0].values.map((row: SqlValue[]) => row[1] as string);
+    return ['id', 'name', 'notes', 'created_at'].every((column) => columns.includes(column));
+  } catch {
+    return false;
+  }
 }
 
 // ── Program store management ──
@@ -245,23 +262,19 @@ async function saveNewProgramStore(programId: number, database: import('sql.js')
 async function initDatabase(): Promise<void> {
   const sql = await initSqlJs();
 
-  const migrationDone = await idbGet(MIGRATION_MARKER_KEY);
-
-  if (!migrationDone) {
+  const catalogData = await idbGet(CATALOG_KEY);
+  if (catalogData && catalogData instanceof Uint8Array) {
+    catalogDb = new sql.Database(catalogData);
+    catalogDb.run('PRAGMA foreign_keys = ON');
+    if (!validateCatalogStructure(catalogDb)) {
+      catalogDb.close();
+      catalogDb = null;
+      throw new Error(`Catalog schema is incompatible with version ${SCHEMA_VERSION}.`);
+    }
+  } else {
     catalogDb = new sql.Database();
     catalogDb.run(createCatalogSQL);
     await saveCatalog();
-    await idbPut(MIGRATION_MARKER_KEY, 1);
-  } else {
-    const catalogData = await idbGet(CATALOG_KEY);
-    if (catalogData && catalogData instanceof Uint8Array) {
-      catalogDb = new sql.Database(catalogData);
-      catalogDb.run('PRAGMA foreign_keys = ON');
-    } else {
-      catalogDb = new sql.Database();
-      catalogDb.run(createCatalogSQL);
-      await saveCatalog();
-    }
   }
 
   window.addEventListener('visibilitychange', () => {

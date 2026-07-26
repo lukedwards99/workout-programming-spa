@@ -1,10 +1,10 @@
 // Support an optional isolated database for development builds.
 export const IDB_NAME = import.meta.env.VITE_APP_ENV === 'development'
-  ? 'workout-programming-v5-dev'
-  : 'workout-programming-v5';
+  ? 'workout-programming-v7-dev'
+  : 'workout-programming-v7';
 export const IDB_STORE = 'databases';
-export const CATALOG_KEY = 'catalog-v1';
-export const PROGRAM_KEY_PREFIX = 'program-v1:';
+export const CATALOG_KEY = 'catalog-v7';
+export const PROGRAM_KEY_PREFIX = 'program-v7:';
 
 let idbPromise: Promise<IDBDatabase> | null = null;
 

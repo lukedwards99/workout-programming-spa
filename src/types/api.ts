@@ -1,4 +1,11 @@
-import type { EntityId, IsoDate, ProgramSummaryStats, WorkoutSetType } from './domain';
+import type {
+  CardioDistanceUnit,
+  EntityId,
+  ExerciseType,
+  IsoDate,
+  ProgramSummaryStats,
+  WorkoutSetType,
+} from './domain';
 
 // ── Program ──
 
@@ -48,13 +55,19 @@ export interface CopyWorkoutInput {
   dayOffset: number;
 }
 
-// ── Workout Set ──
+// ── Workout Exercise ──
 
-export interface CreateWorkoutSetInput {
+export interface CreateWorkoutExerciseInput {
   workoutId: EntityId;
   exerciseId: EntityId;
   exerciseVariationId?: EntityId | null;
   exerciseOrder: number;
+}
+
+// ── Strength Set ──
+
+export interface CreateStrengthSetInput {
+  workoutExerciseId: EntityId;
   setNumber: number;
   setType?: WorkoutSetType;
   plannedReps?: number | null;
@@ -64,13 +77,40 @@ export interface CreateWorkoutSetInput {
   notes?: string;
 }
 
-export interface UpdateWorkoutSetInput {
+export interface UpdateStrengthSetInput {
   set_type?: WorkoutSetType;
   set_number?: number;
   planned_reps?: number | null;
   actual_reps?: number | null;
   weight?: number | null;
   rir?: number | null;
+  notes?: string;
+}
+
+// ── Cardio Set ──
+
+export interface CreateCardioSetInput {
+  workoutExerciseId: EntityId;
+  setNumber: number;
+  plannedDurationSeconds?: number | null;
+  actualDurationSeconds?: number | null;
+  plannedDistance?: number | null;
+  actualDistance?: number | null;
+  distanceUnit?: CardioDistanceUnit | null;
+  targetRpe?: number | null;
+  actualRpe?: number | null;
+  notes?: string;
+}
+
+export interface UpdateCardioSetInput {
+  set_number?: number;
+  planned_duration_seconds?: number | null;
+  actual_duration_seconds?: number | null;
+  planned_distance?: number | null;
+  actual_distance?: number | null;
+  distance_unit?: CardioDistanceUnit | null;
+  target_rpe?: number | null;
+  actual_rpe?: number | null;
   notes?: string;
 }
 
@@ -91,6 +131,7 @@ export interface UpdateExerciseGroupInput {
 export interface CreateExerciseInput {
   groupId: EntityId;
   name: string;
+  exerciseType?: ExerciseType;
   tutorialUrl?: string;
   notes?: string;
 }
@@ -98,6 +139,7 @@ export interface CreateExerciseInput {
 export interface UpdateExerciseInput {
   groupId: EntityId;
   name: string;
+  exerciseType: ExerciseType;
   tutorialUrl?: string;
   notes?: string;
 }
@@ -151,6 +193,7 @@ export interface ExportedExerciseVariation {
 
 export interface ExportedExercise {
   name: string;
+  exerciseType: ExerciseType;
   tutorialUrl?: string;
   notes?: string;
   groupName?: string;

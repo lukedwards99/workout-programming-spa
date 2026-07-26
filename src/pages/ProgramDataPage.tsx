@@ -154,13 +154,14 @@ export default function ProgramDataPage() {
     });
 
     const exportData: ExerciseJSONExport = {
-      version: 1,
+      version: 2,
       type: 'program-export',
       exportedAt: new Date().toISOString(),
       program: { name: program.name, notes: program.notes || '' },
       exerciseGroups: groups.map((g) => ({ name: g.name, notes: g.notes || '' })),
       exercises: exs.map((e) => ({
         name: e.name,
+        exerciseType: e.exercise_type,
         tutorialUrl: e.tutorial_url || '',
         notes: e.notes || '',
         groupName: groups.find((g) => g.id === e.exercise_group_id)?.name || '',
@@ -202,7 +203,7 @@ export default function ProgramDataPage() {
     try {
       const text = await pendingFile.text();
       const data = JSON.parse(text) as ExerciseJSONExport;
-      if (data.type !== 'program-export') {
+      if (data.type !== 'program-export' || data.version !== 2) {
         flash('danger', 'File is not a valid program export.');
         cancelExerciseImport();
         return;
@@ -214,7 +215,13 @@ export default function ProgramDataPage() {
 
       for (const ex of data.exercises) {
         const group = exerciseGroupsApi.findOrCreate(ex.groupName!);
-        const existing = exercisesApi.list(group.id).find((e) => e.name === ex.name);
+        if (ex.exerciseType !== 'strength' && ex.exerciseType !== 'cardio') {
+          throw new Error(`Exercise "${ex.name}" has an invalid exercise type.`);
+        }
+        const existing = exercisesApi.list(group.id).find(
+          (candidate) =>
+            candidate.name === ex.name && candidate.exercise_type === ex.exerciseType,
+        );
         if (existing) {
           for (const v of (ex.variations || [])) {
             const existingVars = exerciseVariationsApi.list(existing.id);
@@ -233,6 +240,7 @@ export default function ProgramDataPage() {
         const newEx = exercisesApi.create({
           groupId: group.id,
           name: ex.name,
+          exerciseType: ex.exerciseType,
           tutorialUrl: ex.tutorialUrl,
           notes: ex.notes,
         });
@@ -330,22 +338,25 @@ export default function ProgramDataPage() {
 
   // ── Seed Default Exercises ──
   const DEFAULT_EXERCISES = [
-    { group: 'Chest', exercises: ['Bench Press', 'Incline Dumbbell Press', 'Dumbbell Flyes', 'Cable Crossover', 'Push Ups'] },
-    { group: 'Back', exercises: ['Pull Ups', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Face Pulls'] },
-    { group: 'Shoulders', exercises: ['Overhead Press', 'Lateral Raise', 'Rear Delt Fly', 'Arnold Press'] },
-    { group: 'Arms', exercises: ['Barbell Curl', 'Hammer Curl', 'Tricep Pushdown', 'Skullcrusher', 'Preacher Curl'] },
-    { group: 'Legs', exercises: ['Barbell Squat', 'Deadlift', 'Leg Press', 'Romanian Deadlift', 'Calf Raise', 'Bulgarian Split Squat'] },
-    { group: 'Core', exercises: ['Plank', 'Hanging Leg Raise', 'Cable Crunch', 'Ab Wheel Rollout'] },
+    { group: 'Chest', exerciseType: 'strength' as const, exercises: ['Bench Press', 'Incline Dumbbell Press', 'Dumbbell Flyes', 'Cable Crossover', 'Push Ups'] },
+    { group: 'Back', exerciseType: 'strength' as const, exercises: ['Pull Ups', 'Barbell Row', 'Lat Pulldown', 'Seated Cable Row', 'Face Pulls'] },
+    { group: 'Shoulders', exerciseType: 'strength' as const, exercises: ['Overhead Press', 'Lateral Raise', 'Rear Delt Fly', 'Arnold Press'] },
+    { group: 'Arms', exerciseType: 'strength' as const, exercises: ['Barbell Curl', 'Hammer Curl', 'Tricep Pushdown', 'Skullcrusher', 'Preacher Curl'] },
+    { group: 'Legs', exerciseType: 'strength' as const, exercises: ['Barbell Squat', 'Deadlift', 'Leg Press', 'Romanian Deadlift', 'Calf Raise', 'Bulgarian Split Squat'] },
+    { group: 'Core', exerciseType: 'strength' as const, exercises: ['Plank', 'Hanging Leg Raise', 'Cable Crunch', 'Ab Wheel Rollout'] },
+    { group: 'Cardio', exerciseType: 'cardio' as const, exercises: ['Running', 'Cycling', 'Rowing'] },
   ];
 
   const confirmSeed = () => {
     let addedCount = 0;
-    for (const { group, exercises } of DEFAULT_EXERCISES) {
+    for (const { group, exerciseType, exercises } of DEFAULT_EXERCISES) {
       const grp = exerciseGroupsApi.findOrCreate(group);
       for (const name of exercises) {
-        const existing = exercisesApi.list(grp.id).find((e) => e.name === name);
+        const existing = exercisesApi.list(grp.id).find(
+          (exercise) => exercise.name === name && exercise.exercise_type === exerciseType,
+        );
         if (existing) continue;
-        exercisesApi.create({ groupId: grp.id, name });
+        exercisesApi.create({ groupId: grp.id, name, exerciseType });
         addedCount++;
       }
     }
@@ -381,7 +392,7 @@ export default function ProgramDataPage() {
 
       <div className="data-card">
         <h2>Import Exercises into Program</h2>
-        <p>Upload a previously exported program <code>.json</code> file. Exercises will be merged into this program (same-named groups will be reused).</p>
+        <p>Upload a previously exported program <code>.json</code> file. Typed Strength/Cardio exercises will be merged into this program (same-named groups will be reused).</p>
 
         <div className="file-drop-zone" onClick={() => fileRef.current?.click()}>
           <input type="file" ref={fileRef} accept=".json" style={{ display: 'none' }} onChange={handleExerciseFileSelect} />
@@ -397,7 +408,7 @@ export default function ProgramDataPage() {
 
       <div className="data-card">
         <h2>Program Backup</h2>
-        <p>Save a complete SQLite backup of this program including all mesocycles, workouts, exercise library, and workout sets. Use the restore option to revert this program to a previous state.</p>
+        <p>Save a complete SQLite backup of this program including all mesocycles, workouts, the typed exercise library, strength sets, and cardio sets. Use the restore option to revert this program to a previous state.</p>
         <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Current database size: {(dbSize / 1024).toFixed(1)} KB</p>
         {folderBackupSupported ? (
           <>
@@ -449,7 +460,7 @@ export default function ProgramDataPage() {
         onHide={cancelExerciseImport}
         onConfirm={handleExerciseImport}
         title="Import Exercises"
-        message="Import exercises from this JSON file into the current program? Exercises with the same name will be merged."
+        message="Import exercises from this JSON file into the current program? Exercises with the same name and type will be merged."
         confirmLabel="Import Exercises"
         variant="primary"
       />

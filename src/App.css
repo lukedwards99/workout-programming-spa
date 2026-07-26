@@ -145,6 +145,7 @@ tr:hover { background: rgba(255,255,255,.02); }
 .alert-success { background: #0e2f1a; color: var(--success); border: 1px solid #1a4a2a; }
 .alert-danger { background: #2f0e0e; color: var(--danger); border: 1px solid #4a1a1a; }
 .alert-warning { background: #2f2200; color: var(--warning); border: 1px solid #4a3600; }
+.alert-warn { background: #2f2200; color: var(--warning); border: 1px solid #4a3600; }
 
 .empty-state { text-align: center; padding: 48px 20px; color: var(--text-muted); }
 .empty-state p { margin-bottom: 16px; }
@@ -296,6 +297,18 @@ tr:hover { background: rgba(255,255,255,.02); }
 .exercise-header h3 { font-size: 16px; font-weight: 600; }
 .exercise-header .meta { font-size: 12px; color: var(--text-muted); }
 .exercise-body { padding: 0 18px 14px; }
+.exercise-type-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+.exercise-type-strength { background: #1a4a2a; color: var(--success); }
+.exercise-type-cardio { background: #17365d; color: #79b8ff; }
+.cardio-exercise-block { border-color: #264f78; }
 
 .set-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
 .set-table th, .set-table td { text-align: center; padding: 5px 8px; border-bottom: 1px solid var(--border); font-size: 13px; }
@@ -307,6 +320,10 @@ tr:hover { background: rgba(255,255,255,.02); }
   max-width: 100%;
 }
 .set-table select { width: auto; }
+.cardio-set-table { min-width: 980px; }
+.cardio-set-table input { width: 78px; }
+.cardio-set-table .cardio-duration-cell input { width: 86px; }
+.cardio-set-table .cardio-unit-cell select { width: 62px; }
 .set-type-select {
   padding: 2px 4px; font-size: 12px; font-weight: 500;
   text-transform: capitalize; width: auto;
@@ -452,6 +469,25 @@ tr:hover { background: rgba(255,255,255,.02); }
   color: var(--text); font-size: 14px; margin-bottom: 16px;
 }
 .search-input:focus { outline: none; border-color: var(--accent); }
+.exercise-type-filter {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.exercise-type-options {
+  display: flex;
+  gap: 16px;
+  padding: 8px 0;
+}
+.exercise-type-options label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  cursor: pointer;
+}
+.exercise-type-options input { accent-color: var(--accent); }
 
 /* ── Workout Generator ── */
 
@@ -689,5 +725,20 @@ tr:hover { background: rgba(255,255,255,.02); }
   }
   .set-table.responsive-table .set-actions-cell .set-move-btns {
     margin-right: 0;
+  }
+  .cardio-set-table {
+    min-width: 0;
+  }
+  .set-table.responsive-table tbody tr.cardio-set-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .set-table.responsive-table tbody tr.cardio-set-row .set-number-cell,
+  .set-table.responsive-table tbody tr.cardio-set-row .set-notes-cell,
+  .set-table.responsive-table tbody tr.cardio-set-row .set-actions-cell {
+    grid-column: 1 / -1;
+  }
+  .set-table.responsive-table tbody tr.cardio-set-row input,
+  .set-table.responsive-table tbody tr.cardio-set-row select {
+    width: 100%;
   }
 }

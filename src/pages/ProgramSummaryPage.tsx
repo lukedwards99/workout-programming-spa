@@ -22,7 +22,7 @@ export default function ProgramSummaryPage() {
   return (
     <>
       <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16, marginTop: -8 }}>
-        Programmed statistics &mdash; calculated from your training plan, not completed sessions.
+        Strength programmed statistics &mdash; cardio exercises are not included.
       </p>
 
       <SummarySetTypeFilterControls />
@@ -31,7 +31,7 @@ export default function ProgramSummaryPage() {
         stats={buildStatItems(data.totals, [
           { label: 'Mesocycles', value: formatCount(data.mesocycles) },
         ])}
-        caption="Program training summary"
+        caption="Program strength training summary"
       />
 
       {!hasData && (
