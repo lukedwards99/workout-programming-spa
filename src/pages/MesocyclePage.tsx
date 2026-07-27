@@ -8,9 +8,9 @@ import { workoutsApi } from '../api/workoutsApi';
 import { summaryApi } from '../api/summaryApi';
 import { FormModal, ConfirmModal, WorkoutEditModal } from '../components';
 import WorkoutGeneratorModal from '../components/workout-generator/WorkoutGeneratorModal';
-import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
+import SummaryStatGrid, { buildStatSections } from '../components/summary/SummaryStatGrid';
 import SummaryBreakdownTables from '../components/summary/SummaryBreakdownTables';
-import SummarySetTypeFilterControls, { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
+import { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
 import { formatCount } from '../components/summary/formatSummary';
 
 interface Alert {
@@ -241,25 +241,18 @@ export default function MesocyclePage() {
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>
             Strength programmed statistics &mdash; cardio exercises are not included.
           </p>
-          <SummarySetTypeFilterControls />
           {summaryData && (
             <>
               <SummaryStatGrid
-                stats={buildStatItems(summaryData.totals, [
+                sections={buildStatSections(summaryData.totals, [
                   { label: 'Mesocycle Days', value: formatCount(summaryData.mesocycleLength) },
                 ])}
                 caption="Mesocycle strength training summary"
               />
-              {summaryData.totals.totalSets === 0 ? (
-                <div className="empty-state">
-                  <p>{selectedSetTypes.length === 0 ? 'Select at least one set type to see summary data.' : 'No programmed training data matches the selected set types in this mesocycle.'}</p>
-                </div>
-              ) : (
-                <SummaryBreakdownTables
-                  byExerciseGroup={summaryData.byExerciseGroup}
-                  byExercise={summaryData.byExercise}
-                />
-              )}
+              <SummaryBreakdownTables
+                byExerciseGroup={summaryData.byExerciseGroup}
+                byExercise={summaryData.byExercise}
+              />
             </>
           )}
         </>

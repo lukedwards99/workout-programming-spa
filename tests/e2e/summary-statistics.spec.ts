@@ -103,7 +103,10 @@ test.describe('Summary Statistics', () => {
     await expect(page.locator('.stats-grid')).toBeVisible();
     // Workout exists but has no sets
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Sets' }).locator('.val')).toHaveText('0');
-    await expect(page.locator('.empty-state')).toContainText('No programmed training data');
+    await expect(page.getByTestId('exercise-group-set-type-filter')).toBeVisible();
+    await expect(page.getByTestId('exercise-set-type-filter')).toBeVisible();
+    await expect(page.locator('.data-card').filter({ hasText: 'By Exercise Group' })).toContainText('No exercise groups match the selected set types.');
+    await expect(page.locator('.data-card').filter({ hasText: 'By Exercise' }).last()).toContainText('No exercises match the selected set types.');
   });
 
   test('mesocycle summary displays stats and breakdowns', async ({ page }) => {
@@ -305,13 +308,13 @@ test.describe('Summary Statistics', () => {
     await expect(page.url()).toContain('view=summary');
   });
 
-  test('set-type filters recalculate summaries and expandable rows show each selected type', async ({ page }) => {
+  test('set-type filters synchronize, recover from no selection, and control accessible detail rows', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
     await fillSetRow(page, 0, 0, { plannedReps: 10, actualReps: 8, weight: 100, rir: 2 });
     await addSetViaUI(page, 'warmup');
     await fillSetRow(page, 0, 1, { plannedReps: 6, actualReps: 6, weight: 45, rir: 3 });
 
-    const filter = page.getByTestId('summary-set-type-filter');
+    const filter = page.getByTestId('workout-set-type-filter');
     for (const label of ['Warm-up', 'Normal', 'Dropset', 'Failure', 'Rest-pause']) {
       await expect(filter.getByLabel(label)).toBeChecked();
     }
@@ -324,15 +327,81 @@ test.describe('Summary Statistics', () => {
     const programId = page.url().match(/\/programs\/(\d+)/)?.[1];
     await navigateTo(page, `/programs/${programId}/summary`);
     // Direct navigation reloads the SPA, so the in-memory selection returns to its all-selected default.
-    const programFilter = page.getByTestId('summary-set-type-filter');
-    await expect(programFilter.getByLabel('Normal')).toBeChecked();
-    await programFilter.getByLabel('Normal').uncheck();
-    await page.getByRole('button', { name: 'Show details: Chest' }).click();
+    const groupFilter = page.getByTestId('exercise-group-set-type-filter');
+    const exerciseFilter = page.getByTestId('exercise-set-type-filter');
+    await expect(groupFilter.getByLabel('Normal')).toBeChecked();
+    await expect(exerciseFilter.getByLabel('Normal')).toBeChecked();
+    await groupFilter.getByLabel('Normal').uncheck();
+    await expect(exerciseFilter.getByLabel('Normal')).not.toBeChecked();
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Sets' }).locator('.val')).toHaveText('1');
+    await expect(page.locator('.data-card').filter({ hasText: 'By Exercise Group' }).locator('tbody')).toContainText('1');
+
+    const groupDetails = page.getByRole('button', { name: 'Show details for Chest' });
+    await expect(groupDetails).toHaveAttribute('aria-expanded', 'false');
+    const groupDetailId = await groupDetails.getAttribute('aria-controls');
+    expect(groupDetailId).toBeTruthy();
+    await expect(page.locator(`#${groupDetailId}`)).toHaveCount(0);
+    await expect(page.locator('.data-card').filter({ hasText: 'By Exercise Group' }).locator('.summary-row-primary')).toContainText('Chest');
+    await expect(groupDetails).not.toContainText('Chest');
+    await groupDetails.click();
+    await expect(page.getByRole('button', { name: 'Hide details for Chest' })).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator(`#${groupDetailId}`)).toBeVisible();
 
     const detail = page.getByRole('table', { name: 'Set type breakdown' }).first();
     await expect(detail.locator('tbody tr')).toHaveCount(4);
     await expect(detail.locator('tbody')).toContainText('Warm-up');
     await expect(detail.locator('tbody')).toContainText('6');
     await expect(detail.locator('tbody')).not.toContainText('Normal');
+
+    const exerciseDetails = page.getByRole('button', { name: 'Show details for Bench Press' });
+    const exerciseDetailId = await exerciseDetails.getAttribute('aria-controls');
+    expect(exerciseDetailId).toBeTruthy();
+    await exerciseDetails.click();
+    await expect(page.getByRole('button', { name: 'Hide details for Bench Press' })).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.locator(`#${exerciseDetailId}`)).toBeVisible();
+
+    for (const label of ['Warm-up', 'Dropset', 'Failure', 'Rest-pause']) {
+      await groupFilter.getByLabel(label).uncheck();
+    }
+    await expect(groupFilter).toBeVisible();
+    await expect(exerciseFilter).toBeVisible();
+    await expect(page.locator('.data-card').filter({ hasText: 'By Exercise Group' })).toContainText('Select at least one set type to see exercise groups.');
+    await expect(page.locator('.data-card').filter({ hasText: 'By Exercise' }).last()).toContainText('Select at least one set type to see exercises.');
+
+    await exerciseFilter.getByLabel('Normal').check();
+    await expect(groupFilter.getByLabel('Normal')).toBeChecked();
+    await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Sets' }).locator('.val')).toHaveText('1');
+  });
+
+  test('summary controls stay within a narrow mobile viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 568 });
+    const workoutUrl = page.url();
+    const programId = workoutUrl.match(/\/programs\/(\d+)/)?.[1];
+    await navigateTo(page, `/programs/${programId}/exercises`);
+    await addExerciseToLibraryViaUI(page, 'Chest', 'Long Exercise Name That Should Wrap Beside Its Detail Button');
+    await navigateTo(page, workoutUrl);
+    await addExerciseViaUI(page, 'Long Exercise Name That Should Wrap Beside Its Detail Button');
+    await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 100 });
+
+    await navigateTo(page, `/programs/${programId}/summary`);
+
+    const filter = page.getByTestId('exercise-group-set-type-filter');
+    const matchingFilter = page.getByTestId('exercise-set-type-filter');
+    await expect(filter).toBeVisible();
+    await expect(matchingFilter).toBeVisible();
+    await filter.getByLabel('Failure').uncheck();
+    const detailToggle = page.getByRole('button', { name: 'Show details for Chest' });
+    const box = await detailToggle.boundingBox();
+    expect(box?.width).toBeGreaterThanOrEqual(44);
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+    const chips = filter.locator('.summary-set-type-options');
+    expect(await chips.evaluate((element) => element.scrollHeight)).toBeGreaterThan(44);
+    const longNameRow = page.locator('.summary-row-primary').filter({ hasText: 'Long Exercise Name That Should Wrap Beside Its Detail Button' });
+    const longNameBox = await longNameRow.boundingBox();
+    expect((longNameBox?.x ?? 0) + (longNameBox?.width ?? Infinity)).toBeLessThanOrEqual(320);
+    await detailToggle.click();
+    const detailScroller = page.locator('.summary-set-type-breakdown').first();
+    expect(await detailScroller.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });

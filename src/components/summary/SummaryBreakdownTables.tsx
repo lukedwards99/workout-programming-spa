@@ -3,6 +3,7 @@ import { Fragment, type ReactNode } from 'react';
 import type { ExerciseGroupSummaryRow, ExerciseSummaryRow, SetTypeSummary } from '../../types/domain';
 import { formatAverage, formatCount, formatPercentage, formatVolume } from './formatSummary';
 import { SUMMARY_SET_TYPE_LABELS } from './summarySetTypes';
+import SummarySetTypeFilterControls, { useSummarySetTypeFilter } from './SummarySetTypeFilter';
 
 interface SummaryBreakdownTablesProps {
   byExerciseGroup: ExerciseGroupSummaryRow[];
@@ -107,8 +108,13 @@ function ColumnControls({ columns, hiddenColumns, onToggle, testId }: ColumnCont
   );
 }
 
-function TableHeader({ title, controls }: { title: string; controls: ReactNode }) {
-  return <div className="summary-table-header"><h2>{title}</h2>{controls}</div>;
+function TableHeader({ title, controls, filter }: { title: string; controls: ReactNode; filter: ReactNode }) {
+  return (
+    <div className="summary-table-toolbar">
+      <div className="summary-table-header"><h2>{title}</h2>{controls}</div>
+      <div className="summary-table-filter">{filter}</div>
+    </div>
+  );
 }
 
 function SetTypeBreakdown({ rows }: { rows: SetTypeSummary[] }) {
@@ -144,6 +150,29 @@ function SetTypeBreakdown({ rows }: { rows: SetTypeSummary[] }) {
   );
 }
 
+function DetailToggle({ entityName, expanded, detailId, onClick }: {
+  entityName: string;
+  expanded: boolean;
+  detailId: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className="summary-row-toggle"
+      type="button"
+      aria-label={`${expanded ? 'Hide' : 'Show'} details for ${entityName}`}
+      aria-expanded={expanded}
+      aria-controls={detailId}
+      onClick={onClick}
+    >
+      <span className="summary-toggle-text">Details</span>
+      <svg className="summary-toggle-chevron" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <path d="m4 6 4 4 4-4" />
+      </svg>
+    </button>
+  );
+}
+
 function GroupRows({ rows, showColumn }: { rows: ExerciseGroupSummaryRow[]; showColumn: (key: string) => boolean }) {
   const { expandedRows, toggleRow } = useExpandedRows();
   const columnCount = 1 + GROUP_COLUMNS.filter((column) => showColumn(column.key)).length;
@@ -151,14 +180,16 @@ function GroupRows({ rows, showColumn }: { rows: ExerciseGroupSummaryRow[]; show
     <tbody>
       {rows.map((row) => {
         const rowKey = `eg-${row.exerciseGroupId}`;
+        const detailId = `summary-group-details-${row.exerciseGroupId}`;
         const expanded = expandedRows.has(rowKey);
         return (
           <Fragment key={rowKey}>
-            <tr>
-              <td data-label="Group">
-                <button className="summary-row-toggle" aria-expanded={expanded} onClick={() => toggleRow(rowKey)}>
-                  {expanded ? 'Hide' : 'Show'} details: {row.exerciseGroupName}
-                </button>
+            <tr className="summary-parent-row">
+              <td className="summary-row-primary-cell" data-label="Group">
+                <div className="summary-row-primary">
+                  <strong>{row.exerciseGroupName}</strong>
+                  <DetailToggle entityName={row.exerciseGroupName} expanded={expanded} detailId={detailId} onClick={() => toggleRow(rowKey)} />
+                </div>
               </td>
               {showColumn('exercises') && <td data-label="Exercises">{formatCount(row.distinctExercises)}</td>}
               {showColumn('totalSets') && <td data-label="Selected Sets">{formatCount(row.totalSets)}</td>}
@@ -170,7 +201,7 @@ function GroupRows({ rows, showColumn }: { rows: ExerciseGroupSummaryRow[]; show
               {showColumn('averageRir') && <td data-label="Avg RIR">{formatAverage(row.averageRir)}</td>}
               {showColumn('workingSetPercentage') && <td data-label="% of Sets">{formatPercentage(row.workingSetPercentage)}</td>}
             </tr>
-            {expanded && <tr className="summary-detail-row"><td colSpan={columnCount}><SetTypeBreakdown rows={row.setTypeBreakdown} /></td></tr>}
+            {expanded && <tr className="summary-detail-row"><td colSpan={columnCount}><div id={detailId} role="region" aria-label={`Set type details for ${row.exerciseGroupName}`}><SetTypeBreakdown rows={row.setTypeBreakdown} /></div></td></tr>}
           </Fragment>
         );
       })}
@@ -185,14 +216,16 @@ function ExerciseRows({ rows, showColumn }: { rows: ExerciseSummaryRow[]; showCo
     <tbody>
       {rows.map((row) => {
         const rowKey = `ex-${row.exerciseId}`;
+        const detailId = `summary-exercise-details-${row.exerciseId}`;
         const expanded = expandedRows.has(rowKey);
         return (
           <Fragment key={rowKey}>
-            <tr>
-              <td data-label="Exercise">
-                <button className="summary-row-toggle" aria-expanded={expanded} onClick={() => toggleRow(rowKey)}>
-                  {expanded ? 'Hide' : 'Show'} details: {row.exerciseName}
-                </button>
+            <tr className="summary-parent-row">
+              <td className="summary-row-primary-cell" data-label="Exercise">
+                <div className="summary-row-primary">
+                  <strong>{row.exerciseName}</strong>
+                  <DetailToggle entityName={row.exerciseName} expanded={expanded} detailId={detailId} onClick={() => toggleRow(rowKey)} />
+                </div>
               </td>
               {showColumn('group') && <td data-label="Group">{row.exerciseGroupName}</td>}
               {showColumn('totalSets') && <td data-label="Selected Sets">{formatCount(row.totalSets)}</td>}
@@ -204,7 +237,7 @@ function ExerciseRows({ rows, showColumn }: { rows: ExerciseSummaryRow[]; showCo
               {showColumn('averageRir') && <td data-label="Avg RIR">{formatAverage(row.averageRir)}</td>}
               {showColumn('workingSetPercentage') && <td data-label="% of Sets">{formatPercentage(row.workingSetPercentage)}</td>}
             </tr>
-            {expanded && <tr className="summary-detail-row"><td colSpan={columnCount}><SetTypeBreakdown rows={row.setTypeBreakdown} /></td></tr>}
+            {expanded && <tr className="summary-detail-row"><td colSpan={columnCount}><div id={detailId} role="region" aria-label={`Set type details for ${row.exerciseName}`}><SetTypeBreakdown rows={row.setTypeBreakdown} /></div></td></tr>}
           </Fragment>
         );
       })}
@@ -215,19 +248,29 @@ function ExerciseRows({ rows, showColumn }: { rows: ExerciseSummaryRow[]; showCo
 export default function SummaryBreakdownTables({ byExerciseGroup, byExercise }: SummaryBreakdownTablesProps) {
   const groupColumns = useHiddenColumns('summary-breakdown-columns:exercise-group');
   const exerciseColumns = useHiddenColumns('summary-breakdown-columns:exercise');
+  const { selectedSetTypes } = useSummarySetTypeFilter();
   const showGroupColumn = (key: string) => !groupColumns.hiddenColumns.includes(key);
   const showExerciseColumn = (key: string) => !exerciseColumns.hiddenColumns.includes(key);
+  const noTypesSelected = selectedSetTypes.length === 0;
 
   return (
     <>
       <div className="data-card">
-        <TableHeader title="By Exercise Group" controls={<ColumnControls columns={GROUP_COLUMNS} hiddenColumns={groupColumns.hiddenColumns} onToggle={groupColumns.toggleColumn} testId="exercise-group-columns" />} />
-        {byExerciseGroup.length > 0 ? <div className="table-responsive"><table className="responsive-table"><thead><tr><th>Group</th>{GROUP_COLUMNS.filter((column) => showGroupColumn(column.key)).map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><GroupRows rows={byExerciseGroup} showColumn={showGroupColumn} /></table></div> : <p>No exercise groups match the selected set types.</p>}
+        <TableHeader
+          title="By Exercise Group"
+          controls={<ColumnControls columns={GROUP_COLUMNS} hiddenColumns={groupColumns.hiddenColumns} onToggle={groupColumns.toggleColumn} testId="exercise-group-columns" />}
+          filter={<SummarySetTypeFilterControls ariaLabel="Set types included in exercise group summary" testId="exercise-group-set-type-filter" compact />}
+        />
+        {byExerciseGroup.length > 0 ? <div className="table-responsive"><table className="responsive-table"><thead><tr><th>Group</th>{GROUP_COLUMNS.filter((column) => showGroupColumn(column.key)).map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><GroupRows rows={byExerciseGroup} showColumn={showGroupColumn} /></table></div> : <p className="summary-inline-empty">{noTypesSelected ? 'Select at least one set type to see exercise groups.' : 'No exercise groups match the selected set types.'}</p>}
       </div>
 
       <div className="data-card">
-        <TableHeader title="By Exercise" controls={<ColumnControls columns={EXERCISE_COLUMNS} hiddenColumns={exerciseColumns.hiddenColumns} onToggle={exerciseColumns.toggleColumn} testId="exercise-columns" />} />
-        {byExercise.length > 0 ? <div className="table-responsive"><table className="responsive-table"><thead><tr><th>Exercise</th>{EXERCISE_COLUMNS.filter((column) => showExerciseColumn(column.key)).map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><ExerciseRows rows={byExercise} showColumn={showExerciseColumn} /></table></div> : <p>No exercises match the selected set types.</p>}
+        <TableHeader
+          title="By Exercise"
+          controls={<ColumnControls columns={EXERCISE_COLUMNS} hiddenColumns={exerciseColumns.hiddenColumns} onToggle={exerciseColumns.toggleColumn} testId="exercise-columns" />}
+          filter={<SummarySetTypeFilterControls ariaLabel="Set types included in exercise summary" testId="exercise-set-type-filter" compact />}
+        />
+        {byExercise.length > 0 ? <div className="table-responsive"><table className="responsive-table"><thead><tr><th>Exercise</th>{EXERCISE_COLUMNS.filter((column) => showExerciseColumn(column.key)).map((column) => <th key={column.key}>{column.label}</th>)}</tr></thead><ExerciseRows rows={byExercise} showColumn={showExerciseColumn} /></table></div> : <p className="summary-inline-empty">{noTypesSelected ? 'Select at least one set type to see exercises.' : 'No exercises match the selected set types.'}</p>}
       </div>
     </>
   );

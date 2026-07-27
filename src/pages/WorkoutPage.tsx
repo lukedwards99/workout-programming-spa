@@ -24,7 +24,7 @@ import { strengthSetsApi } from '../api/strengthSetsApi';
 import { cardioSetsApi } from '../api/cardioSetsApi';
 import { summaryApi } from '../api/summaryApi';
 import { FormModal, ConfirmModal } from '../components';
-import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
+import SummaryStatGrid, { buildStatSections } from '../components/summary/SummaryStatGrid';
 import SummarySetTypeFilterControls, { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
 
 const SET_TYPES = ['warmup', 'normal', 'dropset', 'failure', 'rest-pause'] as const;
@@ -635,9 +635,9 @@ export default function WorkoutPage() {
           <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 12 }}>
             Strength programmed statistics &mdash; cardio exercises are not included.
           </p>
-          <SummarySetTypeFilterControls />
+          <SummarySetTypeFilterControls ariaLabel="Set types included in workout summary" testId="workout-set-type-filter" />
           <SummaryStatGrid
-            stats={buildStatItems(workoutSummary.totals)}
+            sections={buildStatSections(workoutSummary.totals)}
             caption="Workout strength training summary"
           />
         </div>
