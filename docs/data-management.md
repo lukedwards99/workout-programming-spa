@@ -4,7 +4,7 @@ LiftLog keeps your data in the current browser on the current device. There is n
 
 ## Exercise-library JSON
 
-The **Data** tab inside a program can export its exercise library as a `.json` file. This export includes exercise groups, exercises, variations, URLs, and notes. It does not include mesocycles, workouts, or workout sets.
+The **Data** tab inside a program can export its exercise library as a `.json` file. This export includes exercise groups, Strength/Cardio exercise types, exercises, variations, URLs, and notes. It does not include mesocycles, workouts, or sets.
 
 To use it in another program:
 
@@ -16,7 +16,7 @@ Imports merge into the destination library. Existing groups with the same name a
 
 ## Complete program backup
 
-Use **Data → Download Program Backup** to save a complete `.sqlite` backup of the current program. It includes the program metadata, mesocycles, workouts, exercise library, and workout sets.
+Use **Data → Download Program Backup** to save a complete `.sqlite` backup of the current program. It includes the program metadata, mesocycles, workouts, typed exercise library, strength sets, and cardio sets.
 
 To restore a backup:
 
@@ -40,9 +40,7 @@ LiftLog keeps a stable backup identity for the program, so later folder backups 
 
 ## Recommended routine
 
-- Download a complete program backup before substantial edits, restores, or spreadsheet imports.
+- Download a complete program backup before substantial edits or restores.
 - Keep more than one dated copy outside the browser when the plan matters.
 - Test a backup only when you have first saved a current backup of the target program.
 - Export the exercise library JSON when you want to reuse exercises in another LiftLog program.
-
-See [Mesocycle spreadsheets](mesocycle-spreadsheets.md) for the separate Excel import workflow.

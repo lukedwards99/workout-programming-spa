@@ -2,6 +2,7 @@
 
 export type EntityId = number;
 export type IsoDate = string;
+export type ExerciseType = 'strength' | 'cardio';
 
 // ── Persisted domain rows (matches DDL column names and nullability) ──
 
@@ -40,6 +41,7 @@ export interface Exercise {
   id: EntityId;
   exercise_group_id: EntityId;
   name: string;
+  exercise_type: ExerciseType;
   tutorial_url: string | null;
   notes: string | null;
 }
@@ -53,20 +55,41 @@ export interface ExerciseVariation {
   notes: string | null;
 }
 
-export type WorkoutSetType = 'warmup' | 'normal' | 'dropset' | 'failure' | 'rest-pause';
-
-export interface WorkoutSet {
+export interface WorkoutExercise {
   id: EntityId;
   workout_id: EntityId;
   exercise_id: EntityId;
   exercise_variation_id: EntityId | null;
   exercise_order: number;
+}
+
+export type WorkoutSetType = 'warmup' | 'normal' | 'dropset' | 'failure' | 'rest-pause';
+
+export interface StrengthSet {
+  id: EntityId;
+  workout_exercise_id: EntityId;
   set_number: number;
   set_type: WorkoutSetType;
   planned_reps: number | null;
   actual_reps: number | null;
   weight: number | null;
   rir: number | null;
+  notes: string | null;
+}
+
+export type CardioDistanceUnit = 'mi' | 'km' | 'm';
+
+export interface CardioSet {
+  id: EntityId;
+  workout_exercise_id: EntityId;
+  set_number: number;
+  planned_duration_seconds: number | null;
+  actual_duration_seconds: number | null;
+  planned_distance: number | null;
+  actual_distance: number | null;
+  distance_unit: CardioDistanceUnit | null;
+  target_rpe: number | null;
+  actual_rpe: number | null;
   notes: string | null;
 }
 
@@ -84,12 +107,18 @@ export interface ExerciseWithVariations extends Exercise {
   variations: ExerciseVariation[];
 }
 
-export interface WorkoutSetWithNames extends WorkoutSet {
+export interface StrengthSetWithNames extends StrengthSet {
   exercise_name: string;
   variation_name: string | null;
 }
 
-export interface WorkoutExerciseBlock {
+export interface CardioSetWithNames extends CardioSet {
+  exercise_name: string;
+  variation_name: string | null;
+}
+
+interface WorkoutExerciseBlockBase {
+  workout_exercise_id: EntityId;
   exercise_id: EntityId;
   exercise_name: string;
   exercise_notes: string | null;
@@ -98,8 +127,19 @@ export interface WorkoutExerciseBlock {
   block_variation_id: number;
   exercise_order: number;
   blockId: string;
-  sets: WorkoutSetWithNames[];
 }
+
+export interface StrengthExerciseBlock extends WorkoutExerciseBlockBase {
+  exercise_type: 'strength';
+  sets: StrengthSetWithNames[];
+}
+
+export interface CardioExerciseBlock extends WorkoutExerciseBlockBase {
+  exercise_type: 'cardio';
+  sets: CardioSetWithNames[];
+}
+
+export type WorkoutExerciseBlock = StrengthExerciseBlock | CardioExerciseBlock;
 
 export interface ExerciseCopySourceGroup {
   group: ExerciseGroup;

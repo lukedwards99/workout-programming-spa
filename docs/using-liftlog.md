@@ -7,15 +7,15 @@ LiftLog helps you design a training plan in the browser. It is a planning tool: 
 - **Program**: the top-level container for a training plan. Each program has its own mesocycles, workouts, and exercise library.
 - **Mesocycle**: a dated training block with a length in days. A mesocycle contains workouts assigned to individual days.
 - **Workout**: one scheduled training session within a mesocycle. A day can contain more than one workout.
-- **Exercise library**: the program-specific list of exercise groups and exercises available when building workouts.
+- **Exercise library**: the program-specific list of exercise groups and typed Strength or Cardio exercises available when building workouts.
 - **Variation**: an optional named form of an exercise, such as a grip or equipment variation. An exercise can appear separately in a workout with different variations, but the same exercise-and-variation combination cannot be added twice to one workout.
-- **Set**: the planning unit inside an exercise block. A set can include its type, planned reps, actual reps, weight, RIR, and notes.
+- **Set**: the planning unit inside an exercise block. Strength sets include set type, planned and actual reps, weight, RIR, and notes. Cardio sets include planned and actual duration, distance and unit, target and actual RPE, and notes.
 
 ## Create your first program
 
 1. On the **Programs** page, select **New Program** and give it a name. Notes are optional.
 2. Open the program and create a mesocycle. Set its name, start date, and length in days.
-3. Open the **Exercises** tab to add exercise groups, exercises, and optional variations. You can also use **Data → Seed Default Exercises** to begin with the included starter library.
+3. Open the **Exercises** tab to add exercise groups, choose Strength or Cardio for each exercise, and add optional variations. You can also use **Data → Seed Default Exercises** to begin with the included starter library.
 4. Return to the **Mesocycles** tab and open the mesocycle. Add workouts to the appropriate days.
 5. Open each workout, choose **Add Exercise**, then add or reorder exercises and sets.
 6. Use the program, mesocycle, or workout summary to review the resulting plan.
@@ -31,6 +31,12 @@ Choose **Add Exercise**, select its group and exercise, and optionally choose a 
 - enter planned and actual reps independently, plus weight, RIR, and notes;
 - move sets or exercise blocks to adjust their order; and
 - remove the exercise block from that workout.
+
+A Cardio exercise begins with one blank cardio set instead. Enter durations as
+minutes or `minutes:seconds` (for example, `30` or `12:30`). Distance is
+optional and can use miles, kilometers, or meters. Target and actual RPE accept
+values from 1 through 10. Strength and Cardio blocks can be ordered together in
+the same workout.
 
 Use **planned reps** for the prescription you intend to perform and **actual reps** for the outcome you record. They are stored independently.
 
@@ -48,8 +54,8 @@ The generator preserves the selected workouts' relative day spacing. Existing wo
 
 ## Read summaries
 
-Program, mesocycle, and workout summaries show programmed workouts, exercises, variations, sets, reps, volume, and average RIR. The program and mesocycle views also provide breakdowns by exercise group and exercise.
+Program, mesocycle, and workout summaries show Strength programmed workouts, exercises, variations, sets, reps, volume, and average RIR. Cardio is intentionally excluded from summaries for now. The program and mesocycle views also provide Strength breakdowns by exercise group and exercise.
 
 Use the set-type filter to choose which set types are included. Warm-up sets are counted separately from working sets; non-warm-up types count as working sets. Actual reps and volume are shown in breakdowns, but changing actual reps does not change the programmed summary metrics.
 
-For Excel-based editing, see [Mesocycle spreadsheets](mesocycle-spreadsheets.md). For backups and moving exercise libraries, see [Data management and backups](data-management.md).
+For backups and moving exercise libraries, see [Data management and backups](data-management.md).

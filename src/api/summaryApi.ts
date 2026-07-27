@@ -122,8 +122,8 @@ function parseSummaryTotals(row: SqlRow, includeWorkouts: boolean) {
 }
 
 const TOTALS_COMMON = `
-  COUNT(DISTINCT ws.exercise_id) as distinct_exercises,
-  COUNT(DISTINCT ws.exercise_variation_id) as distinct_variations,
+  COUNT(DISTINCT CASE WHEN ws.id IS NOT NULL THEN we.exercise_id END) as distinct_exercises,
+  COUNT(DISTINCT CASE WHEN ws.id IS NOT NULL THEN we.exercise_variation_id END) as distinct_variations,
   COALESCE(COUNT(ws.id), 0) as total_sets,
   COALESCE(SUM(CASE WHEN ws.set_type <> 'warmup' THEN 1 ELSE 0 END), 0) as working_sets,
   COALESCE(SUM(CASE WHEN ws.set_type = 'warmup' THEN 1 ELSE 0 END), 0) as warmup_sets,
@@ -160,8 +160,9 @@ const SET_TYPE_METRICS = `
 `;
 
 const GROUP_JOIN = `
-  FROM workout_sets ws
-  JOIN exercises e ON e.id = ws.exercise_id
+  FROM strength_sets ws
+  JOIN workout_exercises we ON we.id = ws.workout_exercise_id
+  JOIN exercises e ON e.id = we.exercise_id
   JOIN exercise_groups eg ON eg.id = e.exercise_group_id
 `;
 
@@ -183,7 +184,7 @@ export const summaryApi = {
       workouts: asNumber(queryValue('SELECT COUNT(*) FROM workouts')),
       exerciseGroups: asNumber(queryValue('SELECT COUNT(*) FROM exercise_groups')),
       exercises: asNumber(queryValue('SELECT COUNT(*) FROM exercises')),
-      sets: asNumber(queryValue('SELECT COUNT(*) FROM workout_sets')),
+      sets: asNumber(queryValue('SELECT COUNT(*) FROM strength_sets')),
     };
   },
 
@@ -192,7 +193,8 @@ export const summaryApi = {
     const totals = parseSummaryTotals(queryOne(`
       SELECT COUNT(DISTINCT wo.id) as workouts, ${TOTALS_COMMON}
       FROM workouts wo
-      LEFT JOIN workout_sets ws ON ws.workout_id = wo.id AND ${filter.sql}
+      LEFT JOIN workout_exercises we ON we.workout_id = wo.id
+      LEFT JOIN strength_sets ws ON ws.workout_exercise_id = we.id AND ${filter.sql}
     `, filter.params) ?? {}, true);
 
     const groupRows = queryAll(`
@@ -238,7 +240,8 @@ export const summaryApi = {
     const totals = parseSummaryTotals(queryOne(`
       SELECT COUNT(DISTINCT wo.id) as workouts, ${TOTALS_COMMON}
       FROM workouts wo
-      LEFT JOIN workout_sets ws ON ws.workout_id = wo.id AND ${filter.sql}
+      LEFT JOIN workout_exercises we ON we.workout_id = wo.id
+      LEFT JOIN strength_sets ws ON ws.workout_exercise_id = we.id AND ${filter.sql}
       WHERE wo.mesocycle_id = ?
     `, [...filter.params, mesocycleId]) ?? {}, true);
 
@@ -247,7 +250,7 @@ export const summaryApi = {
     const groupRows = queryAll(`
       SELECT ${BREAKDOWN_GROUP_COMMON}
       ${GROUP_JOIN}
-      JOIN workouts wo ON wo.id = ws.workout_id
+      JOIN workouts wo ON wo.id = we.workout_id
       ${scopeWhere}
       GROUP BY eg.id, eg.name
       ORDER BY total_sets DESC, programmed_reps DESC, eg.name ASC
@@ -255,7 +258,7 @@ export const summaryApi = {
     const exerciseRows = queryAll(`
       SELECT ${BREAKDOWN_EXERCISE_COMMON}
       ${GROUP_JOIN}
-      JOIN workouts wo ON wo.id = ws.workout_id
+      JOIN workouts wo ON wo.id = we.workout_id
       ${scopeWhere}
       GROUP BY e.id, e.name, eg.id, eg.name
       ORDER BY total_sets DESC, programmed_reps DESC, e.name ASC
@@ -263,14 +266,14 @@ export const summaryApi = {
     const groupSetTypes = queryAll(`
       SELECT eg.id as exercise_group_id, ws.set_type, ${SET_TYPE_METRICS}
       ${GROUP_JOIN}
-      JOIN workouts wo ON wo.id = ws.workout_id
+      JOIN workouts wo ON wo.id = we.workout_id
       ${scopeWhere}
       GROUP BY eg.id, ws.set_type
     `, scopeParams);
     const exerciseSetTypes = queryAll(`
       SELECT e.id as exercise_id, ws.set_type, ${SET_TYPE_METRICS}
       ${GROUP_JOIN}
-      JOIN workouts wo ON wo.id = ws.workout_id
+      JOIN workouts wo ON wo.id = we.workout_id
       ${scopeWhere}
       GROUP BY e.id, ws.set_type
     `, scopeParams);
@@ -292,7 +295,8 @@ export const summaryApi = {
     const totals = parseSummaryTotals(queryOne(`
       SELECT ${TOTALS_COMMON}
       FROM workouts wo
-      LEFT JOIN workout_sets ws ON ws.workout_id = wo.id AND ${filter.sql}
+      LEFT JOIN workout_exercises we ON we.workout_id = wo.id
+      LEFT JOIN strength_sets ws ON ws.workout_exercise_id = we.id AND ${filter.sql}
       WHERE wo.id = ?
     `, [...filter.params, workoutId]) ?? {}, false);
 

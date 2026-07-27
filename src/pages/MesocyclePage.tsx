@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, type ChangeEvent, type FormEvent, type MouseEvent } from 'react';
+import { useState, useEffect, useCallback, type FormEvent, type MouseEvent } from 'react';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import type { Program, Mesocycle, Workout, MesocycleTrainingSummary } from '../types/domain';
 import { activateProgram, deactivateProgram } from '../db/databaseService';
@@ -6,12 +6,11 @@ import { programsApi } from '../api/programsApi';
 import { mesocyclesApi } from '../api/mesocyclesApi';
 import { workoutsApi } from '../api/workoutsApi';
 import { summaryApi } from '../api/summaryApi';
-import { exportMesocycleWorkbook, replaceMesocycleFromWorkbook, validateMesocycleWorkbook, type ImportedMesocycleWorkbook } from '../api/mesocycleSpreadsheetApi';
 import { FormModal, ConfirmModal, WorkoutEditModal } from '../components';
 import WorkoutGeneratorModal from '../components/workout-generator/WorkoutGeneratorModal';
-import SummaryStatGrid, { buildStatItems } from '../components/summary/SummaryStatGrid';
+import SummaryStatGrid, { buildStatSections } from '../components/summary/SummaryStatGrid';
 import SummaryBreakdownTables from '../components/summary/SummaryBreakdownTables';
-import SummarySetTypeFilterControls, { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
+import { useSummarySetTypeFilter } from '../components/summary/SummarySetTypeFilter';
 import { formatCount } from '../components/summary/formatSummary';
 
 interface Alert {
@@ -49,11 +48,6 @@ export default function MesocyclePage() {
 
   // ── Generator state ──
   const [showGenerator, setShowGenerator] = useState(false);
-  const importFileRef = useRef<HTMLInputElement>(null);
-  const [pendingImport, setPendingImport] = useState<ImportedMesocycleWorkbook | null>(null);
-  const [showImportConfirm, setShowImportConfirm] = useState(false);
-  const [importBusy, setImportBusy] = useState(false);
-  const [exportBusy, setExportBusy] = useState(false);
   const { selectedSetTypes } = useSummarySetTypeFilter();
 
   const load = useCallback(() => {
@@ -199,57 +193,6 @@ export default function MesocyclePage() {
     setShowModal(true);
   };
 
-  const handleExport = async () => {
-    if (!program) return;
-    setExportBusy(true);
-    try {
-      await exportMesocycleWorkbook(program.id, program.name, mesocycle);
-      flash('success', `"${mesocycle.name}" exported to Excel.`);
-    } catch (err) {
-      flash('danger', `Export failed: ${(err as Error).message}`);
-    } finally {
-      setExportBusy(false);
-    }
-  };
-
-  const handleImportFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !program) return;
-    try {
-      const imported = await validateMesocycleWorkbook(file, program.id, mesocycle.id);
-      setPendingImport(imported);
-      setShowImportConfirm(true);
-    } catch (err) {
-      flash('danger', `Import failed: ${(err as Error).message}`);
-      if (importFileRef.current) importFileRef.current.value = '';
-    }
-  };
-
-  const cancelImport = () => {
-    if (importBusy) return;
-    setShowImportConfirm(false);
-    setPendingImport(null);
-    if (importFileRef.current) importFileRef.current.value = '';
-  };
-
-  const confirmImport = async () => {
-    if (!pendingImport) return;
-    setImportBusy(true);
-    try {
-      await replaceMesocycleFromWorkbook(mesocycle.id, pendingImport);
-      load();
-      if (view === 'summary') loadSummary();
-      flash('success', `"${pendingImport.mesocycle.name}" imported from Excel.`);
-      setShowImportConfirm(false);
-      setPendingImport(null);
-      if (importFileRef.current) importFileRef.current.value = '';
-    } catch (err) {
-      flash('danger', `Import failed: ${(err as Error).message}`);
-    } finally {
-      setImportBusy(false);
-    }
-  };
-
   const startDate = new Date(mesocycle.start_date + 'T00:00:00');
 
   const dayName = (offset: number): string => {
@@ -270,9 +213,6 @@ export default function MesocyclePage() {
         <h1>{mesocycle.name}</h1>
         {view === 'schedule' && (
           <div className="d-flex gap-2 flex-wrap">
-            <button className="btn btn-outline" onClick={handleExport} disabled={exportBusy}>{exportBusy ? 'Exporting…' : 'Export Excel'}</button>
-            <button className="btn btn-outline" onClick={() => importFileRef.current?.click()}>Import Excel</button>
-            <input ref={importFileRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style={{ display: 'none' }} onChange={handleImportFile} />
             <button className="btn btn-outline" onClick={() => setShowGenerator(true)}>
               Generate Workouts
             </button>
@@ -299,27 +239,20 @@ export default function MesocyclePage() {
       {view === 'summary' ? (
         <>
           <p style={{ color: 'var(--text-muted)', fontSize: 14, marginBottom: 16 }}>
-            Programmed statistics &mdash; calculated from your training plan, not completed sessions.
+            Strength programmed statistics &mdash; cardio exercises are not included.
           </p>
-          <SummarySetTypeFilterControls />
           {summaryData && (
             <>
               <SummaryStatGrid
-                stats={buildStatItems(summaryData.totals, [
+                sections={buildStatSections(summaryData.totals, [
                   { label: 'Mesocycle Days', value: formatCount(summaryData.mesocycleLength) },
                 ])}
-                caption="Mesocycle training summary"
+                caption="Mesocycle strength training summary"
               />
-              {summaryData.totals.totalSets === 0 ? (
-                <div className="empty-state">
-                  <p>{selectedSetTypes.length === 0 ? 'Select at least one set type to see summary data.' : 'No programmed training data matches the selected set types in this mesocycle.'}</p>
-                </div>
-              ) : (
-                <SummaryBreakdownTables
-                  byExerciseGroup={summaryData.byExerciseGroup}
-                  byExercise={summaryData.byExercise}
-                />
-              )}
+              <SummaryBreakdownTables
+                byExerciseGroup={summaryData.byExerciseGroup}
+                byExercise={summaryData.byExercise}
+              />
             </>
           )}
         </>
@@ -371,16 +304,6 @@ export default function MesocyclePage() {
         onConfirm={confirmDelete}
         title="Delete Workout"
         message={`Delete "${pendingDelete?.name}"?`}
-      />
-
-      <ConfirmModal
-        show={showImportConfirm}
-        onHide={cancelImport}
-        onConfirm={confirmImport}
-        title="Replace Mesocycle from Excel"
-        message={`Importing this workbook will replace all workouts and sets in "${mesocycle.name}". This cannot be undone.`}
-        confirmLabel={importBusy ? 'Importing...' : 'Replace Mesocycle'}
-        variant="danger"
       />
 
       {editingWorkout && (

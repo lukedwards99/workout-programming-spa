@@ -1,4 +1,4 @@
-import type { ExerciseGroup, Exercise, ExerciseCopySourceGroup } from '../types/domain';
+import type { ExerciseGroup, Exercise, ExerciseCopySourceGroup, ExerciseType } from '../types/domain';
 import type { CopyResult } from '../types/api';
 import type { SqlRow, SqlValue } from '../types/database';
 import { openProgramStore, saveProgramStore, saveNow, getCatalogDb } from '../db/databaseService';
@@ -54,6 +54,7 @@ function asExercise(row: SqlRow): Exercise {
     id: row.id as number,
     exercise_group_id: row.exercise_group_id as number,
     name: row.name as string,
+    exercise_type: row.exercise_type as ExerciseType,
     tutorial_url: row.tutorial_url as string | null,
     notes: row.notes as string | null,
   };
@@ -97,8 +98,8 @@ export const copyApi = {
 
         // Create target exercise
         targetDb.run(
-          'INSERT INTO exercises (exercise_group_id, name, tutorial_url, notes) VALUES (?, ?, ?, ?)',
-          [targetGroupId, sourceEx.name, sourceEx.tutorial_url, sourceEx.notes]
+          'INSERT INTO exercises (exercise_group_id, name, exercise_type, tutorial_url, notes) VALUES (?, ?, ?, ?, ?)',
+          [targetGroupId, sourceEx.name, sourceEx.exercise_type, sourceEx.tutorial_url, sourceEx.notes]
         );
         const newExId = Number(targetDb.exec('SELECT last_insert_rowid()')[0].values[0][0]);
         idMap[sourceEx.id as number] = newExId;

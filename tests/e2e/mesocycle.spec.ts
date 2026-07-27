@@ -16,6 +16,12 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await viewMesocycle(page, 'Block 1');
   });
 
+  test('does not expose the removed Excel workflow', async ({ page }) => {
+    await expect(page.getByRole('button', { name: 'Export Excel' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Import Excel' })).toHaveCount(0);
+    await expect(page.locator('input[accept*=".xlsx"]')).toHaveCount(0);
+  });
+
   test('displays breadcrumb with full hierarchy', async ({ page }) => {
     await expect(page.locator('.breadcrumb')).toContainText('PPL Program');
     await expect(page.locator('.breadcrumb')).toContainText('Block 1');

@@ -2,7 +2,7 @@ import type { EntityId } from '../types/domain';
 import type { WorkoutPlan, PlanningAlgorithmId } from '../planning/types';
 import { getAlgorithm } from '../planning/algorithmRegistry';
 import { execSQL, queryOne } from '../db/databaseService';
-import { cloneWorkoutSets } from './workoutsApi';
+import { cloneWorkoutContents } from './workoutsApi';
 
 export interface GeneratedWorkout {
   id: EntityId;
@@ -102,7 +102,7 @@ export function executeWorkoutPlan(
         );
       }
 
-      const newId = cloneWorkoutSets(
+      const newId = cloneWorkoutContents(
         {
           id: source.id as number,
           mesocycle_id: source.mesocycle_id as number,

@@ -5,27 +5,41 @@ export interface StatItem {
   label: string;
 }
 
-interface SummaryStatGridProps {
+export interface StatSection {
+  id: 'structure' | 'sets' | 'workload' | 'averages';
+  title: string;
   stats: StatItem[];
+}
+
+interface SummaryStatGridProps {
+  sections: StatSection[];
   caption?: string;
 }
 
-export default function SummaryStatGrid({ stats, caption }: SummaryStatGridProps) {
+export default function SummaryStatGrid({ sections, caption }: SummaryStatGridProps) {
   return (
-    <div role="region" aria-label={caption || 'Summary statistics'}>
-      <div className="stats-grid">
-        {stats.map((s) => (
-          <div className="stat-card" key={s.label}>
-            <div className="val">{s.value}</div>
-            <div className="lbl">{s.label}</div>
-          </div>
+    <section className="summary-overview" aria-label={caption || 'Summary statistics'}>
+      <h2 className="summary-overview-title">Overview</h2>
+      <div className="stats-grid summary-stat-sections">
+        {sections.map((section) => (
+          <section className="summary-stat-section" aria-labelledby={`summary-section-${section.id}`} key={section.id}>
+            <h3 id={`summary-section-${section.id}`}>{section.title}</h3>
+            <dl className="summary-stat-list">
+              {section.stats.map((stat) => (
+                <div className="stat-card summary-stat-item" key={stat.label}>
+                  <dt className="lbl">{stat.label}</dt>
+                  <dd className="val">{stat.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
-export function buildStatItems(
+export function buildStatSections(
   data: {
     workouts?: number;
     distinctExercises: number;
@@ -38,27 +52,43 @@ export function buildStatItems(
     averageRepsPerWorkingSet: number | null;
     averageRir: number | null;
   },
-  extra?: { label: string; value: string }[],
-): StatItem[] {
-  const items: StatItem[] = [];
-
+  structureStats: StatItem[] = [],
+): StatSection[] {
+  const structure = [...structureStats];
   if (data.workouts !== undefined) {
-    items.push({ value: formatCount(data.workouts), label: 'Programmed Workouts' });
+    structure.push({ value: formatCount(data.workouts), label: 'Programmed Workouts' });
   }
-
-  items.push(
+  structure.push(
     { value: formatCount(data.distinctExercises), label: 'Programmed Exercises' },
     { value: formatCount(data.distinctVariations), label: 'Programmed Variations' },
-    { value: formatCount(data.totalSets), label: 'Programmed Sets' },
-    { value: formatCount(data.workingSets), label: 'Programmed Working Sets' },
-    { value: formatCount(data.warmupSets), label: 'Programmed Warm-up Sets' },
-    { value: formatCount(data.programmedReps), label: 'Programmed Reps' },
-    { value: formatVolume(data.programmedVolume), label: 'Programmed Volume' },
-    { value: formatAverage(data.averageRepsPerWorkingSet), label: 'Avg Reps / Selected Set' },
-    { value: formatAverage(data.averageRir), label: 'Avg RIR' },
   );
 
-  if (extra) items.push(...extra);
-
-  return items;
+  return [
+    { id: 'structure', title: 'Program structure', stats: structure },
+    {
+      id: 'sets',
+      title: 'Sets',
+      stats: [
+        { value: formatCount(data.totalSets), label: 'Programmed Sets' },
+        { value: formatCount(data.workingSets), label: 'Programmed Working Sets' },
+        { value: formatCount(data.warmupSets), label: 'Programmed Warm-up Sets' },
+      ],
+    },
+    {
+      id: 'workload',
+      title: 'Workload',
+      stats: [
+        { value: formatCount(data.programmedReps), label: 'Programmed Reps' },
+        { value: formatVolume(data.programmedVolume), label: 'Programmed Volume' },
+      ],
+    },
+    {
+      id: 'averages',
+      title: 'Averages',
+      stats: [
+        { value: formatAverage(data.averageRepsPerWorkingSet), label: 'Avg Reps / Selected Set' },
+        { value: formatAverage(data.averageRir), label: 'Avg RIR' },
+      ],
+    },
+  ];
 }

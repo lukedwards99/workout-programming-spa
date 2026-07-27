@@ -35,8 +35,8 @@ export default function TutorialPage() {
         <h2>What is LiftLog?</h2>
         <p>
           LiftLog is a browser-based workout programming tool that helps you plan and organize your
-          strength training. Create training programs, break them into mesocycles (training blocks),
-          and design individual workouts with exercises, sets, planned and actual reps, weights, and more.
+          strength and cardio training. Create training programs, break them into mesocycles (training blocks),
+          and design individual workouts with typed exercises and programmable sets.
         </p>
       </div>
 
@@ -45,8 +45,8 @@ export default function TutorialPage() {
         <p><strong>Programs</strong> — A training program is your top-level container. For example, "Push/Pull/Legs 2025" or "5/3/1 Cycle 1". Each program has its own exercise library, mesocycles, and workouts.</p>
         <p><strong>Mesocycles</strong> — A mesocycle is a training block within a program, typically lasting 1-8 weeks. You define its length in days and add workouts to specific days.</p>
         <p><strong>Workouts</strong> — A workout is a single training session on a specific day of the mesocycle. Each workout contains exercises with sets.</p>
-        <p><strong>Exercises &amp; Sets</strong> — Exercises are drawn from your program's exercise library. Each exercise can have multiple sets with different types (normal, warmup, dropset, failure, rest-pause), planned reps, actual reps, weight, and Reps in Reserve (RIR).</p>
-        <p><strong>Summary Statistics</strong> — View programmed training volume, working sets, and exercise breakdowns at the program, mesocycle, and workout levels. All stats are labeled "programmed" since they reflect your plan, not completed sessions.</p>
+        <p><strong>Exercises &amp; Sets</strong> — Exercises are classified as Strength or Cardio. Strength sets track set type, reps, weight, and Reps in Reserve (RIR). Cardio sets track duration, distance, and RPE.</p>
+        <p><strong>Summary Statistics</strong> — View programmed Strength training volume, working sets, and exercise breakdowns at the program, mesocycle, and workout levels. Cardio is not included in summaries yet.</p>
       </div>
 
       <div className="data-card">
@@ -55,8 +55,8 @@ export default function TutorialPage() {
           1. Create a Program from the home page.<br />
           2. Add a Mesocycle to define your training block.<br />
           3. Add Workouts to specific days of the mesocycle.<br />
-          4. Inside each workout, add Exercises from your library and define Sets with planned reps, actual reps, weight, and type.<br />
-          5. View your programmed statistics on the Summary tab.
+          4. Inside each workout, add Strength and Cardio exercises from your library and program their sets.<br />
+          5. View your programmed Strength statistics on the Summary tab.
         </p>
       </div>
 

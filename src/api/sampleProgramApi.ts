@@ -4,7 +4,8 @@ import { exercisesApi } from './exercisesApi';
 import { exerciseVariationsApi } from './exerciseVariationsApi';
 import { mesocyclesApi } from './mesocyclesApi';
 import { workoutsApi } from './workoutsApi';
-import { workoutSetsApi } from './workoutSetsApi';
+import { workoutExercisesApi } from './workoutExercisesApi';
+import { strengthSetsApi } from './strengthSetsApi';
 import { activateProgram, deactivateProgram } from '../db/databaseService';
 import { localToday } from '../utils/dates';
 import type { WorkoutSetType } from '../types/domain';
@@ -56,7 +57,7 @@ export async function createSampleProgram(): Promise<SampleProgramResult> {
       groups[groupName] = g.id;
 
       for (const exName of exNames) {
-        const e = exercisesApi.create({ groupId: g.id, name: exName });
+        const e = exercisesApi.create({ groupId: g.id, name: exName, exerciseType: 'strength' });
         if (!e) throw new Error(`Failed to create exercise: ${exName}`);
         exercises[exName] = e.id;
       }
@@ -165,26 +166,22 @@ export async function createSampleProgram(): Promise<SampleProgramResult> {
       if (!wo) throw new Error(`Failed to create workout: ${wDef.name}`);
 
       let exerciseOrder = 0;
-      let currentExName = '';
       let currentBlockKey = '';
       let currentSetNum = 0;
+      let currentBlockId: number | null = null;
 
       for (const sDef of wDef.sets) {
-        if (sDef.exerciseName !== currentExName) {
-          exerciseOrder++;
-          currentExName = sDef.exerciseName;
-        }
-
         const blockKey = `${sDef.exerciseName}::${sDef.variationName ?? ''}`;
         if (blockKey !== currentBlockKey) {
           currentBlockKey = blockKey;
           currentSetNum = 1;
+          exerciseOrder++;
         } else {
           currentSetNum++;
         }
 
-        const exId = exercises[currentExName];
-        if (!exId) throw new Error(`Exercise not found: ${currentExName}`);
+        const exId = exercises[sDef.exerciseName];
+        if (!exId) throw new Error(`Exercise not found: ${sDef.exerciseName}`);
 
         let varId: number | null = null;
         if (sDef.variationName) {
@@ -193,17 +190,34 @@ export async function createSampleProgram(): Promise<SampleProgramResult> {
           if (v) varId = v.id;
         }
 
-        workoutSetsApi.create({
-          workoutId: wo.id,
-          exerciseId: exId,
-          exerciseVariationId: varId,
-          exerciseOrder,
-          setNumber: currentSetNum,
-          setType: sDef.setType as WorkoutSetType,
-          plannedReps: sDef.reps,
-          weight: sDef.weight,
-          rir: sDef.rir ?? null,
-        });
+        if (currentSetNum === 1) {
+          const block = workoutExercisesApi.create({
+            workoutId: wo.id,
+            exerciseId: exId,
+            exerciseVariationId: varId,
+            exerciseOrder,
+          });
+          if (!block) throw new Error(`Failed to add exercise block: ${sDef.exerciseName}`);
+          currentBlockId = block.id;
+          const initialSet = strengthSetsApi.list(block.id)[0];
+          if (!initialSet) throw new Error(`Failed to create initial set: ${sDef.exerciseName}`);
+          strengthSetsApi.update(initialSet.id, {
+            set_type: sDef.setType as WorkoutSetType,
+            planned_reps: sDef.reps,
+            weight: sDef.weight,
+            rir: sDef.rir ?? null,
+          });
+        } else {
+          if (currentBlockId == null) throw new Error('Sample exercise block was not initialized.');
+          strengthSetsApi.create({
+            workoutExerciseId: currentBlockId,
+            setNumber: currentSetNum,
+            setType: sDef.setType as WorkoutSetType,
+            plannedReps: sDef.reps,
+            weight: sDef.weight,
+            rir: sDef.rir ?? null,
+          });
+        }
       }
     }
 

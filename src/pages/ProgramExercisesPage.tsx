@@ -1,11 +1,19 @@
 import { useState, useEffect, useCallback, type FormEvent, type MouseEvent, type ChangeEvent } from 'react';
 import { useParams } from 'react-router-dom';
-import type { Program, ExerciseGroupWithCount, Exercise, ExerciseVariation, ExerciseCopySourceGroup } from '../types/domain';
+import type {
+  Program,
+  ExerciseGroupWithCount,
+  Exercise,
+  ExerciseVariation,
+  ExerciseCopySourceGroup,
+  ExerciseType,
+} from '../types/domain';
 import { programsApi } from '../api/programsApi';
 import { exerciseGroupsApi } from '../api/exerciseGroupsApi';
 import { exercisesApi } from '../api/exercisesApi';
 import { exerciseVariationsApi } from '../api/exerciseVariationsApi';
 import { copyApi } from '../api/copyApi';
+import { workoutExercisesApi } from '../api/workoutExercisesApi';
 import { activateProgram, saveNow } from '../db/databaseService';
 import { FormModal, ConfirmModal } from '../components';
 
@@ -28,6 +36,7 @@ interface GroupForm {
 interface ExForm {
   groupId: number | string;
   name: string;
+  exerciseType: ExerciseType;
   tutorialUrl: string;
   notes: string;
 }
@@ -40,6 +49,7 @@ export default function ProgramExercisesPage() {
   const [selectedGroup, setSelectedGroup] = useState<number | null>(null);
   const [exercises, setExercises] = useState<Exercise[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState<ExerciseType | 'all'>('all');
   const [alert, setAlert] = useState<Alert | null>(null);
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [varInputs, setVarInputs] = useState<Record<number, string>>({});
@@ -51,7 +61,13 @@ export default function ProgramExercisesPage() {
 
   // Exercise modal
   const [showExModal, setShowExModal] = useState(false);
-  const [exForm, setExForm] = useState<ExForm>({ groupId: '', name: '', tutorialUrl: '', notes: '' });
+  const [exForm, setExForm] = useState<ExForm>({
+    groupId: '',
+    name: '',
+    exerciseType: 'strength',
+    tutorialUrl: '',
+    notes: '',
+  });
   const [editingExId, setEditingExId] = useState<number | null>(null);
 
   // Copy modal
@@ -119,10 +135,22 @@ export default function ProgramExercisesPage() {
   const handleExSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (editingExId) {
-      exercisesApi.update(editingExId, exForm as { groupId: number; name: string; tutorialUrl: string; notes: string });
+      exercisesApi.update(editingExId, exForm as {
+        groupId: number;
+        name: string;
+        exerciseType: ExerciseType;
+        tutorialUrl: string;
+        notes: string;
+      });
       flash('success', `"${exForm.name}" updated.`);
     } else {
-      exercisesApi.create(exForm as { groupId: number; name: string; tutorialUrl: string; notes: string });
+      exercisesApi.create(exForm as {
+        groupId: number;
+        name: string;
+        exerciseType: ExerciseType;
+        tutorialUrl: string;
+        notes: string;
+      });
       flash('success', `"${exForm.name}" created.`);
     }
     setShowExModal(false);
@@ -131,13 +159,25 @@ export default function ProgramExercisesPage() {
 
   const openAddEx = () => {
     setEditingExId(null);
-    setExForm({ groupId: selectedGroup || (groups[0]?.id || ''), name: '', tutorialUrl: '', notes: '' });
+    setExForm({
+      groupId: selectedGroup || (groups[0]?.id || ''),
+      name: '',
+      exerciseType: typeFilter === 'all' ? 'strength' : typeFilter,
+      tutorialUrl: '',
+      notes: '',
+    });
     setShowExModal(true);
   };
 
   const openEditEx = (ex: Exercise) => {
     setEditingExId(ex.id);
-    setExForm({ groupId: ex.exercise_group_id, name: ex.name, tutorialUrl: ex.tutorial_url || '', notes: ex.notes || '' });
+    setExForm({
+      groupId: ex.exercise_group_id,
+      name: ex.name,
+      exerciseType: ex.exercise_type,
+      tutorialUrl: ex.tutorial_url || '',
+      notes: ex.notes || '',
+    });
     setShowExModal(true);
   };
 
@@ -227,6 +267,9 @@ export default function ProgramExercisesPage() {
   const allPrograms = programsApi.list().filter((p) => p.id !== pid);
 
   let filtered = exercises;
+  if (typeFilter !== 'all') {
+    filtered = filtered.filter((exercise) => exercise.exercise_type === typeFilter);
+  }
   if (searchQuery) {
     const q = searchQuery.toLowerCase();
     filtered = filtered.filter((e) => e.name.toLowerCase().includes(q));
@@ -271,6 +314,18 @@ export default function ProgramExercisesPage() {
         </div>
 
         <div className="col-12 col-md-9">
+          <div className="exercise-type-filter" role="group" aria-label="Exercise type filter">
+            {(['all', 'strength', 'cardio'] as const).map((type) => (
+              <button
+                key={type}
+                type="button"
+                className={`btn btn-sm ${typeFilter === type ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setTypeFilter(type)}
+              >
+                {type === 'all' ? 'All' : type === 'strength' ? 'Strength' : 'Cardio'}
+              </button>
+            ))}
+          </div>
           <input
             className="search-input"
             placeholder="Search exercises..."
@@ -290,7 +345,10 @@ export default function ProgramExercisesPage() {
                     <div>
                       <h4>{ex.name}</h4>
                       <div className="ex-item-meta">
-                        {groups.find((g) => g.id === ex.exercise_group_id)?.name || 'Unknown'} &middot; {variations.length} variation{variations.length !== 1 ? 's' : ''}
+                        <span className={`exercise-type-badge exercise-type-${ex.exercise_type}`}>
+                          {ex.exercise_type === 'cardio' ? 'Cardio' : 'Strength'}
+                        </span>
+                        {' '}{groups.find((g) => g.id === ex.exercise_group_id)?.name || 'Unknown'} &middot; {variations.length} variation{variations.length !== 1 ? 's' : ''}
                         {ex.notes && <> &middot; {ex.notes}</>}
                       </div>
                     </div>
@@ -348,11 +406,34 @@ export default function ProgramExercisesPage() {
       {/* Exercise Modal */}
       <FormModal show={showExModal} onHide={() => setShowExModal(false)} title={editingExId ? 'Edit Exercise' : 'Add Exercise'} onSubmit={handleExSubmit}>
         <div className="form-group">
-          <label>Muscle Group</label>
+          <label>Exercise Group</label>
           <select value={exForm.groupId} onChange={(e: ChangeEvent<HTMLSelectElement>) => setExForm({ ...exForm, groupId: Number(e.target.value) })} required>
             <option value="">-- Select --</option>
             {groups.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
           </select>
+        </div>
+        <div className="form-group">
+          <label>Exercise Type</label>
+          <div className="exercise-type-options">
+            {(['strength', 'cardio'] as const).map((type) => (
+              <label key={type}>
+                <input
+                  type="radio"
+                  name="exercise-type"
+                  value={type}
+                  checked={exForm.exerciseType === type}
+                  disabled={editingExId != null && workoutExercisesApi.isExerciseProgrammed(editingExId)}
+                  onChange={() => setExForm({ ...exForm, exerciseType: type })}
+                />
+                {type === 'strength' ? 'Strength' : 'Cardio'}
+              </label>
+            ))}
+          </div>
+          {editingExId != null && workoutExercisesApi.isExerciseProgrammed(editingExId) && (
+            <small style={{ color: 'var(--text-muted)' }}>
+              Type cannot be changed after an exercise has been programmed.
+            </small>
+          )}
         </div>
         <div className="form-group">
           <label>Exercise Name</label>
@@ -403,6 +484,9 @@ export default function ProgramExercisesPage() {
                       onChange={() => toggleExSelect(ex.id)}
                     />
                     {ex.name}
+                    <span className={`exercise-type-badge exercise-type-${ex.exercise_type}`}>
+                      {ex.exercise_type === 'cardio' ? 'Cardio' : 'Strength'}
+                    </span>
                     {ex.notes && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>({ex.notes})</span>}
                   </label>
                 ))}
