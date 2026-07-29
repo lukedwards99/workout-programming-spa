@@ -5,8 +5,16 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
-  reporter: 'list',
+  workers: process.env.CI || process.env.E2E_WASM_PROFILE ? 1 : undefined,
+  reporter: process.env.E2E_PROFILE
+    ? [
+        ['line'],
+        ['json', { outputFile: 'test-results/e2e-results.json' }],
+      ]
+    : 'list',
+  testMatch: process.env.E2E_WASM_PROFILE ? '**/wasm-diagnostics.spec.ts' : undefined,
+  testIgnore: process.env.E2E_WASM_PROFILE ? undefined : '**/wasm-diagnostics.spec.ts',
+  outputDir: 'test-results/artifacts',
 
   use: {
     baseURL: 'http://localhost:5173',
