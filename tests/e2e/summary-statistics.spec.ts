@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
-  clearDatabase, navigateTo, seedProgramViaUI,
+  navigateTo, seedProgramViaUI,
   addExerciseGroupViaUI, addExerciseToLibraryViaUI,
   addMesocycleViaUI, viewMesocycle, addWorkoutViaUI, openWorkout,
   addExerciseViaUI, addSetViaUI, fillSetRow,
@@ -8,8 +8,6 @@ import {
 
 test.describe('Summary Statistics', () => {
   test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
-    await page.waitForTimeout(500);
 
     const programId = await seedProgramViaUI(page, 'Summary Stats Program');
 
@@ -35,7 +33,6 @@ test.describe('Summary Statistics', () => {
     await addExerciseViaUI(page, 'Incline Press');
     await fillSetRow(page, 1, 0, { plannedReps: 12, weight: 0 });
     await page.locator('.exercise-block').nth(1).locator('td[data-label="Weight"] input').clear();
-    await page.waitForTimeout(300);
 
     await expect(page.locator('.stats-grid')).toBeVisible();
 
@@ -55,24 +52,20 @@ test.describe('Summary Statistics', () => {
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Sets' }).locator('.val')).toHaveText('1');
 
     await addSetViaUI(page, 'warmup');
-    await page.waitForTimeout(400);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('1');
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Sets' }).locator('.val')).toHaveText('2');
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Warm-up Sets' }).locator('.val')).toHaveText('1');
 
     await addSetViaUI(page, 'dropset');
-    await page.waitForTimeout(400);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('2');
   });
 
   test('dropset and failure sets count as working sets', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
     await addSetViaUI(page, 'dropset');
-    await page.waitForTimeout(400);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('2');
 
     await addSetViaUI(page, 'failure');
-    await page.waitForTimeout(400);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('3');
   });
 
@@ -82,7 +75,6 @@ test.describe('Summary Statistics', () => {
 
     const programId = page.url().match(/\/programs\/(\d+)/)?.[1];
     await navigateTo(page, `/programs/${programId}/summary`);
-    await page.waitForTimeout(500);
 
     await expect(page.locator('.stats-grid')).toBeVisible();
     await expect(page.locator('.stat-card').filter({ hasText: 'Mesocycles' }).locator('.val')).toHaveText('1');
@@ -98,7 +90,6 @@ test.describe('Summary Statistics', () => {
     const programId = page.url().match(/\/programs\/(\d+)/)?.[1];
     // Don't add any exercises to the workout, just go to summary
     await navigateTo(page, `/programs/${programId}/summary`);
-    await page.waitForTimeout(500);
 
     await expect(page.locator('.stats-grid')).toBeVisible();
     // Workout exists but has no sets
@@ -114,13 +105,11 @@ test.describe('Summary Statistics', () => {
     await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 100 });
     await addSetViaUI(page, 'normal');
     await fillSetRow(page, 0, 1, { plannedReps: 8, weight: 120 });
-    await page.waitForTimeout(300);
 
     // Get mesocycle link from breadcrumb
     const mesoLink = page.locator('.breadcrumb a').nth(1);
     const mesoHref = await mesoLink.getAttribute('href') || '';
     await navigateTo(page, mesoHref + '?view=summary');
-    await page.waitForTimeout(500);
 
     await expect(page.locator('.stats-grid')).toBeVisible();
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Workouts' }).locator('.val')).toHaveText('1');
@@ -138,19 +127,16 @@ test.describe('Summary Statistics', () => {
     const mesoLink = page.locator('.breadcrumb a').nth(1);
     const mesoHref = await mesoLink.getAttribute('href') || '';
     await navigateTo(page, mesoHref);
-    await page.waitForTimeout(500);
 
     // Should start on Schedule view with day cells
     await expect(page.locator('.day-cell').first()).toBeVisible();
 
     // Navigate to Summary
     await page.locator('.program-tabs button').filter({ hasText: 'Summary' }).click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.stats-grid')).toBeVisible();
 
     // Navigate back to Schedule
     await page.locator('.program-tabs button').filter({ hasText: 'Schedule' }).click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.day-cell').first()).toBeVisible();
     await expect(page.url()).toContain('view=schedule');
   });
@@ -158,12 +144,10 @@ test.describe('Summary Statistics', () => {
   test('workout summary updates after editing set data', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
     await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 100 });
-    await page.waitForTimeout(300);
 
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('10');
 
     await page.locator('.exercise-block').first().locator('td[data-label="Planned Reps"] input').fill('15');
-    await page.waitForTimeout(500);
 
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('15');
   });
@@ -171,12 +155,10 @@ test.describe('Summary Statistics', () => {
   test('actual reps do not change programmed summary statistics', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
     await fillSetRow(page, 0, 0, { plannedReps: 10, actualReps: 7, weight: 100 });
-    await page.waitForTimeout(300);
 
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('10');
 
     await page.locator('.exercise-block').first().locator('td[data-label="Actual Reps"] input').fill('12');
-    await page.waitForTimeout(500);
 
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('10');
   });
@@ -184,7 +166,6 @@ test.describe('Summary Statistics', () => {
   test('null planned reps/weight are handled without NaN', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
     await page.locator('.exercise-block').first().locator('td[data-label="Planned Reps"] input').clear();
-    await page.waitForTimeout(500);
 
     await expect(page.locator('.stats-grid')).toBeVisible();
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Reps' }).locator('.val')).toHaveText('0');
@@ -200,11 +181,9 @@ test.describe('Summary Statistics', () => {
     await addExerciseViaUI(page, 'Incline Press');
     await fillSetRow(page, 1, 0, { plannedReps: 12 });
     await page.locator('.exercise-block').nth(1).locator('td[data-label="Weight"] input').clear();
-    await page.waitForTimeout(300);
 
     const programId = page.url().match(/\/programs\/(\d+)/)?.[1];
     await navigateTo(page, `/programs/${programId}/summary`);
-    await page.waitForTimeout(500);
 
     // Both Bench Press and Incline are in Chest group, so Chest has 3 working sets = 100%
     const groupsTable = page.locator('table').first();
@@ -262,12 +241,10 @@ test.describe('Summary Statistics', () => {
   test('exercises used only for warm-up sets are still counted', async ({ page }) => {
     await addExerciseViaUI(page, 'Bench Press');
     await addSetViaUI(page, 'warmup');
-    await page.waitForTimeout(300);
 
     // Change the existing normal set to warmup so ALL sets are warmup
     const typeSelect = page.locator('.exercise-block').first().locator('tbody tr').nth(0).locator('select.set-type-select');
     await typeSelect.selectOption('warmup');
-    await page.waitForTimeout(400);
 
     await expect(page.locator('.stats-grid')).toBeVisible();
     // Exercise should still be counted even though all sets are warmup
@@ -279,7 +256,6 @@ test.describe('Summary Statistics', () => {
     // Navigate to program summary — exercise should still be counted
     const programId = page.url().match(/\/programs\/(\d+)/)?.[1];
     await navigateTo(page, `/programs/${programId}/summary`);
-    await page.waitForTimeout(500);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Exercises' }).locator('.val')).toHaveText('1');
   });
 
@@ -289,7 +265,6 @@ test.describe('Summary Statistics', () => {
 
     // Navigate with invalid view value
     await navigateTo(page, mesoHref + '?view=foo');
-    await page.waitForTimeout(500);
 
     // Should render Schedule view (day cells visible)
     await expect(page.locator('.day-cell').first()).toBeVisible();
@@ -303,7 +278,6 @@ test.describe('Summary Statistics', () => {
 
     // Navigate to Summary tab should work
     await page.locator('.program-tabs button').filter({ hasText: 'Summary' }).click();
-    await page.waitForTimeout(300);
     await expect(page.locator('.stats-grid')).toBeVisible();
     await expect(page.url()).toContain('view=summary');
   });

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import * as fs from 'node:fs';
 import {
   addExerciseGroupViaUI,
@@ -6,8 +6,8 @@ import {
   addExerciseViaUI,
   addMesocycleViaUI,
   addWorkoutViaUI,
-  clearDatabase,
   copyWorkout,
+  flushPersistence,
   navigateTo,
   openWorkout,
   seedProgramViaUI,
@@ -18,7 +18,6 @@ test.describe('Cardio exercise programming', () => {
   let programId: number;
 
   test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
     programId = (await seedProgramViaUI(page, 'Mixed Training'))!;
 
     await navigateTo(page, `/programs/${programId}/exercises`);
@@ -67,7 +66,6 @@ test.describe('Cardio exercise programming', () => {
     await cardioBlock.getByLabel('Planned Distance').fill('5');
     await cardioBlock.getByLabel('Distance Unit').selectOption('km');
     await cardioBlock.getByLabel('Target RPE').fill('6');
-    await page.waitForTimeout(500);
 
     await expect(cardioBlock.getByLabel('Planned Duration')).toHaveValue('30:30');
     await expect(cardioBlock.getByLabel('Planned Distance')).toHaveValue('5');
@@ -81,7 +79,9 @@ test.describe('Cardio exercise programming', () => {
     await expect(blocks.nth(0).locator('h3')).toHaveText('Running');
     await expect(blocks.nth(1).locator('h3')).toHaveText('Bench Press');
 
+    await flushPersistence(page);
     await page.reload();
+    await expect(page.getByTestId('app-ready')).toBeVisible();
     await expect(blocks.nth(0).locator('h3')).toHaveText('Running');
     await expect(page.locator('.cardio-exercise-block').getByLabel('Planned Duration').first()).toHaveValue('30:30');
 
@@ -102,7 +102,7 @@ test.describe('Cardio exercise programming', () => {
     await plannedDuration.fill('25:15');
     await plannedDuration.press('Tab');
     await cardioBlock.getByLabel('Target RPE').fill('5');
-    await page.waitForTimeout(500);
+    await flushPersistence(page);
 
     await page.getByRole('link', { name: 'Mesocycle' }).click();
     await copyWorkout(page, 'Mixed Day');
@@ -132,7 +132,7 @@ test.describe('Cardio exercise programming', () => {
     await plannedDuration.fill('20:45');
     await plannedDuration.press('Tab');
     await page.locator('.cardio-exercise-block').getByLabel('Actual RPE').fill('7');
-    await page.waitForTimeout(500);
+    await flushPersistence(page);
 
     await navigateTo(page, `/programs/${programId}/data`);
     const [download] = await Promise.all([
@@ -146,7 +146,7 @@ test.describe('Cardio exercise programming', () => {
     const changedDuration = page.locator('.cardio-exercise-block').getByLabel('Planned Duration');
     await changedDuration.fill('40:00');
     await changedDuration.press('Tab');
-    await page.waitForTimeout(500);
+    await flushPersistence(page);
 
     await navigateTo(page, `/programs/${programId}/data`);
     await page.locator('input[accept=".sqlite"]').setInputFiles({
@@ -155,10 +155,11 @@ test.describe('Cardio exercise programming', () => {
       buffer: backup,
     });
     await page.locator('.modal-content').getByRole('button', { name: 'Restore' }).click();
-    await page.waitForTimeout(1000);
+    await expect(page.locator('.modal-content')).toBeHidden();
+    await expect(page.locator('.alert-success, .alert-warning')).toContainText('restored');
 
-    await page.goto(workoutUrl);
-    await page.waitForSelector('.cardio-exercise-block');
+    await navigateTo(page, workoutUrl);
+    await expect(page.locator('.cardio-exercise-block')).toBeVisible();
     await expect(page.locator('.cardio-exercise-block').getByLabel('Planned Duration')).toHaveValue('20:45');
     await expect(page.locator('.cardio-exercise-block').getByLabel('Actual RPE')).toHaveValue('7');
   });

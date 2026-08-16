@@ -1,4 +1,6 @@
-export const SQL_WASM_URL = 'https://cdn.jsdelivr.net/npm/sql.js@1.13.0/dist/sql-wasm.wasm';
+import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
+
+export const SQL_WASM_URL = sqlWasmUrl;
 
 let initPromise: Promise<import('sql.js').SqlJsStatic> | null = null;
 

@@ -11,6 +11,12 @@ const basename = import.meta.env.BASE_URL.replace(/\/$/, '') || undefined;
 
 const sessionRedirectKey = 'gh-redirect';
 
+if (import.meta.env.VITE_E2E === 'true') {
+  void import('./testing/e2eBridge').then(({ installE2EBridge }) => {
+    installE2EBridge();
+  });
+}
+
 (function restoreRedirect() {
   const redirect = sessionStorage.getItem(sessionRedirectKey);
   if (redirect) {

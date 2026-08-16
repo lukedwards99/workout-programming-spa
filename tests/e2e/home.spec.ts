@@ -1,11 +1,7 @@
-import { test, expect } from '@playwright/test';
-import { clearDatabase, createProgramViaUI, viewProgram } from './setup';
+import { test, expect } from './fixtures';
+import { createProgramViaUI, viewProgram } from './setup';
 
 test.describe('Home Page — Programs', () => {
-  test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
-  });
-
   test('shows empty state when no programs exist', async ({ page }) => {
     await expect(page.locator('.empty-state')).toBeVisible();
     await expect(page.locator('.empty-state p').first()).toHaveText(/No programs yet/);
@@ -29,7 +25,6 @@ test.describe('Home Page — Programs', () => {
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content input[required]').fill('Updated Name');
     await page.locator('.modal-content button:has-text("Save")').click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.card h3').first()).toHaveText('Updated Name');
   });
 
@@ -39,7 +34,6 @@ test.describe('Home Page — Programs', () => {
     await page.locator('button:has-text("Delete")').click();
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content .btn-danger').click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.empty-state')).toBeVisible();
   });
 
@@ -48,7 +42,6 @@ test.describe('Home Page — Programs', () => {
     await page.locator('button:has-text("Delete")').click();
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content .btn-outline').click();
-    await page.waitForTimeout(300);
     await expect(page.locator('.card h3').first()).toHaveText('Keep Me');
   });
 
@@ -87,7 +80,6 @@ test.describe('Home Page — Programs', () => {
     await page.click('button:has-text("+ New Program")');
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content button:has-text("Cancel")').click();
-    await page.waitForTimeout(300);
     await expect(page.locator('.modal-content')).toHaveCount(0);
   });
 });

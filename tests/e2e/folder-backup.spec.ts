@@ -1,6 +1,7 @@
-import { test, expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
 import initSqlJs from 'sql.js';
-import { clearDatabase, navigateTo, seedProgramViaUI } from './setup';
+import { deleteAllProgramsViaUI, navigateTo, seedProgramViaUI } from './setup';
 
 interface FolderTestWindow extends Window {
   __denyBackupPermission?: boolean;
@@ -93,7 +94,8 @@ async function parseBackupMetadata(bytes: number[]): Promise<Record<string, stri
 test.describe('User-managed backup folder', () => {
   test.beforeEach(async ({ page }) => {
     await installOpfsDirectoryPicker(page);
-    await clearDatabase(page);
+    await page.reload();
+    await expect(page.getByTestId('app-ready')).toBeVisible();
   });
 
   test('persists the folder and overwrites one stable file after a program rename', async ({ page }) => {
@@ -138,7 +140,7 @@ test.describe('User-managed backup folder', () => {
     await expect(page.locator('.alert-success')).toContainText('Program backup saved as');
     const originalBackup = await readOpfsBackups(page);
 
-    await clearDatabase(page);
+    await deleteAllProgramsViaUI(page);
     const restoredId = await seedProgramViaUI(page, 'Restore Target');
     await navigateTo(page, `/programs/${restoredId}/data`);
     const chooserPromise = page.waitForEvent('filechooser');
