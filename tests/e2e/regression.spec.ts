@@ -1,9 +1,9 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
-  clearDatabase, navigateTo, seedProgramViaUI,
+  navigateTo, seedProgramViaUI,
   addExerciseGroupViaUI, addExerciseToLibraryViaUI,
   addMesocycleViaUI, viewMesocycle, addWorkoutViaUI, openWorkout,
-  addExerciseViaUI, addSetViaUI,
+  addExerciseViaUI, addSetViaUI, flushPersistence,
 } from './setup';
 import * as fs from 'node:fs';
 import initSqlJs from 'sql.js';
@@ -11,7 +11,6 @@ import initSqlJs from 'sql.js';
 test.describe('Regression Tests', () => {
   test.describe('P1-1: Set field persistence after edit', () => {
     test('planned and actual reps survive a page reload independently', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Test PPL');
 
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -30,13 +29,12 @@ test.describe('Regression Tests', () => {
       const firstRow = page.locator('.exercise-block').first().locator('.set-table tbody tr').first();
       await firstRow.locator('td[data-label="Planned Reps"] input').fill('12');
       await firstRow.locator('td[data-label="Actual Reps"] input').fill('10');
-      await page.waitForTimeout(500);
+      await flushPersistence(page);
 
       // Reload and verify
       await page.reload();
-      await page.waitForSelector('.nav-bar', { timeout: 10000 });
-      await page.waitForSelector('.exercise-block', { timeout: 10000 });
-      await page.waitForTimeout(500);
+      await expect(page.getByTestId('app-ready')).toBeVisible();
+      await expect(page.locator('.exercise-block')).toBeVisible();
 
       await expect(firstRow.locator('td[data-label="Planned Reps"] input')).toHaveValue('12');
       await expect(firstRow.locator('td[data-label="Actual Reps"] input')).toHaveValue('10');
@@ -45,20 +43,18 @@ test.describe('Regression Tests', () => {
 
   test.describe('P1-2: Cascade delete after reload', () => {
     test('deleting a program removes its mesocycles', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Delete Test');
       await addMesocycleViaUI(page, 'Child Block');
-      await page.waitForTimeout(500);
 
       // Go home to delete
       await navigateTo(page, '/');
-      await page.waitForTimeout(300);
 
       // Delete program
       await page.locator('button:has-text("Delete")').click();
       await page.waitForSelector('.modal-content');
       await page.locator('.modal-content .btn-danger').click();
-      await page.waitForTimeout(500);
+      await expect(page.locator('.modal-content')).toBeHidden();
+      await expect(page.locator('.card', { hasText: 'Delete Test' })).toHaveCount(0);
 
       // Create a new program and check that Child Block is gone
       await seedProgramViaUI(page, 'New Program');
@@ -69,7 +65,6 @@ test.describe('Regression Tests', () => {
 
   test.describe('P1-3: Per-program stats isolation', () => {
     test('Data tab shows only the current program stats', async ({ page }) => {
-      await clearDatabase(page);
 
       // Program A with exercises
       const idA = await seedProgramViaUI(page, 'Program A');
@@ -100,7 +95,6 @@ test.describe('Regression Tests', () => {
 
   test.describe('P1-4: Variation-specific workout blocks', () => {
     test('same exercise with different variations creates separate blocks', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Variation Test');
 
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -109,10 +103,8 @@ test.describe('Regression Tests', () => {
 
       // Add a variation
       await page.locator('.ex-item-header').click();
-      await page.waitForTimeout(300);
       await page.locator('.ex-item-detail input').fill('Close Grip');
       await page.locator('.ex-item-detail button:has-text("+")').click();
-      await page.waitForTimeout(400);
 
       // Create a workout
       await navigateTo(page, `/programs/${programId}`);
@@ -125,20 +117,16 @@ test.describe('Regression Tests', () => {
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
       await page.locator('.modal-content select').first().selectOption({ index: 1 });
-      await page.waitForTimeout(300);
       await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content select').last().selectOption({ label: 'Close Grip' });
       await page.locator('.modal-content button:has-text("Add")').click();
-      await page.waitForTimeout(500);
 
       // Add Bench Press without variation also
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
       await page.locator('.modal-content select').first().selectOption({ index: 1 });
-      await page.waitForTimeout(300);
       await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content button:has-text("Add")').click();
-      await page.waitForTimeout(500);
 
       // Should show 2 blocks (one with variation, one without)
       await expect(page.locator('.exercise-block')).toHaveCount(2);
@@ -148,7 +136,6 @@ test.describe('Regression Tests', () => {
 
   test.describe('P2-1: Set renumbering after deletion', () => {
     test('deleting a middle set renumbers remaining sets', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Renumber Test');
 
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -167,7 +154,6 @@ test.describe('Regression Tests', () => {
 
       // Delete set #2 (the second row)
       await page.locator('.exercise-block').first().locator('.set-table tbody tr').nth(1).locator('button.btn-danger.btn-xs').click();
-      await page.waitForTimeout(500);
 
       // Should have 2 rows (was 3, deleted 1) with set #s 1 and 2
       const rows = page.locator('.exercise-block').first().locator('.set-table tbody tr');
@@ -179,7 +165,6 @@ test.describe('Regression Tests', () => {
 
   test.describe('P3-1: Duplicate import prevention', () => {
     test('importing the same file twice does not create duplicates', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Import Test');
 
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -200,9 +185,7 @@ test.describe('Regression Tests', () => {
       await page.locator('.file-drop-zone').click();
       const fc1 = await fileChooserPromise1;
       await fc1.setFiles({ name: 'export.json', mimeType: 'application/json', buffer });
-      await page.waitForTimeout(500);
       await page.click('button:has-text("Import Exercises")');
-      await page.waitForTimeout(1000);
 
       // Check exercise count
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -214,9 +197,7 @@ test.describe('Regression Tests', () => {
       await page.locator('.file-drop-zone').click();
       const fc2 = await fileChooserPromise2;
       await fc2.setFiles({ name: 'export.json', mimeType: 'application/json', buffer });
-      await page.waitForTimeout(500);
       await page.click('button:has-text("Import Exercises")');
-      await page.waitForTimeout(1000);
 
       // Still 1 exercise
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -226,7 +207,6 @@ test.describe('Regression Tests', () => {
 
   test.describe('P1-5: Variation-aware set renumbering', () => {
     test('deleting a set from one variation block does not affect another', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'VarRenumber');
 
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -234,10 +214,8 @@ test.describe('Regression Tests', () => {
       await addExerciseToLibraryViaUI(page, 'Chest', 'Bench Press');
 
       await page.locator('.ex-item-header').click();
-      await page.waitForTimeout(300);
       await page.locator('.ex-item-detail input').fill('Close Grip');
       await page.locator('.ex-item-detail button:has-text("+")').click();
-      await page.waitForTimeout(400);
 
       await navigateTo(page, `/programs/${programId}`);
       await addMesocycleViaUI(page, 'Block 1', 7);
@@ -249,20 +227,16 @@ test.describe('Regression Tests', () => {
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
       await page.locator('.modal-content select').first().selectOption({ index: 1 });
-      await page.waitForTimeout(300);
       await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content select').last().selectOption({ label: 'Close Grip' });
       await page.locator('.modal-content button:has-text("Add")').click();
-      await page.waitForTimeout(500);
 
       // Add Bench Press without variation
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
       await page.locator('.modal-content select').first().selectOption({ index: 1 });
-      await page.waitForTimeout(300);
       await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content button:has-text("Add")').click();
-      await page.waitForTimeout(500);
 
       // Add sets to both blocks
       const blocks = page.locator('.exercise-block');
@@ -270,17 +244,13 @@ test.describe('Regression Tests', () => {
 
       // Add 2 more sets to first block (Close Grip)
       await blocks.nth(0).locator('button:has-text("+ Set")').click();
-      await page.waitForTimeout(300);
       await blocks.nth(0).locator('button:has-text("+ Set")').click();
-      await page.waitForTimeout(300);
 
       // Add 1 more set to second block (no variation)
       await blocks.nth(1).locator('button:has-text("+ Set")').click();
-      await page.waitForTimeout(300);
 
       // Delete set #2 from first block
       await blocks.nth(0).locator('.set-table tbody tr').nth(1).locator('button.btn-danger.btn-xs').click();
-      await page.waitForTimeout(500);
 
       // First block should have sets #1, #2 (was 3 rows, deleted middle, renumbered to 2)
       const rowsA = blocks.nth(0).locator('.set-table tbody tr');
@@ -306,7 +276,6 @@ test.describe('Regression Tests', () => {
       const fakeBuffer = Buffer.from(badDb.export());
       badDb.close();
 
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Validation Program');
       await addMesocycleViaUI(page, 'Real Block');
 
@@ -322,7 +291,6 @@ test.describe('Regression Tests', () => {
       await page.click('text=Restore Program Backup');
       const fc = await fileChooserPromise;
       await fc.setFiles({ name: 'fake.db', mimeType: 'application/octet-stream', buffer: fakeBuffer });
-      await page.waitForTimeout(1000);
 
       // Should show error alert — restore was rejected
       await expect(page.locator('.alert-danger')).toBeVisible();
@@ -335,7 +303,6 @@ test.describe('Regression Tests', () => {
 
   test.describe('P2-3: Duplicate exercise block prevention', () => {
     test('cannot add the same exercise+variation combo twice', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Dup Prevent');
 
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -356,10 +323,8 @@ test.describe('Regression Tests', () => {
       await page.click('button:has-text("+ Add Exercise")');
       await page.waitForSelector('.modal-content');
       await page.locator('.modal-content select').first().selectOption({ index: 1 });
-      await page.waitForTimeout(300);
       await page.locator('.modal-content select').nth(1).selectOption({ label: 'Bench Press' });
       await page.locator('.modal-content button:has-text("Add")').click();
-      await page.waitForTimeout(500);
 
       // Should show warning and still have only 1 block
       await expect(page.locator('.alert-warn')).toBeVisible();
@@ -369,7 +334,6 @@ test.describe('Regression Tests', () => {
 
   test.describe('P2-4: Valid program backup restore', () => {
     test('export then restore returns program to backup state', async ({ page }) => {
-      await clearDatabase(page);
 
       // Create program A
       const idA = await seedProgramViaUI(page, 'Program A');
@@ -410,11 +374,11 @@ test.describe('Regression Tests', () => {
       await page.click('text=Restore Program Backup');
       const fc = await fileChooserPromise;
       await fc.setFiles({ name: 'backup.sqlite', mimeType: 'application/octet-stream', buffer });
-      await page.waitForTimeout(500);
 
       // Confirm restore
       await page.locator('.modal-content .btn-danger').click();
-      await page.waitForTimeout(1500);
+      await expect(page.locator('.modal-content')).toBeHidden();
+      await expect(page.locator('.alert-success, .alert-warning')).toContainText('restored');
 
       // Verify A is back to backup state (only Block Alpha)
       await navigateTo(page, `/programs/${idA}`);
@@ -433,7 +397,6 @@ test.describe('Regression Tests', () => {
 
   test.describe('P3-2: Seed default exercises', () => {
     test('seed populates default exercise library without duplicates', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Seed Test');
 
       await navigateTo(page, `/programs/${programId}/data`);
@@ -442,7 +405,6 @@ test.describe('Regression Tests', () => {
       await page.click('button:has-text("Seed Default Exercises")');
       await page.waitForSelector('.modal-content');
       await page.locator('.modal-content .btn-primary').click();
-      await page.waitForTimeout(1000);
 
       // Navigate to exercises tab and verify groups were created
       await navigateTo(page, `/programs/${programId}/exercises`);
@@ -456,7 +418,6 @@ test.describe('Regression Tests', () => {
       await page.click('button:has-text("Seed Default Exercises")');
       await page.waitForSelector('.modal-content');
       await page.locator('.modal-content .btn-primary').click();
-      await page.waitForTimeout(1000);
 
       await navigateTo(page, `/programs/${programId}/exercises`);
       await expect(page.locator('.ex-item:has-text("Bench Press")')).toHaveCount(1);
@@ -465,22 +426,18 @@ test.describe('Regression Tests', () => {
 
   test.describe('P0-1: Date rendering', () => {
     test('mesocycle start_date displays the calendar date entered, not one day early', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Date Test');
 
       await addMesocycleViaUI(page, 'July Block', 7, '2026-07-12');
-      await page.waitForTimeout(500);
 
       const dateCell = page.locator('td[data-label="Start Date"]').first();
       await expect(dateCell).toContainText('Jul 12, 2026');
     });
 
     test('mesocycle start_date displays correctly for a mid-month date', async ({ page }) => {
-      await clearDatabase(page);
       const programId = await seedProgramViaUI(page, 'Date Test 2');
 
       await addMesocycleViaUI(page, 'January Block', 14, '2026-01-15');
-      await page.waitForTimeout(500);
 
       const dateCell = page.locator('td[data-label="Start Date"]').first();
       await expect(dateCell).toContainText('Jan 15, 2026');

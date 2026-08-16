@@ -1,10 +1,7 @@
-import { test, expect } from '@playwright/test';
-import { clearDatabase, waitForApp } from './setup';
+import { test, expect } from './fixtures';
 
 test.describe('Clean database cutover', () => {
   test('ignores and preserves the legacy IndexedDB namespace', async ({ page }) => {
-    await waitForApp(page);
-
     const legacyBytes = [9, 8, 7, 6];
     await page.evaluate(async (bytes) => {
       await new Promise<void>((resolve, reject) => {
@@ -31,7 +28,6 @@ test.describe('Clean database cutover', () => {
 
     await page.reload();
     await page.waitForSelector('.nav-bar');
-    await clearDatabase(page);
     await expect(page.locator('.card')).toHaveCount(0);
 
     const result = await page.evaluate(async () => {

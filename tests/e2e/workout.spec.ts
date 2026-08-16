@@ -1,16 +1,13 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
-  clearDatabase, navigateTo, seedProgramViaUI,
+  navigateTo, seedProgramViaUI,
   addExerciseGroupViaUI, addExerciseToLibraryViaUI,
   addMesocycleViaUI, viewMesocycle, addWorkoutViaUI, openWorkout,
-  addExerciseViaUI, addSetViaUI,
+  addExerciseViaUI, addSetViaUI, flushPersistence,
 } from './setup';
 
 test.describe('Workout Page — Exercises & Sets', () => {
   test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
-    await page.waitForTimeout(500);
-
     const programId = await seedProgramViaUI(page, 'Test PPL');
 
     await navigateTo(page, `/programs/${programId}/exercises`);
@@ -67,7 +64,9 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await expect(blocks.nth(0).locator('h3')).toHaveText('Incline Dumbbell Press');
     await expect(blocks.nth(1).locator('h3')).toHaveText('Barbell Bench Press');
 
+    await flushPersistence(page);
     await page.reload();
+    await expect(page.getByTestId('app-ready')).toBeVisible();
     await expect(blocks.nth(0).locator('h3')).toHaveText('Incline Dumbbell Press');
   });
 
@@ -132,7 +131,6 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await addSetViaUI(page, 'normal');
     await expect(page.locator('.exercise-block').first().locator('.set-table tbody tr')).toHaveCount(2);
     await page.locator('.exercise-block').first().locator('.set-table tbody tr').first().locator('button.btn-danger.btn-xs').click();
-    await page.waitForTimeout(300);
     await expect(page.locator('.exercise-block').first().locator('.set-table tbody tr')).toHaveCount(1);
   });
 
@@ -142,7 +140,6 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await page.locator('.exercise-block').first().locator('button.btn-danger.btn-sm').click();
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content .btn-danger').click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.empty-state')).toBeVisible();
   });
 
@@ -158,13 +155,10 @@ test.describe('Workout Page — Exercises & Sets', () => {
     await expect(page.locator('.stats-grid')).toBeVisible();
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('1');
     await addSetViaUI(page, 'warmup');
-    await page.waitForTimeout(400);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('1');
     await addSetViaUI(page, 'normal');
-    await page.waitForTimeout(400);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('2');
     await addSetViaUI(page, 'rest-pause');
-    await page.waitForTimeout(400);
     await expect(page.locator('.stat-card').filter({ hasText: 'Programmed Working Sets' }).locator('.val')).toHaveText('3');
   });
 });

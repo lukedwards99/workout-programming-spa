@@ -1,18 +1,17 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
-  clearDatabase, createProgramViaUI, viewProgram,
+  createProgramViaUI, viewProgram,
   addMesocycleViaUI, viewMesocycle,
   addWorkoutViaUI, openWorkout,
   addExerciseGroupViaUI, addExerciseToLibraryViaUI,
   addExerciseViaUI, addSetViaUI, fillSetRow,
+  navigateTo,
 } from './setup';
 
 test.describe('Workout Generator', () => {
   test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
     await createProgramViaUI(page, 'Gen Test');
     await viewProgram(page, 'Gen Test');
-    await page.waitForTimeout(500);
   });
 
   test('GEN-1: Mesocycle page exposes Generate Workouts button and picker contains Simple plan', async ({ page }) => {
@@ -71,7 +70,6 @@ test.describe('Workout Generator', () => {
 
     // Generate
     await page.locator('.modal-footer button:has-text("Generate")').click();
-    await page.waitForTimeout(500);
 
     // Verify copies appear in the grid
     await expect(page.locator('.day-cell').nth(7)).toContainText('Push A');
@@ -120,7 +118,6 @@ test.describe('Workout Generator', () => {
 
     await page.click('button:has-text("Preview")');
     await page.locator('.modal-footer button:has-text("Generate")').click();
-    await page.waitForTimeout(500);
 
     // Both should appear on day 7 (8th cell)
     await expect(page.locator('.day-cell').nth(7)).toContainText('Workout A');
@@ -130,13 +127,11 @@ test.describe('Workout Generator', () => {
   test('GEN-6: Deep copy preserves exercise and set data', async ({ page }) => {
     // Navigate to exercises and create exercise library
     await page.locator('.program-tabs a:has-text("Exercises")').click();
-    await page.waitForTimeout(500);
     await addExerciseGroupViaUI(page, 'Chest');
     await addExerciseToLibraryViaUI(page, 'Chest', 'Bench Press');
 
     // Go back to mesocycles, create a meso and workout with exercise data
     await page.locator('.program-tabs a:has-text("Mesocycles")').click();
-    await page.waitForTimeout(500);
     await addMesocycleViaUI(page, 'Block', 14);
     await viewMesocycle(page, 'Block');
     await addWorkoutViaUI(page, 0, 'Deep Test');
@@ -148,14 +143,13 @@ test.describe('Workout Generator', () => {
     await addSetViaUI(page, 'dropset');
     await fillSetRow(page, 0, 0, { plannedReps: 10, weight: 135, rir: 2 });
     await fillSetRow(page, 0, 1, { plannedReps: 8, weight: 95 });
-    await page.waitForTimeout(500);
 
     // Navigate back to mesocycle page
     const url = page.url();
     const match = url.match(/\/programs\/(\d+)\/workouts\/(\d+)/);
     const programId = match?.[1];
-    await page.goto(`/programs/${programId}/mesocycles/1`);
-    await page.waitForSelector('.day-cell', { timeout: 10000 });
+    await navigateTo(page, `/programs/${programId}/mesocycles/1`);
+    await expect(page.locator('.day-cell').first()).toBeVisible();
 
     // Generate a copy on day 7
     await page.click('button:has-text("Generate Workouts")');
@@ -166,12 +160,10 @@ test.describe('Workout Generator', () => {
     await page.fill('#gen-total-occurrences', '2');
     await page.click('button:has-text("Preview")');
     await page.locator('.modal-footer button:has-text("Generate")').click();
-    await page.waitForTimeout(500);
 
     // Navigate to the copy and verify sets
     await page.locator('.day-cell').nth(7).locator('.workout-chip-link').first().click();
     await page.waitForSelector('.exercise-block', { timeout: 10000 });
-    await page.waitForTimeout(500);
 
     // Should have Bench Press and 2 sets
     await expect(page.locator('.exercise-block')).toContainText('Bench Press');
@@ -194,7 +186,6 @@ test.describe('Workout Generator', () => {
     await page.fill('#gen-total-occurrences', '2');
     await page.click('button:has-text("Preview")');
     await page.locator('.modal-footer button:has-text("Generate")').click();
-    await page.waitForTimeout(500);
 
     // Day 8 (index 7) should have both workouts
     const day7Cell = page.locator('.day-cell').nth(7);
@@ -240,7 +231,6 @@ test.describe('Workout Generator', () => {
 
     // Cancel
     await page.locator('.modal-content button:has-text("Cancel")').click();
-    await page.waitForTimeout(500);
 
     // Day 7 should not have Cancel Test
     const day7 = page.locator('.day-cell').nth(7);
@@ -302,7 +292,6 @@ test.describe('Workout Generator', () => {
     // Change day and copy
     await page.locator('#edit-workout-day').selectOption('2');
     await page.click('button:has-text("Copy Workout")');
-    await page.waitForTimeout(500);
 
     // Should have "(Copy)" on day 3 and original on day 1
     await expect(page.locator('.day-cell').nth(0)).toContainText('Op Test');
@@ -315,7 +304,6 @@ test.describe('Workout Generator', () => {
     await page.click('button:has-text("Delete")');
     await page.waitForSelector('.modal-content');
     await page.click('.modal-content .btn-danger');
-    await page.waitForTimeout(500);
 
     // Original gone, copy remains
     await expect(page.locator('.day-cell').nth(0)).not.toContainText('Op Test');

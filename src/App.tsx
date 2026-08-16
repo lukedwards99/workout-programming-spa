@@ -40,7 +40,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className="app" data-testid="app-ready">
       <SummarySetTypeFilterProvider>
         <Navigation />
         <div className="container">

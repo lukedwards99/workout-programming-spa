@@ -1,15 +1,15 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
-  clearDatabase, createProgramViaUI, viewProgram,
+  createProgramViaUI, viewProgram,
   addMesocycleViaUI, viewMesocycle, addWorkoutViaUI,
   openWorkoutEdit, editWorkout, copyWorkout,
   openWorkout, addExerciseViaUI, addSetViaUI, fillSetRow,
   addExerciseGroupViaUI, addExerciseToLibraryViaUI,
+  navigateTo,
 } from './setup';
 
 test.describe('Mesocycle Page — Calendar View', () => {
   test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
     await createProgramViaUI(page, 'PPL Program');
     await viewProgram(page, 'PPL Program');
     await addMesocycleViaUI(page, 'Block 1', 7);
@@ -65,7 +65,6 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await page.locator('.modal-content button:has-text("Delete")').click();
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content .btn-danger').click();
-    await page.waitForTimeout(500);
 
     await expect(page.locator('.day-cell').first()).not.toContainText('Remove Me');
   });
@@ -83,7 +82,6 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await page.locator('.day-cell').first().locator('button:has-text("+ Add workout")').click();
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content button:has-text("Cancel")').click();
-    await page.waitForTimeout(300);
 
     await expect(page.locator('.modal-content')).toHaveCount(0);
     await expect(page.locator('.day-cell').first().locator('.workout-chip')).toHaveCount(0);
@@ -136,13 +134,12 @@ test.describe('Mesocycle Page — Calendar View', () => {
     const m = mesoUrl.match(/\/programs\/(\d+)\//);
     const pid = m ? m[1] : '1';
 
-    await page.goto(`/programs/${pid}/exercises`);
-    await page.waitForSelector('.nav-bar');
+    await navigateTo(page, `/programs/${pid}/exercises`);
     await addExerciseGroupViaUI(page, 'Legs');
     await addExerciseToLibraryViaUI(page, 'Legs', 'Squat');
 
-    await page.goto(mesoUrl);
-    await page.waitForSelector('.day-cell');
+    await navigateTo(page, mesoUrl);
+    await expect(page.locator('.day-cell').first()).toBeVisible();
 
     await addWorkoutViaUI(page, 0, 'Deep Source');
     await openWorkout(page, 'Deep Source');
@@ -150,8 +147,8 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await addSetViaUI(page, 'normal');
     await fillSetRow(page, 0, 0, { plannedReps: 10, actualReps: 9, weight: 100, rir: 2 });
 
-    await page.goto(mesoUrl);
-    await page.waitForSelector('.day-cell');
+    await navigateTo(page, mesoUrl);
+    await expect(page.locator('.day-cell').first()).toBeVisible();
 
     await copyWorkout(page, 'Deep Source', 1);
 
@@ -169,7 +166,6 @@ test.describe('Mesocycle Page — Calendar View', () => {
     await openWorkoutEdit(page, 'Keep Me');
     await page.locator('#edit-workout-name').fill('Nope');
     await page.locator('.modal-content button:has-text("Cancel")').click();
-    await page.waitForTimeout(300);
 
     await expect(page.locator('.modal-content')).toHaveCount(0);
     await expect(page.locator('.day-cell').first()).toContainText('Keep Me');

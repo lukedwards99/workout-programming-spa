@@ -1,13 +1,10 @@
-import { test, expect } from '@playwright/test';
-import { clearDatabase, createProgramViaUI, viewProgram, addMesocycleViaUI } from './setup';
+import { test, expect } from './fixtures';
+import { createProgramViaUI, viewProgram, addMesocycleViaUI } from './setup';
 
 test.describe('Program Page — Mesocycles', () => {
   test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
-    await page.waitForTimeout(500);
     await createProgramViaUI(page, 'Test Program', 'Program notes');
     await viewProgram(page, 'Test Program');
-    await page.waitForTimeout(500);
   });
 
   test('shows program name and notes on the page', async ({ page }) => {
@@ -35,7 +32,6 @@ test.describe('Program Page — Mesocycles', () => {
   test('uses default mesocycle length when not specified', async ({ page }) => {
     await page.locator('input[placeholder*="4-Week"]').fill('Default Block');
     await page.click('button:has-text("+ Add Mesocycle")');
-    await page.waitForTimeout(500);
     await expect(page.locator('tbody')).toContainText('7 days');
   });
 
@@ -53,7 +49,6 @@ test.describe('Program Page — Mesocycles', () => {
     await page.locator('.modal-content input[required]').fill('Renamed Block');
     await page.locator('.modal-content input[type="number"]').fill('10');
     await page.locator('.modal-content button:has-text("Save")').click();
-    await page.waitForTimeout(500);
     await expect(page.locator('tbody')).toContainText('Renamed Block');
     await expect(page.locator('tbody')).toContainText('10 days');
   });
@@ -64,7 +59,6 @@ test.describe('Program Page — Mesocycles', () => {
     await page.locator('button:has-text("Del")').click();
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content .btn-danger').click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.empty-state')).toBeVisible();
   });
 
@@ -72,7 +66,6 @@ test.describe('Program Page — Mesocycles', () => {
     await addMesocycleViaUI(page, 'View Block');
     const row = page.locator('tr', { hasText: 'View Block' });
     await row.click();
-    await page.waitForTimeout(500);
     await expect(page.locator('.breadcrumb')).toContainText('View Block');
     await expect(page).toHaveURL(/\/programs\/.*\/mesocycles\//);
   });

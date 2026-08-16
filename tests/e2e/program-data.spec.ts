@@ -1,14 +1,12 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
-  clearDatabase, navigateTo, seedProgramViaUI,
+  deleteAllProgramsViaUI, navigateTo, seedProgramViaUI,
   addExerciseGroupViaUI, addExerciseToLibraryViaUI,
 } from './setup';
 import * as fs from 'node:fs';
 
 test.describe('Program Data Page', () => {
   test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
-    await page.waitForTimeout(500);
 
     const programId = await seedProgramViaUI(page, 'Data Test Program');
     await navigateTo(page, `/programs/${programId}/exercises`);
@@ -55,7 +53,6 @@ test.describe('Program Data Page', () => {
     await page.locator('.file-drop-zone').click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles({ name: 'not-json.txt', mimeType: 'text/plain', buffer: txtContent });
-    await page.waitForTimeout(500);
     await expect(page.locator('.alert-danger')).toContainText('Invalid file type');
   });
 
@@ -71,7 +68,6 @@ test.describe('Program Data Page', () => {
     await page.locator('.file-drop-zone').click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles({ name: 'program-export.json', mimeType: 'application/json', buffer });
-    await page.waitForTimeout(500);
 
     await expect(page.locator('button:has-text("Import Exercises")')).toBeVisible();
     await expect(page.locator('button:has-text("Cancel")').last()).toBeVisible();
@@ -89,10 +85,8 @@ test.describe('Program Data Page', () => {
     await page.locator('.file-drop-zone').click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles({ name: 'program-export.json', mimeType: 'application/json', buffer });
-    await page.waitForTimeout(500);
 
     await page.locator('button:has-text("Cancel")').last().click();
-    await page.waitForTimeout(300);
     await expect(page.locator('button:has-text("Import Exercises")')).toHaveCount(0);
   });
 
@@ -104,7 +98,7 @@ test.describe('Program Data Page', () => {
     const tempPath = await download.path();
     const buffer = fs.readFileSync(tempPath);
 
-    await clearDatabase(page);
+    await deleteAllProgramsViaUI(page);
     const newId = await seedProgramViaUI(page, 'Fresh Program');
     await navigateTo(page, `/programs/${newId}/data`);
 
@@ -112,10 +106,10 @@ test.describe('Program Data Page', () => {
     await page.locator('.file-drop-zone').click();
     const fileChooser = await fileChooserPromise;
     await fileChooser.setFiles({ name: 'program-export.json', mimeType: 'application/json', buffer });
-    await page.waitForTimeout(500);
 
     await page.click('button:has-text("Import Exercises")');
-    await page.waitForTimeout(1000);
+    await expect(page.locator('.modal-content')).toBeHidden();
+    await expect(page.locator('.alert-success')).toContainText('Exercises imported');
 
     await navigateTo(page, `/programs/${newId}/exercises`);
     await expect(page.locator('.ex-item').filter({ hasText: 'Bench Press' })).toBeVisible();

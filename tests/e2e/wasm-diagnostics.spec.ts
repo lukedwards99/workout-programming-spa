@@ -13,6 +13,13 @@ type WasmObservation = {
 const observations: WasmObservation[] = [];
 const sampleCount = 10;
 
+function isWasmBinaryRequest(url: string): boolean {
+  const parsed = new URL(url);
+  return parsed.pathname.endsWith('.wasm')
+    && !parsed.searchParams.has('import')
+    && !parsed.searchParams.has('url');
+}
+
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   if (sorted.length === 0) return 0;
@@ -27,10 +34,10 @@ test.describe.serial('SQL.js WASM diagnostics', () => {
       const finished: Promise<void>[] = [];
 
       page.on('request', (request) => {
-        if (request.url().includes('sql-wasm.wasm')) startedAt.set(request.url(), Date.now());
+        if (isWasmBinaryRequest(request.url())) startedAt.set(request.url(), Date.now());
       });
       page.on('response', (response) => {
-        if (!response.url().includes('sql-wasm.wasm')) return;
+        if (!isWasmBinaryRequest(response.url())) return;
         const completed = response.finished().then((failure) => {
           const headers = response.headers();
           observations.push({
@@ -54,7 +61,11 @@ test.describe.serial('SQL.js WASM diagnostics', () => {
       await page.goto('/');
       await page.locator('.nav-bar').waitFor();
       await Promise.all(finished);
-      expect(page.url()).toMatch(/localhost:5173/);
+      expect(observations).toHaveLength(sample);
+      expect(new URL(observations.at(-1)!.requestUrl).origin).toBe(new URL(page.url()).origin);
+      expect(observations.at(-1)!.requestUrl).not.toContain('cdn.jsdelivr.net');
+      expect(observations.at(-1)!.status).toBe(200);
+      expect(observations.at(-1)!.failure).toBeNull();
     });
   }
 

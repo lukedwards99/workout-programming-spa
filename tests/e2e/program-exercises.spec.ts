@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
-  clearDatabase, navigateTo, seedProgramViaUI,
+  navigateTo, seedProgramViaUI,
   addExerciseGroupViaUI, addExerciseToLibraryViaUI,
 } from './setup';
 
@@ -8,7 +8,6 @@ test.describe('Program Exercises Page', () => {
   let programId;
 
   test.beforeEach(async ({ page }) => {
-    await clearDatabase(page);
     const id = await seedProgramViaUI(page, 'Exercise Test');
     programId = id;
     await navigateTo(page, `/programs/${id}/exercises`);
@@ -50,12 +49,10 @@ test.describe('Program Exercises Page', () => {
     await addExerciseToLibraryViaUI(page, 'Back', 'Pull-Up');
 
     await page.locator('.group-item').filter({ hasText: 'Chest' }).click();
-    await page.waitForTimeout(300);
     await expect(page.locator('.ex-item').filter({ hasText: 'Bench Press' })).toBeVisible();
     await expect(page.locator('.ex-item').filter({ hasText: 'Pull-Up' })).toHaveCount(0);
 
     await page.locator('.group-item').filter({ hasText: 'Back' }).click();
-    await page.waitForTimeout(300);
     await expect(page.locator('.ex-item').filter({ hasText: 'Pull-Up' })).toBeVisible();
     await expect(page.locator('.ex-item').filter({ hasText: 'Bench Press' })).toHaveCount(0);
   });
@@ -66,12 +63,10 @@ test.describe('Program Exercises Page', () => {
     await addExerciseToLibraryViaUI(page, 'Shoulders', 'Front Raise');
 
     await page.locator('.search-input').fill('Lateral');
-    await page.waitForTimeout(300);
     await expect(page.locator('.ex-item').filter({ hasText: 'Lateral Raise' })).toBeVisible();
     await expect(page.locator('.ex-item').filter({ hasText: 'Front Raise' })).toHaveCount(0);
 
     await page.locator('.search-input').fill('');
-    await page.waitForTimeout(300);
     await expect(page.locator('.ex-item')).toHaveCount(2);
   });
 
@@ -80,11 +75,9 @@ test.describe('Program Exercises Page', () => {
     await addExerciseToLibraryViaUI(page, 'Chest', 'Bench Press');
 
     await page.locator('.ex-item-header').click();
-    await page.waitForTimeout(300);
 
     await page.locator('.ex-item-detail input').fill('Close Grip');
     await page.locator('.ex-item-detail button:has-text("+")').click();
-    await page.waitForTimeout(400);
 
     await expect(page.locator('.ex-item-detail .var-item')).toContainText('Close Grip');
     await expect(page.locator('.ex-item-detail .var-item')).toContainText('primary');
@@ -97,7 +90,6 @@ test.describe('Program Exercises Page', () => {
     await page.locator('.ex-item').filter({ hasText: 'Delete Me' }).locator('button:has-text("Del")').click();
     await page.waitForSelector('.modal-content');
     await page.locator('.modal-content .btn-danger').click();
-    await page.waitForTimeout(500);
 
     await expect(page.locator('.ex-item').filter({ hasText: 'Delete Me' })).toHaveCount(0);
   });
