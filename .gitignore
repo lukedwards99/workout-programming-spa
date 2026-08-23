@@ -4,3 +4,7 @@ dist/
 .DS_Store
 .vscode/
 test-results/*
+.wrangler/
+.dev.vars*
+.env*
+!.env.example

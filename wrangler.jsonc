@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "liftlog-local",
+  "main": "./worker/index.ts",
+  "compatibility_date": "2026-08-22",
+  "assets": {
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "APP_ENV": "local",
+    "LOCAL_AUTH_ENABLED": "true"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "liftlog-local",
+      "database_id": "00000000-0000-0000-0000-000000000001",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": ["0 3 * * *"]
+  }
+}
