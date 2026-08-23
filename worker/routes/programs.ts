@@ -2,462 +2,145 @@ import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../types';
 import {
-  all, ApiError, audit, canEditProgram, canReadProgram, data, deleteStatement, first,
-  newId, now, parseJson, requireWorkspaceRole, stampStatement,
+  all, ApiError, audit, canEditProgramExecution, canEditProgramPlan, canReadProgram,
+  data, deleteStatement, first, isPlatformAdmin, membership, newId, now, parseJson,
+  requireWorkspaceRole, stampStatement,
 } from '../lib';
 
 export const programRoutes = new Hono<AppEnv>();
+type Ctx = Parameters<typeof data>[0];
+type Row = Record<string, unknown>;
 
-async function requireProgramRead(c: Parameters<typeof data>[0], workspaceId: string, programId: string) {
-  if (!await canReadProgram(c.env.DB, c.get('principal'), workspaceId, programId)) {
-    throw new ApiError(403, 'forbidden', 'You do not have access to this program.');
-  }
+async function requireRead(c: Ctx, workspaceId: string, programId: string) {
+  if (!await canReadProgram(c.env.DB, c.get('principal'), workspaceId, programId)) throw new ApiError(403, 'forbidden', 'You do not have access to this program.');
+}
+async function requirePlan(c: Ctx, workspaceId: string, programId: string) {
+  if (!await canEditProgramPlan(c.env.DB, c.get('principal'), workspaceId, programId)) throw new ApiError(403, 'forbidden', 'You cannot change this program plan.');
+}
+async function requireExecution(c: Ctx, workspaceId: string, programId: string) {
+  if (!await canEditProgramExecution(c.env.DB, c.get('principal'), workspaceId, programId)) throw new ApiError(403, 'forbidden', 'You cannot record execution for this program.');
+}
+function requireCopyActor(c: Ctx, workspaceId: string) {
+  requireWorkspaceRole(c.get('principal'), workspaceId, ['owner', 'coach']);
+}
+async function requireAllowedOwner(c: Ctx, workspaceId: string, ownerUserId: string) {
+  const principal = c.get('principal');
+  const target = await first<{ role: string; status: string }>(c.env.DB.prepare('SELECT role, status FROM workspace_members WHERE workspace_id = ? AND user_id = ?').bind(workspaceId, ownerUserId));
+  if (!target || target.status !== 'active') throw new ApiError(400, 'invalid_owner', 'Choose an active workspace member.');
+  if (isPlatformAdmin(principal) || membership(principal, workspaceId)?.role === 'owner' || ownerUserId === principal.userId) return;
+  const related = await first(c.env.DB.prepare(`SELECT 1 FROM coach_client_relationships WHERE workspace_id = ? AND coach_user_id = ? AND client_user_id = ? AND status = 'active'`).bind(workspaceId, principal.userId, ownerUserId));
+  if (!related) throw new ApiError(403, 'forbidden', 'You can only create a program for yourself or a related client.');
 }
 
-async function requireProgramEdit(c: Parameters<typeof data>[0], workspaceId: string, programId: string) {
-  if (!await canEditProgram(c.env.DB, c.get('principal'), workspaceId, programId)) {
-    throw new ApiError(403, 'forbidden', 'You cannot edit this program.');
-  }
+const copyFields = z.object({ includeExecutedValues: z.boolean() });
+
+async function workoutTree(db: D1Database, workspaceId: string, programId: string, workoutId: string) {
+  const workout = await first<Row>(db.prepare('SELECT * FROM workouts WHERE workspace_id=? AND program_id=? AND id=?').bind(workspaceId, programId, workoutId));
+  if (!workout) throw new ApiError(404, 'not_found', 'Workout not found.');
+  const blocks = await all<Row>(db.prepare('SELECT * FROM workout_exercises WHERE workspace_id=? AND program_id=? AND workout_id=? ORDER BY exercise_order').bind(workspaceId, programId, workoutId));
+  if (!blocks.length) return { workout, blocks, strength: [] as Row[], cardio: [] as Row[] };
+  const ids = blocks.map((row) => String(row.id)); const marks = ids.map(() => '?').join(',');
+  const [strength, cardio] = await Promise.all([
+    all<Row>(db.prepare(`SELECT * FROM strength_sets WHERE workspace_id=? AND program_id=? AND workout_exercise_id IN (${marks}) ORDER BY set_number`).bind(workspaceId, programId, ...ids)),
+    all<Row>(db.prepare(`SELECT * FROM cardio_sets WHERE workspace_id=? AND program_id=? AND workout_exercise_id IN (${marks}) ORDER BY set_number`).bind(workspaceId, programId, ...ids)),
+  ]);
+  return { workout, blocks, strength, cardio };
+}
+
+function cloneWorkout(db: D1Database, source: Awaited<ReturnType<typeof workoutTree>>, target: { workspaceId: string; programId: string; mesocycleId: string; actor: string; name?: string; dayOffset?: number }, include: boolean) {
+  const timestamp = now(); const workoutId = newId(); const blockIds = new Map<string, string>();
+  const statements: D1PreparedStatement[] = [db.prepare(`INSERT INTO workouts (id,workspace_id,program_id,mesocycle_id,name,day_offset,notes,sort_order,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,1,?,?,?)`).bind(workoutId, target.workspaceId, target.programId, target.mesocycleId, target.name ?? source.workout.name, target.dayOffset ?? source.workout.day_offset, source.workout.notes ?? null, source.workout.sort_order, timestamp, timestamp, target.actor)];
+  for (const row of source.blocks) { const id = newId(); blockIds.set(String(row.id), id); statements.push(db.prepare(`INSERT INTO workout_exercises (id,workspace_id,program_id,workout_id,exercise_id,exercise_variation_id,exercise_order,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,1,?,?,?)`).bind(id, target.workspaceId, target.programId, workoutId, row.exercise_id, row.exercise_variation_id ?? null, row.exercise_order, timestamp, timestamp, target.actor)); }
+  for (const row of source.strength) statements.push(db.prepare(`INSERT INTO strength_sets (id,workspace_id,program_id,workout_exercise_id,set_number,set_type,planned_reps,actual_reps,planned_weight,actual_weight,target_rir,actual_rir,coach_notes,athlete_notes,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)`).bind(newId(), target.workspaceId, target.programId, blockIds.get(String(row.workout_exercise_id)), row.set_number, row.set_type, row.planned_reps ?? null, include ? row.actual_reps ?? null : null, row.planned_weight ?? null, include ? row.actual_weight ?? null : null, row.target_rir ?? null, include ? row.actual_rir ?? null : null, row.coach_notes ?? null, include ? row.athlete_notes ?? null : null, timestamp, timestamp, target.actor));
+  for (const row of source.cardio) statements.push(db.prepare(`INSERT INTO cardio_sets (id,workspace_id,program_id,workout_exercise_id,set_number,planned_duration_seconds,actual_duration_seconds,planned_distance,actual_distance,distance_unit,target_rpe,actual_rpe,coach_notes,athlete_notes,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)`).bind(newId(), target.workspaceId, target.programId, blockIds.get(String(row.workout_exercise_id)), row.set_number, row.planned_duration_seconds ?? null, include ? row.actual_duration_seconds ?? null : null, row.planned_distance ?? null, include ? row.actual_distance ?? null : null, row.distance_unit ?? null, row.target_rpe ?? null, include ? row.actual_rpe ?? null : null, row.coach_notes ?? null, include ? row.athlete_notes ?? null : null, timestamp, timestamp, target.actor));
+  return { workoutId, statements };
+}
+
+function deleteProgramStatements(db: D1Database, workspaceId: string, programId: string, actor: string) {
+  return ['strength_sets', 'cardio_sets', 'workout_exercises', 'workouts', 'mesocycles'].map((table) => stampStatement(db, table, 'workspace_id=? AND program_id=?', [workspaceId, programId], actor)).concat([
+    stampStatement(db, 'programs', 'workspace_id=? AND id=?', [workspaceId, programId], actor),
+    deleteStatement(db, 'programs', 'workspace_id=? AND id=?', [workspaceId, programId]),
+  ]);
 }
 
 programRoutes.get('/workspaces/:workspaceId/programs', async (c) => {
-  const principal = c.get('principal');
-  const workspaceId = c.req.param('workspaceId');
-  const member = requireWorkspaceRole(principal, workspaceId, ['owner', 'coach', 'client']);
-  const visibility = c.req.query('visibility') ?? 'current';
-  const kind = c.req.query('kind');
-  const clauses = ['p.workspace_id = ?', 'p.visibility = ?'];
-  const params: unknown[] = [workspaceId, visibility];
-  if (kind) { clauses.push('p.kind = ?'); params.push(kind); }
-  if (!principal.platformRoles.includes('admin') && member.role !== 'owner') {
-    clauses.push(`(
-      p.owner_user_id = ? OR EXISTS (
-        SELECT 1 FROM program_members pm WHERE pm.workspace_id = p.workspace_id AND pm.program_id = p.id AND pm.user_id = ?
-      ) OR EXISTS (
-        SELECT 1 FROM program_assignments pa WHERE pa.workspace_id = p.workspace_id AND pa.assigned_program_id = p.id
-          AND (pa.coach_user_id = ? OR pa.client_user_id = ?)
-      )
-    )`);
-    params.push(principal.userId, principal.userId, principal.userId, principal.userId);
-  }
-  const rows = await all(c.env.DB.prepare(
-    `SELECT p.*, owner.display_name AS owner_name,
-       pa.id AS assignment_id, pa.client_user_id, client.display_name AS client_name,
-       pa.status AS assignment_status
-     FROM programs p
-     JOIN users owner ON owner.id = p.owner_user_id
-     LEFT JOIN program_assignments pa ON pa.assigned_program_id = p.id
-     LEFT JOIN users client ON client.id = pa.client_user_id
-     WHERE ${clauses.join(' AND ')} ORDER BY p.updated_at DESC`,
-  ).bind(...params));
-  return data(c, rows);
+  const principal = c.get('principal'); const workspaceId = c.req.param('workspaceId'); const access = requireWorkspaceRole(principal, workspaceId, ['owner', 'coach', 'client']);
+  const clauses = ['p.workspace_id=?', 'p.visibility=?']; const params: unknown[] = [workspaceId, c.req.query('visibility') ?? 'current'];
+  if (c.req.query('ownerUserId')) { clauses.push('p.owner_user_id=?'); params.push(c.req.query('ownerUserId')); }
+  if (!isPlatformAdmin(principal) && access.role === 'coach') { clauses.push(`(p.owner_user_id=? OR EXISTS(SELECT 1 FROM coach_client_relationships r WHERE r.workspace_id=p.workspace_id AND r.coach_user_id=? AND r.client_user_id=p.owner_user_id AND r.status='active'))`); params.push(principal.userId, principal.userId); }
+  if (!isPlatformAdmin(principal) && access.role === 'client') { clauses.push('p.owner_user_id=?'); params.push(principal.userId); }
+  return data(c, await all(c.env.DB.prepare(`SELECT p.*,u.display_name AS owner_name FROM programs p JOIN users u ON u.id=p.owner_user_id WHERE ${clauses.join(' AND ')} ORDER BY p.updated_at DESC`).bind(...params)));
 });
 
 programRoutes.post('/workspaces/:workspaceId/programs', async (c) => {
-  const principal = c.get('principal');
-  const workspaceId = c.req.param('workspaceId');
-  requireWorkspaceRole(principal, workspaceId, ['owner', 'coach']);
-  const body = await parseJson(c, z.object({
-    name: z.string().trim().min(1).max(160), notes: z.string().max(4000).optional(),
-    kind: z.enum(['personal', 'template']).default('personal'),
-  }));
-  const id = newId();
-  const timestamp = now();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO programs
-       (id, workspace_id, owner_user_id, name, notes, kind, status, visibility, revision,
-        created_at, updated_at, updated_by_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, 'draft', 'current', 1, ?, ?, ?)`,
-    ).bind(id, workspaceId, principal.userId, body.name, body.notes || null, body.kind, timestamp, timestamp, principal.userId),
-    c.env.DB.prepare(
-      `INSERT INTO program_members
-       (workspace_id, program_id, user_id, access_level, created_at, updated_at, updated_by_user_id)
-       VALUES (?, ?, ?, 'editor', ?, ?, ?)`,
-    ).bind(workspaceId, id, principal.userId, timestamp, timestamp, principal.userId),
-  ]);
-  await audit(c.env.DB, principal.userId, 'program.created', 'program', id, { workspaceId, programId: id });
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE workspace_id = ? AND id = ?').bind(workspaceId, id)), 201);
+  const workspaceId = c.req.param('workspaceId'); const principal = c.get('principal'); requireCopyActor(c, workspaceId);
+  const body = await parseJson(c, z.object({ name: z.string().trim().min(1).max(160), notes: z.string().max(4000).optional(), ownerUserId: z.string().optional() }));
+  const defaultAdminOwner = isPlatformAdmin(principal) && !membership(principal, workspaceId)
+    ? await first<{ user_id: string }>(c.env.DB.prepare(`SELECT user_id FROM workspace_members WHERE workspace_id=? AND role='owner' AND status='active' ORDER BY joined_at LIMIT 1`).bind(workspaceId))
+    : null;
+  const owner = body.ownerUserId ?? defaultAdminOwner?.user_id ?? principal.userId; await requireAllowedOwner(c, workspaceId, owner);
+  const id = newId(), timestamp = now(); await c.env.DB.prepare(`INSERT INTO programs (id,workspace_id,owner_user_id,name,notes,visibility,revision,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,'current',1,?,?,?)`).bind(id, workspaceId, owner, body.name, body.notes ?? null, timestamp, timestamp, principal.userId).run();
+  await audit(c.env.DB, principal.userId, 'program.created', 'program', id, { workspaceId, programId: id, subjectUserId: owner }); return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE id=?').bind(id)), 201);
 });
 
 programRoutes.post('/workspaces/:workspaceId/programs/:programId/copy', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId } = c.req.param();
-  await requireProgramRead(c, workspaceId, programId);
-  requireWorkspaceRole(principal, workspaceId, ['owner', 'coach']);
-  const body = await parseJson(c, z.object({ name: z.string().trim().min(1).max(160), kind: z.enum(['personal', 'template']).default('personal') }));
-  const source = await first<Record<string, unknown>>(c.env.DB.prepare('SELECT * FROM programs WHERE workspace_id = ? AND id = ?').bind(workspaceId, programId));
-  if (!source) throw new ApiError(404, 'not_found', 'Program not found.');
-  const [mesocycles, workouts, blocks, strengthSets, cardioSets] = await Promise.all([
-    all<Record<string, unknown>>(c.env.DB.prepare('SELECT * FROM mesocycles WHERE workspace_id = ? AND program_id = ?').bind(workspaceId, programId)),
-    all<Record<string, unknown>>(c.env.DB.prepare('SELECT * FROM workouts WHERE workspace_id = ? AND program_id = ?').bind(workspaceId, programId)),
-    all<Record<string, unknown>>(c.env.DB.prepare('SELECT * FROM workout_exercises WHERE workspace_id = ? AND program_id = ?').bind(workspaceId, programId)),
-    all<Record<string, unknown>>(c.env.DB.prepare('SELECT * FROM strength_sets WHERE workspace_id = ? AND program_id = ?').bind(workspaceId, programId)),
-    all<Record<string, unknown>>(c.env.DB.prepare('SELECT * FROM cardio_sets WHERE workspace_id = ? AND program_id = ?').bind(workspaceId, programId)),
-  ]);
-  const copyId = newId(); const timestamp = now(); const mesocycleIds = new Map<string, string>(); const workoutIds = new Map<string, string>(); const blockIds = new Map<string, string>();
-  const statements: D1PreparedStatement[] = [
-    c.env.DB.prepare(`INSERT INTO programs
-      (id, workspace_id, owner_user_id, name, notes, kind, status, visibility, revision, created_at, updated_at, updated_by_user_id)
-      VALUES (?, ?, ?, ?, ?, ?, 'draft', 'current', 1, ?, ?, ?)`).bind(copyId, workspaceId, principal.userId, body.name, source.notes ?? null, body.kind, timestamp, timestamp, principal.userId),
-    c.env.DB.prepare(`INSERT INTO program_members (workspace_id, program_id, user_id, access_level, created_at, updated_at, updated_by_user_id)
-      VALUES (?, ?, ?, 'editor', ?, ?, ?)`).bind(workspaceId, copyId, principal.userId, timestamp, timestamp, principal.userId),
-  ];
-  for (const row of mesocycles) { const id = newId(); mesocycleIds.set(String(row.id), id); statements.push(c.env.DB.prepare(`INSERT INTO mesocycles (id, workspace_id, program_id, name, mesocycle_length, start_date, notes, sort_order, version, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`).bind(id, workspaceId, copyId, row.name, row.mesocycle_length, row.start_date, row.notes, row.sort_order, timestamp, timestamp, principal.userId)); }
-  for (const row of workouts) { const id = newId(); workoutIds.set(String(row.id), id); statements.push(c.env.DB.prepare(`INSERT INTO workouts (id, workspace_id, program_id, mesocycle_id, name, day_offset, notes, sort_order, version, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`).bind(id, workspaceId, copyId, mesocycleIds.get(String(row.mesocycle_id)), row.name, row.day_offset, row.notes, row.sort_order, timestamp, timestamp, principal.userId)); }
-  for (const row of blocks) { const id = newId(); blockIds.set(String(row.id), id); statements.push(c.env.DB.prepare(`INSERT INTO workout_exercises (id, workspace_id, program_id, workout_id, exercise_id, exercise_variation_id, exercise_order, version, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`).bind(id, workspaceId, copyId, workoutIds.get(String(row.workout_id)), row.exercise_id, row.exercise_variation_id, row.exercise_order, timestamp, timestamp, principal.userId)); }
-  for (const row of strengthSets) statements.push(c.env.DB.prepare(`INSERT INTO strength_sets (id, workspace_id, program_id, workout_exercise_id, set_number, set_type, planned_reps, planned_weight, target_rir, coach_notes, version, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`).bind(newId(), workspaceId, copyId, blockIds.get(String(row.workout_exercise_id)), row.set_number, row.set_type, row.planned_reps, row.planned_weight, row.target_rir, row.coach_notes, timestamp, timestamp, principal.userId));
-  for (const row of cardioSets) statements.push(c.env.DB.prepare(`INSERT INTO cardio_sets (id, workspace_id, program_id, workout_exercise_id, set_number, planned_duration_seconds, planned_distance, distance_unit, target_rpe, coach_notes, version, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`).bind(newId(), workspaceId, copyId, blockIds.get(String(row.workout_exercise_id)), row.set_number, row.planned_duration_seconds, row.planned_distance, row.distance_unit, row.target_rpe, row.coach_notes, timestamp, timestamp, principal.userId));
-  await c.env.DB.batch(statements);
-  await audit(c.env.DB, principal.userId, 'program.copied', 'program', copyId, { workspaceId, programId: copyId, metadata: { sourceProgramId: programId, sourceRevision: source.revision } });
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE workspace_id = ? AND id = ?').bind(workspaceId, copyId)), 201);
+  const { workspaceId, programId } = c.req.param(); const principal = c.get('principal'); await requireRead(c, workspaceId, programId); requireCopyActor(c, workspaceId);
+  const body = await parseJson(c, copyFields.extend({ name: z.string().trim().min(1).max(160), targetOwnerUserId: z.string() })); await requireAllowedOwner(c, workspaceId, body.targetOwnerUserId);
+  const source = await first<Row>(c.env.DB.prepare('SELECT * FROM programs WHERE workspace_id=? AND id=?').bind(workspaceId, programId)); if (!source) throw new ApiError(404, 'not_found', 'Program not found.');
+  const id = newId(), timestamp = now(); const statements: D1PreparedStatement[] = [c.env.DB.prepare(`INSERT INTO programs (id,workspace_id,owner_user_id,name,notes,visibility,revision,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,'current',1,?,?,?)`).bind(id, workspaceId, body.targetOwnerUserId, body.name, source.notes ?? null, timestamp, timestamp, principal.userId)];
+  const mesocycles = await all<Row>(c.env.DB.prepare('SELECT * FROM mesocycles WHERE workspace_id=? AND program_id=? ORDER BY sort_order,start_date').bind(workspaceId, programId));
+  for (const meso of mesocycles) { const mesoId = newId(); statements.push(c.env.DB.prepare(`INSERT INTO mesocycles (id,workspace_id,program_id,name,mesocycle_length,start_date,notes,sort_order,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,1,?,?,?)`).bind(mesoId, workspaceId, id, meso.name, meso.mesocycle_length, meso.start_date, meso.notes ?? null, meso.sort_order, timestamp, timestamp, principal.userId)); const workouts = await all<Row>(c.env.DB.prepare('SELECT id FROM workouts WHERE workspace_id=? AND program_id=? AND mesocycle_id=? ORDER BY sort_order,day_offset').bind(workspaceId, programId, meso.id)); for (const workout of workouts) statements.push(...cloneWorkout(c.env.DB, await workoutTree(c.env.DB, workspaceId, programId, String(workout.id)), { workspaceId, programId: id, mesocycleId: mesoId, actor: principal.userId }, body.includeExecutedValues).statements); }
+  await c.env.DB.batch(statements); await audit(c.env.DB, principal.userId, 'program.copied', 'program', id, { workspaceId, programId: id, subjectUserId: body.targetOwnerUserId, metadata: { sourceProgramId: programId, destinationProgramId: id, includeExecutedValues: body.includeExecutedValues } }); return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE id=?').bind(id)), 201);
 });
 
-programRoutes.get('/workspaces/:workspaceId/programs/:programId', async (c) => {
-  const workspaceId = c.req.param('workspaceId');
-  const programId = c.req.param('programId');
-  await requireProgramRead(c, workspaceId, programId);
-  const row = await first(c.env.DB.prepare(
-    `SELECT p.*, pa.id AS assignment_id, pa.client_user_id, pa.coach_user_id,
-       pa.status AS assignment_status, client.display_name AS client_name
-     FROM programs p LEFT JOIN program_assignments pa ON pa.assigned_program_id = p.id
-     LEFT JOIN users client ON client.id = pa.client_user_id
-     WHERE p.workspace_id = ? AND p.id = ?`,
-  ).bind(workspaceId, programId));
-  if (!row) throw new ApiError(404, 'not_found', 'Program not found.');
-  return data(c, row);
-});
+programRoutes.get('/workspaces/:workspaceId/programs/:programId', async (c) => { const { workspaceId, programId } = c.req.param(); await requireRead(c, workspaceId, programId); const row = await first(c.env.DB.prepare('SELECT p.*,u.display_name AS owner_name FROM programs p JOIN users u ON u.id=p.owner_user_id WHERE p.workspace_id=? AND p.id=?').bind(workspaceId, programId)); if (!row) throw new ApiError(404, 'not_found', 'Program not found.'); return data(c, row); });
+programRoutes.patch('/workspaces/:workspaceId/programs/:programId', async (c) => { const { workspaceId, programId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, z.object({ name: z.string().trim().min(1).max(160), notes: z.string().max(4000).optional(), revision: z.number().int().positive() })); const r = await c.env.DB.prepare(`UPDATE programs SET name=?,notes=?,revision=revision+1,updated_at=?,updated_by_user_id=? WHERE workspace_id=? AND id=? AND revision=?`).bind(b.name, b.notes ?? null, now(), p.userId, workspaceId, programId, b.revision).run(); if (!r.meta.changes) throw new ApiError(409, 'version_conflict', 'The program changed since it was loaded.'); return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE id=?').bind(programId))); });
+for (const [path, visibility] of [['archive', 'archived'], ['restore', 'current']] as const) programRoutes.post(`/workspaces/:workspaceId/programs/:programId/${path}`, async (c) => { const { workspaceId, programId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); await c.env.DB.prepare(`UPDATE programs SET visibility=?,revision=revision+1,updated_at=?,updated_by_user_id=? WHERE workspace_id=? AND id=?`).bind(visibility, now(), p.userId, workspaceId, programId).run(); return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE id=?').bind(programId))); });
+programRoutes.delete('/workspaces/:workspaceId/programs/:programId', async (c) => { const { workspaceId, programId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); await c.env.DB.batch(deleteProgramStatements(c.env.DB, workspaceId, programId, p.userId)); await audit(c.env.DB, p.userId, 'program.deleted', 'program', programId, { workspaceId, programId }); return data(c, { deleted: true }); });
 
-programRoutes.patch('/workspaces/:workspaceId/programs/:programId', async (c) => {
-  const principal = c.get('principal');
-  const workspaceId = c.req.param('workspaceId');
-  const programId = c.req.param('programId');
-  await requireProgramEdit(c, workspaceId, programId);
-  const body = await parseJson(c, z.object({
-    name: z.string().trim().min(1).max(160), notes: z.string().max(4000).optional(),
-    status: z.enum(['draft', 'active', 'completed']), revision: z.number().int().positive(),
-  }));
-  const result = await c.env.DB.prepare(
-    `UPDATE programs SET name = ?, notes = ?, status = ?, revision = revision + 1,
-       updated_at = ?, updated_by_user_id = ?
-     WHERE workspace_id = ? AND id = ? AND revision = ?`,
-  ).bind(body.name, body.notes || null, body.status, now(), principal.userId, workspaceId, programId, body.revision).run();
-  if (!result.meta.changes) throw new ApiError(409, 'version_conflict', 'The program changed since it was loaded.');
-  await audit(c.env.DB, principal.userId, 'program.updated', 'program', programId, { workspaceId, programId });
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE workspace_id = ? AND id = ?').bind(workspaceId, programId)));
-});
+const mesoInput = z.object({ name: z.string().trim().min(1).max(160), mesocycleLength: z.number().int().positive().default(7), startDate: z.string().length(10), notes: z.string().max(4000).optional(), sortOrder: z.number().int().default(0) });
+programRoutes.get('/workspaces/:workspaceId/programs/:programId/mesocycles', async (c) => { const { workspaceId, programId } = c.req.param(); await requireRead(c, workspaceId, programId); return data(c, await all(c.env.DB.prepare(`SELECT m.*,COUNT(w.id) AS workout_count FROM mesocycles m LEFT JOIN workouts w ON w.workspace_id=m.workspace_id AND w.program_id=m.program_id AND w.mesocycle_id=m.id WHERE m.workspace_id=? AND m.program_id=? GROUP BY m.id ORDER BY m.sort_order,m.start_date`).bind(workspaceId, programId))); });
+programRoutes.post('/workspaces/:workspaceId/programs/:programId/mesocycles', async (c) => { const { workspaceId, programId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, mesoInput); const id = newId(), t = now(); await c.env.DB.prepare(`INSERT INTO mesocycles (id,workspace_id,program_id,name,mesocycle_length,start_date,notes,sort_order,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,1,?,?,?)`).bind(id, workspaceId, programId, b.name, b.mesocycleLength, b.startDate, b.notes ?? null, b.sortOrder, t, t, p.userId).run(); return data(c, await first(c.env.DB.prepare('SELECT * FROM mesocycles WHERE id=?').bind(id)), 201); });
+programRoutes.patch('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId', async (c) => { const { workspaceId, programId, mesocycleId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, mesoInput.extend({ version: z.number().int().positive() })); const r = await c.env.DB.prepare(`UPDATE mesocycles SET name=?,mesocycle_length=?,start_date=?,notes=?,sort_order=?,version=version+1,updated_at=?,updated_by_user_id=? WHERE workspace_id=? AND program_id=? AND id=? AND version=?`).bind(b.name, b.mesocycleLength, b.startDate, b.notes ?? null, b.sortOrder, now(), p.userId, workspaceId, programId, mesocycleId, b.version).run(); if (!r.meta.changes) throw new ApiError(409, 'version_conflict', 'The mesocycle changed since it was loaded.'); return data(c, await first(c.env.DB.prepare('SELECT * FROM mesocycles WHERE id=?').bind(mesocycleId))); });
+programRoutes.post('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId/copy', async (c) => { const { workspaceId, programId, mesocycleId } = c.req.param(); const p = c.get('principal'); await requireRead(c, workspaceId, programId); requireCopyActor(c, workspaceId); const b = await parseJson(c, copyFields.extend({ targetProgramId: z.string(), name: z.string().trim().min(1).optional(), startDate: z.string().length(10).optional() })); await requirePlan(c, workspaceId, b.targetProgramId); const source = await first<Row>(c.env.DB.prepare('SELECT * FROM mesocycles WHERE workspace_id=? AND program_id=? AND id=?').bind(workspaceId, programId, mesocycleId)); if (!source) throw new ApiError(404, 'not_found', 'Mesocycle not found.'); const id = newId(), t = now(); const statements: D1PreparedStatement[] = [c.env.DB.prepare(`INSERT INTO mesocycles (id,workspace_id,program_id,name,mesocycle_length,start_date,notes,sort_order,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,1,?,?,?)`).bind(id, workspaceId, b.targetProgramId, b.name ?? source.name, source.mesocycle_length, b.startDate ?? source.start_date, source.notes ?? null, source.sort_order, t, t, p.userId)]; const workouts = await all<Row>(c.env.DB.prepare('SELECT id FROM workouts WHERE workspace_id=? AND program_id=? AND mesocycle_id=? ORDER BY sort_order,day_offset').bind(workspaceId, programId, mesocycleId)); for (const row of workouts) statements.push(...cloneWorkout(c.env.DB, await workoutTree(c.env.DB, workspaceId, programId, String(row.id)), { workspaceId, programId: b.targetProgramId, mesocycleId: id, actor: p.userId }, b.includeExecutedValues).statements); await c.env.DB.batch(statements); await audit(c.env.DB, p.userId, 'mesocycle.copied', 'mesocycle', id, { workspaceId, programId: b.targetProgramId, metadata: { sourceMesocycleId: mesocycleId, destinationMesocycleId: id, includeExecutedValues: b.includeExecutedValues } }); return data(c, await first(c.env.DB.prepare('SELECT * FROM mesocycles WHERE id=?').bind(id)), 201); });
+programRoutes.delete('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId', async (c) => { const { workspaceId, programId, mesocycleId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); await c.env.DB.batch([
+  stampStatement(c.env.DB, 'strength_sets', 'workspace_id=? AND program_id=? AND workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id IN (SELECT id FROM workouts WHERE mesocycle_id=?))', [workspaceId, programId, mesocycleId], p.userId), stampStatement(c.env.DB, 'cardio_sets', 'workspace_id=? AND program_id=? AND workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id IN (SELECT id FROM workouts WHERE mesocycle_id=?))', [workspaceId, programId, mesocycleId], p.userId), stampStatement(c.env.DB, 'workout_exercises', 'workspace_id=? AND program_id=? AND workout_id IN (SELECT id FROM workouts WHERE mesocycle_id=?)', [workspaceId, programId, mesocycleId], p.userId), stampStatement(c.env.DB, 'workouts', 'workspace_id=? AND program_id=? AND mesocycle_id=?', [workspaceId, programId, mesocycleId], p.userId), stampStatement(c.env.DB, 'mesocycles', 'workspace_id=? AND program_id=? AND id=?', [workspaceId, programId, mesocycleId], p.userId), deleteStatement(c.env.DB, 'mesocycles', 'workspace_id=? AND program_id=? AND id=?', [workspaceId, programId, mesocycleId]),
+]); return data(c, { deleted: true }); });
+programRoutes.get('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId/summary', async (c) => { const { workspaceId, programId, mesocycleId } = c.req.param(); await requireRead(c, workspaceId, programId); const strength = await first(c.env.DB.prepare(`SELECT COUNT(*) AS set_count,COALESCE(SUM(planned_reps),0) AS planned_reps,COALESCE(SUM(actual_reps),0) AS actual_reps,COALESCE(SUM(COALESCE(planned_reps,0)*COALESCE(planned_weight,0)),0) AS planned_volume,COALESCE(SUM(COALESCE(actual_reps,0)*COALESCE(actual_weight,0)),0) AS actual_volume FROM strength_sets s JOIN workout_exercises we ON we.id=s.workout_exercise_id JOIN workouts w ON w.id=we.workout_id WHERE s.workspace_id=? AND s.program_id=? AND w.mesocycle_id=?`).bind(workspaceId, programId, mesocycleId)); const cardio = await first(c.env.DB.prepare(`SELECT COUNT(*) AS set_count,COALESCE(SUM(planned_duration_seconds),0) AS planned_duration_seconds,COALESCE(SUM(actual_duration_seconds),0) AS actual_duration_seconds FROM cardio_sets s JOIN workout_exercises we ON we.id=s.workout_exercise_id JOIN workouts w ON w.id=we.workout_id WHERE s.workspace_id=? AND s.program_id=? AND w.mesocycle_id=?`).bind(workspaceId, programId, mesocycleId)); const distances = await all(c.env.DB.prepare(`SELECT distance_unit,COALESCE(SUM(planned_distance),0) AS planned_distance,COALESCE(SUM(actual_distance),0) AS actual_distance FROM cardio_sets s JOIN workout_exercises we ON we.id=s.workout_exercise_id JOIN workouts w ON w.id=we.workout_id WHERE s.workspace_id=? AND s.program_id=? AND w.mesocycle_id=? AND distance_unit IS NOT NULL GROUP BY distance_unit`).bind(workspaceId, programId, mesocycleId)); return data(c, { strength, cardio: { ...(cardio as object), distances } }); });
 
-programRoutes.post('/workspaces/:workspaceId/programs/:programId/archive', async (c) => {
-  const principal = c.get('principal');
-  const workspaceId = c.req.param('workspaceId');
-  const programId = c.req.param('programId');
-  await requireProgramEdit(c, workspaceId, programId);
-  const result = await c.env.DB.prepare(
-    `UPDATE programs SET visibility = 'archived', revision = revision + 1, updated_at = ?, updated_by_user_id = ?
-     WHERE workspace_id = ? AND id = ? AND status = 'completed' AND visibility = 'current'`,
-  ).bind(now(), principal.userId, workspaceId, programId).run();
-  if (!result.meta.changes) throw new ApiError(409, 'archive_requires_completed', 'Only a completed current program can be archived.');
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE workspace_id = ? AND id = ?').bind(workspaceId, programId)));
-});
+const workoutInput = z.object({ name: z.string().trim().min(1).max(160), dayOffset: z.number().int().nonnegative(), notes: z.string().max(4000).optional(), sortOrder: z.number().int().default(0) });
+programRoutes.get('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId/workouts', async (c) => { const { workspaceId, programId, mesocycleId } = c.req.param(); await requireRead(c, workspaceId, programId); return data(c, await all(c.env.DB.prepare('SELECT * FROM workouts WHERE workspace_id=? AND program_id=? AND mesocycle_id=? ORDER BY sort_order,day_offset').bind(workspaceId, programId, mesocycleId))); });
+programRoutes.post('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId/workouts', async (c) => { const { workspaceId, programId, mesocycleId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, workoutInput); const id = newId(), t = now(); await c.env.DB.prepare(`INSERT INTO workouts (id,workspace_id,program_id,mesocycle_id,name,day_offset,notes,sort_order,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,1,?,?,?)`).bind(id, workspaceId, programId, mesocycleId, b.name, b.dayOffset, b.notes ?? null, b.sortOrder, t, t, p.userId).run(); return data(c, await first(c.env.DB.prepare('SELECT * FROM workouts WHERE id=?').bind(id)), 201); });
+programRoutes.post('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId/generate', async (c) => { const { workspaceId, programId, mesocycleId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, z.object({ workouts: z.array(workoutInput.omit({ sortOrder: true })).min(1).max(30) })); const t = now(), ids: string[] = []; await c.env.DB.batch(b.workouts.map((row, index) => { const id = newId(); ids.push(id); return c.env.DB.prepare(`INSERT INTO workouts (id,workspace_id,program_id,mesocycle_id,name,day_offset,notes,sort_order,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,1,?,?,?)`).bind(id, workspaceId, programId, mesocycleId, row.name, row.dayOffset, row.notes ?? null, index, t, t, p.userId); })); return data(c, await all(c.env.DB.prepare(`SELECT * FROM workouts WHERE id IN (${ids.map(() => '?').join(',')}) ORDER BY sort_order`).bind(...ids)), 201); });
+programRoutes.post('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId/copy', async (c) => { const { workspaceId, programId, workoutId } = c.req.param(); const p = c.get('principal'); await requireRead(c, workspaceId, programId); requireCopyActor(c, workspaceId); const b = await parseJson(c, copyFields.extend({ targetProgramId: z.string(), targetMesocycleId: z.string(), name: z.string().trim().min(1).optional(), dayOffset: z.number().int().nonnegative().optional() })); await requirePlan(c, workspaceId, b.targetProgramId); if (!await first(c.env.DB.prepare('SELECT 1 FROM mesocycles WHERE workspace_id=? AND program_id=? AND id=?').bind(workspaceId, b.targetProgramId, b.targetMesocycleId))) throw new ApiError(400, 'invalid_destination', 'The destination mesocycle is not in that program.'); const cloned = cloneWorkout(c.env.DB, await workoutTree(c.env.DB, workspaceId, programId, workoutId), { workspaceId, programId: b.targetProgramId, mesocycleId: b.targetMesocycleId, actor: p.userId, name: b.name, dayOffset: b.dayOffset }, b.includeExecutedValues); await c.env.DB.batch(cloned.statements); await audit(c.env.DB, p.userId, 'workout.copied', 'workout', cloned.workoutId, { workspaceId, programId: b.targetProgramId, metadata: { sourceWorkoutId: workoutId, destinationWorkoutId: cloned.workoutId, includeExecutedValues: b.includeExecutedValues } }); return data(c, await first(c.env.DB.prepare('SELECT * FROM workouts WHERE id=?').bind(cloned.workoutId)), 201); });
+programRoutes.get('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId', async (c) => { const { workspaceId, programId, workoutId } = c.req.param(); await requireRead(c, workspaceId, programId); const workout = await first<Row>(c.env.DB.prepare('SELECT * FROM workouts WHERE workspace_id=? AND program_id=? AND id=?').bind(workspaceId, programId, workoutId)); if (!workout) throw new ApiError(404, 'not_found', 'Workout not found.'); const blocks = await all<Row>(c.env.DB.prepare(`SELECT we.*,e.name AS exercise_name,e.notes AS exercise_notes,e.exercise_type,ev.name AS variation_name,eg.name AS group_name FROM workout_exercises we JOIN exercises e ON e.id=we.exercise_id JOIN exercise_groups eg ON eg.id=e.exercise_group_id LEFT JOIN exercise_variations ev ON ev.id=we.exercise_variation_id WHERE we.workspace_id=? AND we.program_id=? AND we.workout_id=? ORDER BY we.exercise_order`).bind(workspaceId, programId, workoutId)); for (const block of blocks) block.sets = await all(c.env.DB.prepare(`SELECT * FROM ${block.exercise_type === 'cardio' ? 'cardio_sets' : 'strength_sets'} WHERE workspace_id=? AND program_id=? AND workout_exercise_id=? ORDER BY set_number`).bind(workspaceId, programId, block.id)); return data(c, { ...workout, exercise_blocks: blocks }); });
+programRoutes.patch('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId', async (c) => { const { workspaceId, programId, workoutId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, workoutInput.extend({ version: z.number().int().positive() })); const r = await c.env.DB.prepare(`UPDATE workouts SET name=?,day_offset=?,notes=?,sort_order=?,version=version+1,updated_at=?,updated_by_user_id=? WHERE workspace_id=? AND program_id=? AND id=? AND version=?`).bind(b.name, b.dayOffset, b.notes ?? null, b.sortOrder, now(), p.userId, workspaceId, programId, workoutId, b.version).run(); if (!r.meta.changes) throw new ApiError(409, 'version_conflict', 'The workout changed since it was loaded.'); return data(c, await first(c.env.DB.prepare('SELECT * FROM workouts WHERE id=?').bind(workoutId))); });
+programRoutes.delete('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId', async (c) => { const { workspaceId, programId, workoutId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); await c.env.DB.batch([stampStatement(c.env.DB, 'strength_sets', 'workspace_id=? AND program_id=? AND workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id=?)', [workspaceId, programId, workoutId], p.userId), stampStatement(c.env.DB, 'cardio_sets', 'workspace_id=? AND program_id=? AND workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id=?)', [workspaceId, programId, workoutId], p.userId), stampStatement(c.env.DB, 'workout_exercises', 'workspace_id=? AND program_id=? AND workout_id=?', [workspaceId, programId, workoutId], p.userId), stampStatement(c.env.DB, 'workouts', 'workspace_id=? AND program_id=? AND id=?', [workspaceId, programId, workoutId], p.userId), deleteStatement(c.env.DB, 'workouts', 'workspace_id=? AND program_id=? AND id=?', [workspaceId, programId, workoutId])]); return data(c, { deleted: true }); });
 
-programRoutes.post('/workspaces/:workspaceId/programs/:programId/restore', async (c) => {
-  const principal = c.get('principal');
-  const workspaceId = c.req.param('workspaceId');
-  const programId = c.req.param('programId');
-  await requireProgramEdit(c, workspaceId, programId);
-  await c.env.DB.prepare(
-    `UPDATE programs SET visibility = 'current', revision = revision + 1, updated_at = ?, updated_by_user_id = ?
-     WHERE workspace_id = ? AND id = ? AND visibility = 'archived'`,
-  ).bind(now(), principal.userId, workspaceId, programId).run();
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM programs WHERE workspace_id = ? AND id = ?').bind(workspaceId, programId)));
-});
+programRoutes.post('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId/exercises', async (c) => { const { workspaceId, programId, workoutId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, z.object({ exerciseId: z.string(), exerciseVariationId: z.string().nullable().optional(), exerciseOrder: z.number().int().nonnegative() })); const id = newId(), t = now(); await c.env.DB.prepare(`INSERT INTO workout_exercises (id,workspace_id,program_id,workout_id,exercise_id,exercise_variation_id,exercise_order,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,1,?,?,?)`).bind(id, workspaceId, programId, workoutId, b.exerciseId, b.exerciseVariationId ?? null, b.exerciseOrder, t, t, p.userId).run(); return data(c, await first(c.env.DB.prepare('SELECT * FROM workout_exercises WHERE id=?').bind(id)), 201); });
+programRoutes.delete('/workspaces/:workspaceId/programs/:programId/workout-exercises/:blockId', async (c) => { const { workspaceId, programId, blockId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); await c.env.DB.batch([stampStatement(c.env.DB, 'strength_sets', 'workspace_id=? AND program_id=? AND workout_exercise_id=?', [workspaceId, programId, blockId], p.userId), stampStatement(c.env.DB, 'cardio_sets', 'workspace_id=? AND program_id=? AND workout_exercise_id=?', [workspaceId, programId, blockId], p.userId), stampStatement(c.env.DB, 'workout_exercises', 'workspace_id=? AND program_id=? AND id=?', [workspaceId, programId, blockId], p.userId), deleteStatement(c.env.DB, 'workout_exercises', 'workspace_id=? AND program_id=? AND id=?', [workspaceId, programId, blockId])]); return data(c, { deleted: true }); });
 
-function prepareProgramDelete(db: D1Database, workspaceId: string, programId: string, actor: string) {
-  return [
-    stampStatement(db, 'strength_set_results', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'cardio_set_results', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'workout_sessions', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'strength_sets', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'cardio_sets', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'workout_exercises', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'workouts', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'mesocycles', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'program_members', 'workspace_id = ? AND program_id = ?', [workspaceId, programId], actor),
-    stampStatement(db, 'program_assignments', 'workspace_id = ? AND (assigned_program_id = ? OR source_program_id = ?)', [workspaceId, programId, programId], actor),
-    stampStatement(db, 'programs', 'workspace_id = ? AND id = ?', [workspaceId, programId], actor),
-    deleteStatement(db, 'strength_set_results', 'workspace_id = ? AND program_id = ?', [workspaceId, programId]),
-    deleteStatement(db, 'cardio_set_results', 'workspace_id = ? AND program_id = ?', [workspaceId, programId]),
-    deleteStatement(db, 'workout_sessions', 'workspace_id = ? AND program_id = ?', [workspaceId, programId]),
-    deleteStatement(db, 'programs', 'workspace_id = ? AND id = ?', [workspaceId, programId]),
-  ];
-}
-
-programRoutes.delete('/workspaces/:workspaceId/programs/:programId', async (c) => {
-  const principal = c.get('principal');
-  const workspaceId = c.req.param('workspaceId');
-  const programId = c.req.param('programId');
-  await requireProgramEdit(c, workspaceId, programId);
-  await c.env.DB.batch(prepareProgramDelete(c.env.DB, workspaceId, programId, principal.userId));
-  await audit(c.env.DB, principal.userId, 'program.deleted', 'program', programId, { workspaceId, programId });
-  return data(c, { deleted: true });
-});
-
-programRoutes.get('/workspaces/:workspaceId/programs/:programId/mesocycles', async (c) => {
-  const { workspaceId, programId } = c.req.param();
-  await requireProgramRead(c, workspaceId, programId);
-  return data(c, await all(c.env.DB.prepare(
-    `SELECT m.*, COUNT(w.id) AS workout_count FROM mesocycles m
-     LEFT JOIN workouts w ON w.workspace_id = m.workspace_id AND w.program_id = m.program_id AND w.mesocycle_id = m.id
-     WHERE m.workspace_id = ? AND m.program_id = ? GROUP BY m.id ORDER BY m.sort_order, m.start_date`,
-  ).bind(workspaceId, programId)));
-});
-
-programRoutes.post('/workspaces/:workspaceId/programs/:programId/mesocycles', async (c) => {
-  const principal = c.get('principal');
-  const { workspaceId, programId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  const body = await parseJson(c, z.object({
-    name: z.string().trim().min(1).max(160), mesocycleLength: z.number().int().positive().default(7),
-    startDate: z.string().min(10).max(10), notes: z.string().max(4000).optional(), sortOrder: z.number().int().default(0),
-  }));
-  const id = newId(); const timestamp = now();
-  await c.env.DB.batch([
-    c.env.DB.prepare(
-      `INSERT INTO mesocycles
-       (id, workspace_id, program_id, name, mesocycle_length, start_date, notes, sort_order, version, created_at, updated_at, updated_by_user_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-    ).bind(id, workspaceId, programId, body.name, body.mesocycleLength, body.startDate, body.notes || null, body.sortOrder, timestamp, timestamp, principal.userId),
-    c.env.DB.prepare(`UPDATE programs SET revision = revision + 1, updated_at = ?, updated_by_user_id = ? WHERE workspace_id = ? AND id = ?`).bind(timestamp, principal.userId, workspaceId, programId),
-  ]);
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM mesocycles WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, id)), 201);
-});
-
-programRoutes.patch('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, mesocycleId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  const body = await parseJson(c, z.object({
-    name: z.string().trim().min(1), mesocycleLength: z.number().int().positive(), startDate: z.string().length(10),
-    notes: z.string().optional(), sortOrder: z.number().int().default(0), version: z.number().int().positive(),
-  }));
-  const result = await c.env.DB.prepare(
-    `UPDATE mesocycles SET name = ?, mesocycle_length = ?, start_date = ?, notes = ?, sort_order = ?,
-       version = version + 1, updated_at = ?, updated_by_user_id = ?
-     WHERE workspace_id = ? AND program_id = ? AND id = ? AND version = ?`,
-  ).bind(body.name, body.mesocycleLength, body.startDate, body.notes || null, body.sortOrder, now(), principal.userId, workspaceId, programId, mesocycleId, body.version).run();
-  if (!result.meta.changes) throw new ApiError(409, 'version_conflict', 'The mesocycle changed since it was loaded.');
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM mesocycles WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, mesocycleId)));
-});
-
-programRoutes.delete('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, mesocycleId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  await c.env.DB.batch([
-    stampStatement(c.env.DB, 'strength_sets', 'workspace_id = ? AND program_id = ? AND workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id IN (SELECT id FROM workouts WHERE mesocycle_id = ?))', [workspaceId, programId, mesocycleId], principal.userId),
-    stampStatement(c.env.DB, 'cardio_sets', 'workspace_id = ? AND program_id = ? AND workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id IN (SELECT id FROM workouts WHERE mesocycle_id = ?))', [workspaceId, programId, mesocycleId], principal.userId),
-    stampStatement(c.env.DB, 'workout_exercises', 'workspace_id = ? AND program_id = ? AND workout_id IN (SELECT id FROM workouts WHERE mesocycle_id = ?)', [workspaceId, programId, mesocycleId], principal.userId),
-    stampStatement(c.env.DB, 'workouts', 'workspace_id = ? AND program_id = ? AND mesocycle_id = ?', [workspaceId, programId, mesocycleId], principal.userId),
-    stampStatement(c.env.DB, 'mesocycles', 'workspace_id = ? AND program_id = ? AND id = ?', [workspaceId, programId, mesocycleId], principal.userId),
-    deleteStatement(c.env.DB, 'mesocycles', 'workspace_id = ? AND program_id = ? AND id = ?', [workspaceId, programId, mesocycleId]),
-  ]);
-  return data(c, { deleted: true });
-});
-
-programRoutes.get('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId/workouts', async (c) => {
-  const { workspaceId, programId, mesocycleId } = c.req.param();
-  await requireProgramRead(c, workspaceId, programId);
-  return data(c, await all(c.env.DB.prepare(
-    'SELECT * FROM workouts WHERE workspace_id = ? AND program_id = ? AND mesocycle_id = ? ORDER BY sort_order, day_offset, id',
-  ).bind(workspaceId, programId, mesocycleId)));
-});
-
-programRoutes.post('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId/workouts', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, mesocycleId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  const body = await parseJson(c, z.object({
-    name: z.string().trim().min(1), dayOffset: z.number().int().nonnegative(), notes: z.string().optional(), sortOrder: z.number().int().default(0),
-  }));
-  const id = newId(); const timestamp = now();
-  await c.env.DB.prepare(
-    `INSERT INTO workouts
-     (id, workspace_id, program_id, mesocycle_id, name, day_offset, notes, sort_order, version, created_at, updated_at, updated_by_user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-  ).bind(id, workspaceId, programId, mesocycleId, body.name, body.dayOffset, body.notes || null, body.sortOrder, timestamp, timestamp, principal.userId).run();
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM workouts WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, id)), 201);
-});
-
-programRoutes.post('/workspaces/:workspaceId/programs/:programId/mesocycles/:mesocycleId/generate', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, mesocycleId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  const body = await parseJson(c, z.object({ workouts: z.array(z.object({ name: z.string().trim().min(1), dayOffset: z.number().int().nonnegative(), notes: z.string().max(4000).optional() })).min(1).max(30) }));
-  const timestamp = now(); const ids: string[] = [];
-  const statements = body.workouts.map((workout, index) => { const id = newId(); ids.push(id); return c.env.DB.prepare(`INSERT INTO workouts
-    (id, workspace_id, program_id, mesocycle_id, name, day_offset, notes, sort_order, version, created_at, updated_at, updated_by_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`).bind(id, workspaceId, programId, mesocycleId, workout.name, workout.dayOffset, workout.notes ?? null, index, timestamp, timestamp, principal.userId); });
-  statements.push(c.env.DB.prepare('UPDATE programs SET revision = revision + 1, updated_at = ?, updated_by_user_id = ? WHERE workspace_id = ? AND id = ?').bind(timestamp, principal.userId, workspaceId, programId));
-  await c.env.DB.batch(statements);
-  return data(c, await all(c.env.DB.prepare(`SELECT * FROM workouts WHERE workspace_id = ? AND program_id = ? AND id IN (${ids.map(() => '?').join(',')}) ORDER BY sort_order`).bind(workspaceId, programId, ...ids)), 201);
-});
-
-programRoutes.get('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId', async (c) => {
-  const { workspaceId, programId, workoutId } = c.req.param();
-  await requireProgramRead(c, workspaceId, programId);
-  const workout = await first(c.env.DB.prepare('SELECT * FROM workouts WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, workoutId));
-  if (!workout) throw new ApiError(404, 'not_found', 'Workout not found.');
-  const blocks = await all<Record<string, unknown>>(c.env.DB.prepare(
-    `SELECT we.*, e.name AS exercise_name, e.notes AS exercise_notes, e.exercise_type,
-       ev.name AS variation_name, eg.name AS group_name
-     FROM workout_exercises we JOIN exercises e ON e.id = we.exercise_id
-     JOIN exercise_groups eg ON eg.id = e.exercise_group_id
-     LEFT JOIN exercise_variations ev ON ev.id = we.exercise_variation_id
-     WHERE we.workspace_id = ? AND we.program_id = ? AND we.workout_id = ? ORDER BY we.exercise_order`,
-  ).bind(workspaceId, programId, workoutId));
-  for (const block of blocks) {
-    const tableName = block.exercise_type === 'cardio' ? 'cardio_sets' : 'strength_sets';
-    block.sets = await all(c.env.DB.prepare(
-      `SELECT * FROM ${tableName} WHERE workspace_id = ? AND program_id = ? AND workout_exercise_id = ? ORDER BY set_number`,
-    ).bind(workspaceId, programId, block.id));
-  }
-  return data(c, { ...workout as Record<string, unknown>, exercise_blocks: blocks });
-});
-
-programRoutes.patch('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, workoutId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  const body = await parseJson(c, z.object({
-    name: z.string().trim().min(1), dayOffset: z.number().int().nonnegative(), notes: z.string().optional(),
-    sortOrder: z.number().int().default(0), version: z.number().int().positive(),
-  }));
-  const result = await c.env.DB.prepare(
-    `UPDATE workouts SET name = ?, day_offset = ?, notes = ?, sort_order = ?, version = version + 1,
-       updated_at = ?, updated_by_user_id = ? WHERE workspace_id = ? AND program_id = ? AND id = ? AND version = ?`,
-  ).bind(body.name, body.dayOffset, body.notes || null, body.sortOrder, now(), principal.userId, workspaceId, programId, workoutId, body.version).run();
-  if (!result.meta.changes) throw new ApiError(409, 'version_conflict', 'The workout changed since it was loaded.');
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM workouts WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, workoutId)));
-});
-
-programRoutes.delete('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, workoutId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  await c.env.DB.batch([
-    stampStatement(c.env.DB, 'strength_sets', 'workspace_id = ? AND program_id = ? AND workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id = ?)', [workspaceId, programId, workoutId], principal.userId),
-    stampStatement(c.env.DB, 'cardio_sets', 'workspace_id = ? AND program_id = ? AND workout_exercise_id IN (SELECT id FROM workout_exercises WHERE workout_id = ?)', [workspaceId, programId, workoutId], principal.userId),
-    stampStatement(c.env.DB, 'workout_exercises', 'workspace_id = ? AND program_id = ? AND workout_id = ?', [workspaceId, programId, workoutId], principal.userId),
-    stampStatement(c.env.DB, 'workouts', 'workspace_id = ? AND program_id = ? AND id = ?', [workspaceId, programId, workoutId], principal.userId),
-    deleteStatement(c.env.DB, 'workouts', 'workspace_id = ? AND program_id = ? AND id = ?', [workspaceId, programId, workoutId]),
-  ]);
-  return data(c, { deleted: true });
-});
-
-programRoutes.post('/workspaces/:workspaceId/programs/:programId/workouts/:workoutId/exercises', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, workoutId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  const body = await parseJson(c, z.object({
-    exerciseId: z.string(), exerciseVariationId: z.string().nullable().optional(), exerciseOrder: z.number().int().nonnegative(),
-  }));
-  const id = newId(); const timestamp = now();
-  await c.env.DB.prepare(
-    `INSERT INTO workout_exercises
-     (id, workspace_id, program_id, workout_id, exercise_id, exercise_variation_id, exercise_order, version, created_at, updated_at, updated_by_user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-  ).bind(id, workspaceId, programId, workoutId, body.exerciseId, body.exerciseVariationId ?? null, body.exerciseOrder, timestamp, timestamp, principal.userId).run();
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM workout_exercises WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, id)), 201);
-});
-
-programRoutes.delete('/workspaces/:workspaceId/programs/:programId/workout-exercises/:blockId', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, blockId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId);
-  await c.env.DB.batch([
-    stampStatement(c.env.DB, 'strength_sets', 'workspace_id = ? AND program_id = ? AND workout_exercise_id = ?', [workspaceId, programId, blockId], principal.userId),
-    stampStatement(c.env.DB, 'cardio_sets', 'workspace_id = ? AND program_id = ? AND workout_exercise_id = ?', [workspaceId, programId, blockId], principal.userId),
-    stampStatement(c.env.DB, 'workout_exercises', 'workspace_id = ? AND program_id = ? AND id = ?', [workspaceId, programId, blockId], principal.userId),
-    deleteStatement(c.env.DB, 'workout_exercises', 'workspace_id = ? AND program_id = ? AND id = ?', [workspaceId, programId, blockId]),
-  ]);
-  return data(c, { deleted: true });
-});
-
-const strengthSetInput = z.object({
-  setNumber: z.number().int().positive(), setType: z.enum(['warmup', 'normal', 'dropset', 'failure', 'rest-pause']).default('normal'),
-  plannedReps: z.number().int().nonnegative().nullable().optional(), plannedWeight: z.number().nonnegative().nullable().optional(),
-  targetRir: z.number().int().nonnegative().nullable().optional(), coachNotes: z.string().optional(), version: z.number().int().positive().optional(),
-});
-const cardioSetInput = z.object({
-  setNumber: z.number().int().positive(), plannedDurationSeconds: z.number().int().nonnegative().nullable().optional(),
-  plannedDistance: z.number().nonnegative().nullable().optional(), distanceUnit: z.enum(['mi', 'km', 'm']).nullable().optional(),
-  targetRpe: z.number().int().min(1).max(10).nullable().optional(), coachNotes: z.string().optional(), version: z.number().int().positive().optional(),
-});
-
-programRoutes.post('/workspaces/:workspaceId/programs/:programId/workout-exercises/:blockId/strength-sets', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, blockId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId); const body = await parseJson(c, strengthSetInput);
-  const id = newId(); const timestamp = now();
-  await c.env.DB.prepare(
-    `INSERT INTO strength_sets
-     (id, workspace_id, program_id, workout_exercise_id, set_number, set_type, planned_reps, planned_weight, target_rir, coach_notes, version, created_at, updated_at, updated_by_user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-  ).bind(id, workspaceId, programId, blockId, body.setNumber, body.setType, body.plannedReps ?? null, body.plannedWeight ?? null, body.targetRir ?? null, body.coachNotes || null, timestamp, timestamp, principal.userId).run();
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM strength_sets WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, id)), 201);
-});
-
-programRoutes.patch('/workspaces/:workspaceId/programs/:programId/strength-sets/:setId', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, setId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId); const body = await parseJson(c, strengthSetInput.extend({ version: z.number().int().positive() }));
-  const result = await c.env.DB.prepare(
-    `UPDATE strength_sets SET set_number = ?, set_type = ?, planned_reps = ?, planned_weight = ?, target_rir = ?, coach_notes = ?,
-       version = version + 1, updated_at = ?, updated_by_user_id = ?
-     WHERE workspace_id = ? AND program_id = ? AND id = ? AND version = ?`,
-  ).bind(body.setNumber, body.setType, body.plannedReps ?? null, body.plannedWeight ?? null, body.targetRir ?? null, body.coachNotes || null, now(), principal.userId, workspaceId, programId, setId, body.version).run();
-  if (!result.meta.changes) throw new ApiError(409, 'version_conflict', 'The set changed since it was loaded.');
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM strength_sets WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, setId)));
-});
-
-programRoutes.post('/workspaces/:workspaceId/programs/:programId/workout-exercises/:blockId/cardio-sets', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, blockId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId); const body = await parseJson(c, cardioSetInput);
-  const id = newId(); const timestamp = now();
-  await c.env.DB.prepare(
-    `INSERT INTO cardio_sets
-     (id, workspace_id, program_id, workout_exercise_id, set_number, planned_duration_seconds, planned_distance, distance_unit, target_rpe, coach_notes, version, created_at, updated_at, updated_by_user_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
-  ).bind(id, workspaceId, programId, blockId, body.setNumber, body.plannedDurationSeconds ?? null, body.plannedDistance ?? null, body.distanceUnit ?? null, body.targetRpe ?? null, body.coachNotes || null, timestamp, timestamp, principal.userId).run();
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM cardio_sets WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, id)), 201);
-});
-
-programRoutes.patch('/workspaces/:workspaceId/programs/:programId/cardio-sets/:setId', async (c) => {
-  const principal = c.get('principal'); const { workspaceId, programId, setId } = c.req.param();
-  await requireProgramEdit(c, workspaceId, programId); const body = await parseJson(c, cardioSetInput.extend({ version: z.number().int().positive() }));
-  const result = await c.env.DB.prepare(
-    `UPDATE cardio_sets SET set_number = ?, planned_duration_seconds = ?, planned_distance = ?, distance_unit = ?, target_rpe = ?, coach_notes = ?,
-       version = version + 1, updated_at = ?, updated_by_user_id = ?
-     WHERE workspace_id = ? AND program_id = ? AND id = ? AND version = ?`,
-  ).bind(body.setNumber, body.plannedDurationSeconds ?? null, body.plannedDistance ?? null, body.distanceUnit ?? null, body.targetRpe ?? null, body.coachNotes || null, now(), principal.userId, workspaceId, programId, setId, body.version).run();
-  if (!result.meta.changes) throw new ApiError(409, 'version_conflict', 'The set changed since it was loaded.');
-  return data(c, await first(c.env.DB.prepare('SELECT * FROM cardio_sets WHERE workspace_id = ? AND program_id = ? AND id = ?').bind(workspaceId, programId, setId)));
-});
-
-for (const [path, tableName] of [
-  ['/workspaces/:workspaceId/programs/:programId/strength-sets/:setId', 'strength_sets'],
-  ['/workspaces/:workspaceId/programs/:programId/cardio-sets/:setId', 'cardio_sets'],
-] as const) {
-  programRoutes.delete(path, async (c) => {
-    const principal = c.get('principal'); const { workspaceId, programId, setId } = c.req.param();
-    await requireProgramEdit(c, workspaceId, programId);
-    await c.env.DB.batch([
-      stampStatement(c.env.DB, tableName, 'workspace_id = ? AND program_id = ? AND id = ?', [workspaceId, programId, setId], principal.userId),
-      deleteStatement(c.env.DB, tableName, 'workspace_id = ? AND program_id = ? AND id = ?', [workspaceId, programId, setId]),
-    ]);
-    return data(c, { deleted: true });
-  });
-}
-
+const strengthPlan = z.object({ setNumber: z.number().int().positive(), setType: z.enum(['warmup', 'normal', 'dropset', 'failure', 'rest-pause']).default('normal'), plannedReps: z.number().int().nonnegative().nullable().optional(), plannedWeight: z.number().nonnegative().nullable().optional(), targetRir: z.number().int().nonnegative().nullable().optional(), coachNotes: z.string().optional() });
+const strengthActual = z.object({ actualReps: z.number().int().nonnegative().nullable().optional(), actualWeight: z.number().nonnegative().nullable().optional(), actualRir: z.number().int().nonnegative().nullable().optional(), athleteNotes: z.string().optional(), version: z.number().int().positive() });
+const cardioPlan = z.object({ setNumber: z.number().int().positive(), plannedDurationSeconds: z.number().int().nonnegative().nullable().optional(), plannedDistance: z.number().nonnegative().nullable().optional(), distanceUnit: z.enum(['mi', 'km', 'm']).nullable().optional(), targetRpe: z.number().int().min(1).max(10).nullable().optional(), coachNotes: z.string().optional() });
+const cardioActual = z.object({ actualDurationSeconds: z.number().int().nonnegative().nullable().optional(), actualDistance: z.number().nonnegative().nullable().optional(), actualRpe: z.number().int().min(1).max(10).nullable().optional(), athleteNotes: z.string().optional(), version: z.number().int().positive() });
+programRoutes.post('/workspaces/:workspaceId/programs/:programId/workout-exercises/:blockId/strength-sets', async (c) => { const { workspaceId, programId, blockId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, strengthPlan); const id = newId(), t = now(); await c.env.DB.prepare(`INSERT INTO strength_sets (id,workspace_id,program_id,workout_exercise_id,set_number,set_type,planned_reps,planned_weight,target_rir,coach_notes,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?)`).bind(id, workspaceId, programId, blockId, b.setNumber, b.setType, b.plannedReps ?? null, b.plannedWeight ?? null, b.targetRir ?? null, b.coachNotes ?? null, t, t, p.userId).run(); return data(c, await first(c.env.DB.prepare('SELECT * FROM strength_sets WHERE id=?').bind(id)), 201); });
+programRoutes.patch('/workspaces/:workspaceId/programs/:programId/strength-sets/:setId/plan', async (c) => { const { workspaceId, programId, setId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, strengthPlan.extend({ version: z.number().int().positive() })); const r = await c.env.DB.prepare(`UPDATE strength_sets SET set_number=?,set_type=?,planned_reps=?,planned_weight=?,target_rir=?,coach_notes=?,version=version+1,updated_at=?,updated_by_user_id=? WHERE workspace_id=? AND program_id=? AND id=? AND version=?`).bind(b.setNumber, b.setType, b.plannedReps ?? null, b.plannedWeight ?? null, b.targetRir ?? null, b.coachNotes ?? null, now(), p.userId, workspaceId, programId, setId, b.version).run(); if (!r.meta.changes) throw new ApiError(409, 'version_conflict', 'The set changed since it was loaded.'); return data(c, await first(c.env.DB.prepare('SELECT * FROM strength_sets WHERE id=?').bind(setId))); });
+programRoutes.patch('/workspaces/:workspaceId/programs/:programId/strength-sets/:setId/execution', async (c) => { const { workspaceId, programId, setId } = c.req.param(); const p = c.get('principal'); await requireExecution(c, workspaceId, programId); const b = await parseJson(c, strengthActual); const r = await c.env.DB.prepare(`UPDATE strength_sets SET actual_reps=?,actual_weight=?,actual_rir=?,athlete_notes=?,version=version+1,updated_at=?,updated_by_user_id=? WHERE workspace_id=? AND program_id=? AND id=? AND version=?`).bind(b.actualReps ?? null, b.actualWeight ?? null, b.actualRir ?? null, b.athleteNotes ?? null, now(), p.userId, workspaceId, programId, setId, b.version).run(); if (!r.meta.changes) throw new ApiError(409, 'version_conflict', 'The set changed since it was loaded.'); return data(c, await first(c.env.DB.prepare('SELECT * FROM strength_sets WHERE id=?').bind(setId))); });
+programRoutes.post('/workspaces/:workspaceId/programs/:programId/workout-exercises/:blockId/cardio-sets', async (c) => { const { workspaceId, programId, blockId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, cardioPlan); const id = newId(), t = now(); await c.env.DB.prepare(`INSERT INTO cardio_sets (id,workspace_id,program_id,workout_exercise_id,set_number,planned_duration_seconds,planned_distance,distance_unit,target_rpe,coach_notes,version,created_at,updated_at,updated_by_user_id) VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?)`).bind(id, workspaceId, programId, blockId, b.setNumber, b.plannedDurationSeconds ?? null, b.plannedDistance ?? null, b.distanceUnit ?? null, b.targetRpe ?? null, b.coachNotes ?? null, t, t, p.userId).run(); return data(c, await first(c.env.DB.prepare('SELECT * FROM cardio_sets WHERE id=?').bind(id)), 201); });
+programRoutes.patch('/workspaces/:workspaceId/programs/:programId/cardio-sets/:setId/plan', async (c) => { const { workspaceId, programId, setId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); const b = await parseJson(c, cardioPlan.extend({ version: z.number().int().positive() })); const r = await c.env.DB.prepare(`UPDATE cardio_sets SET set_number=?,planned_duration_seconds=?,planned_distance=?,distance_unit=?,target_rpe=?,coach_notes=?,version=version+1,updated_at=?,updated_by_user_id=? WHERE workspace_id=? AND program_id=? AND id=? AND version=?`).bind(b.setNumber, b.plannedDurationSeconds ?? null, b.plannedDistance ?? null, b.distanceUnit ?? null, b.targetRpe ?? null, b.coachNotes ?? null, now(), p.userId, workspaceId, programId, setId, b.version).run(); if (!r.meta.changes) throw new ApiError(409, 'version_conflict', 'The set changed since it was loaded.'); return data(c, await first(c.env.DB.prepare('SELECT * FROM cardio_sets WHERE id=?').bind(setId))); });
+programRoutes.patch('/workspaces/:workspaceId/programs/:programId/cardio-sets/:setId/execution', async (c) => { const { workspaceId, programId, setId } = c.req.param(); const p = c.get('principal'); await requireExecution(c, workspaceId, programId); const b = await parseJson(c, cardioActual); const r = await c.env.DB.prepare(`UPDATE cardio_sets SET actual_duration_seconds=?,actual_distance=?,actual_rpe=?,athlete_notes=?,version=version+1,updated_at=?,updated_by_user_id=? WHERE workspace_id=? AND program_id=? AND id=? AND version=?`).bind(b.actualDurationSeconds ?? null, b.actualDistance ?? null, b.actualRpe ?? null, b.athleteNotes ?? null, now(), p.userId, workspaceId, programId, setId, b.version).run(); if (!r.meta.changes) throw new ApiError(409, 'version_conflict', 'The set changed since it was loaded.'); return data(c, await first(c.env.DB.prepare('SELECT * FROM cardio_sets WHERE id=?').bind(setId))); });
+for (const [path, table] of [['strength-sets', 'strength_sets'], ['cardio-sets', 'cardio_sets']] as const) programRoutes.delete(`/workspaces/:workspaceId/programs/:programId/${path}/:setId`, async (c) => { const { workspaceId, programId, setId } = c.req.param(); const p = c.get('principal'); await requirePlan(c, workspaceId, programId); await c.env.DB.batch([stampStatement(c.env.DB, table, 'workspace_id=? AND program_id=? AND id=?', [workspaceId, programId, setId], p.userId), deleteStatement(c.env.DB, table, 'workspace_id=? AND program_id=? AND id=?', [workspaceId, programId, setId])]); return data(c, { deleted: true }); });
 programRoutes.get('/workspaces/:workspaceId/programs/:programId/summary', async (c) => {
-  const { workspaceId, programId } = c.req.param(); await requireProgramRead(c, workspaceId, programId);
-  const counts = await first(c.env.DB.prepare(
+  const { workspaceId, programId } = c.req.param();
+  await requireRead(c, workspaceId, programId);
+  const summary = await first(c.env.DB.prepare(
     `SELECT
-      (SELECT COUNT(*) FROM mesocycles WHERE workspace_id = ? AND program_id = ?) AS mesocycles,
-      (SELECT COUNT(*) FROM workouts WHERE workspace_id = ? AND program_id = ?) AS workouts,
-      (SELECT COUNT(*) FROM workout_exercises WHERE workspace_id = ? AND program_id = ?) AS exercises,
-      (SELECT COUNT(*) FROM strength_sets WHERE workspace_id = ? AND program_id = ?) +
-      (SELECT COUNT(*) FROM cardio_sets WHERE workspace_id = ? AND program_id = ?) AS total_sets,
-      (SELECT COUNT(*) FROM workout_sessions WHERE workspace_id = ? AND program_id = ? AND status = 'completed') AS completed_sessions`,
-  ).bind(workspaceId, programId, workspaceId, programId, workspaceId, programId, workspaceId, programId, workspaceId, programId, workspaceId, programId));
-  return data(c, counts);
+       (SELECT COUNT(*) FROM mesocycles WHERE workspace_id=? AND program_id=?) AS mesocycles,
+       (SELECT COUNT(*) FROM workouts WHERE workspace_id=? AND program_id=?) AS workouts,
+       (SELECT COUNT(*) FROM workout_exercises WHERE workspace_id=? AND program_id=?) AS exercises,
+       (SELECT COUNT(*) FROM strength_sets WHERE workspace_id=? AND program_id=?) +
+       (SELECT COUNT(*) FROM cardio_sets WHERE workspace_id=? AND program_id=?) AS total_sets`,
+  ).bind(workspaceId, programId, workspaceId, programId, workspaceId, programId, workspaceId, programId, workspaceId, programId));
+  return data(c, summary);
 });

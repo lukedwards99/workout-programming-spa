@@ -28,8 +28,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     const stored = window.localStorage.getItem(workspaceStorageKey);
-    const selected = next.memberships.find((item) => item.workspaceId === stored && item.status === 'active')
-      ?? next.memberships.find((item) => item.status === 'active')
+    const selected = next.availableWorkspaces.find((item) => item.workspaceId === stored && item.status === 'active')
+      ?? next.availableWorkspaces.find((item) => item.status === 'active')
       ?? null;
     setWorkspaceIdState(selected?.workspaceId ?? null);
   }, []);
@@ -57,7 +57,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [applyPrincipal]);
 
   const setWorkspaceId = useCallback((next: string) => {
-    if (!principal?.memberships.some((item) => item.workspaceId === next && item.status === 'active')) return;
+    if (!principal?.availableWorkspaces.some((item) => item.workspaceId === next && item.status === 'active')) return;
     window.localStorage.setItem(workspaceStorageKey, next);
     setWorkspaceIdState(next);
   }, [principal]);
@@ -71,4 +71,3 @@ export function useSession() {
   if (!value) throw new Error('useSession must be used inside SessionProvider.');
   return value;
 }
-

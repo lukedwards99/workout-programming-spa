@@ -15,6 +15,13 @@ export interface AuthPrincipal {
   providerSubject: string;
   platformRoles: string[];
   memberships: WorkspaceMembership[];
+  availableWorkspaces: Array<{
+    workspaceId: string;
+    workspaceName: string;
+    role: 'admin' | 'owner' | 'coach' | 'client';
+    status: 'active' | 'suspended';
+    isMember: boolean;
+  }>;
 }
 
 export interface LocalUser {
@@ -31,13 +38,8 @@ export interface Program {
   owner_name?: string;
   name: string;
   notes: string | null;
-  kind: 'personal' | 'template' | 'assigned';
-  status: 'draft' | 'active' | 'completed';
   visibility: 'current' | 'archived';
   revision: number;
-  client_user_id?: string | null;
-  client_name?: string | null;
-  assignment_status?: 'active' | 'completed' | null;
   created_at: string;
   updated_at: string;
   updated_by_user_id: string | null;
@@ -105,9 +107,13 @@ export interface StrengthSet {
   set_number: number;
   set_type: 'warmup' | 'normal' | 'dropset' | 'failure' | 'rest-pause';
   planned_reps: number | null;
+  actual_reps: number | null;
   planned_weight: number | null;
+  actual_weight: number | null;
   target_rir: number | null;
+  actual_rir: number | null;
   coach_notes: string | null;
+  athlete_notes: string | null;
   version: number;
 }
 
@@ -115,10 +121,14 @@ export interface CardioSet {
   id: string;
   set_number: number;
   planned_duration_seconds: number | null;
+  actual_duration_seconds: number | null;
   planned_distance: number | null;
+  actual_distance: number | null;
   distance_unit: 'mi' | 'km' | 'm' | null;
   target_rpe: number | null;
+  actual_rpe: number | null;
   coach_notes: string | null;
+  athlete_notes: string | null;
   version: number;
 }
 
@@ -136,24 +146,4 @@ export interface WorkoutExerciseBlock {
 
 export interface WorkoutDetail extends Workout {
   exercise_blocks: WorkoutExerciseBlock[];
-}
-
-export interface StrengthSetResult {
-  id: string;
-  strength_set_id: string;
-  actual_reps: number | null;
-  actual_weight: number | null;
-  actual_rir: number | null;
-  athlete_notes: string | null;
-  version: number;
-}
-
-export interface CardioSetResult {
-  id: string;
-  cardio_set_id: string;
-  actual_duration_seconds: number | null;
-  actual_distance: number | null;
-  actual_rpe: number | null;
-  athlete_notes: string | null;
-  version: number;
 }

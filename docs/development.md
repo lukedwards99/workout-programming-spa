@@ -13,7 +13,12 @@ The schema lives in `migrations/`. Local seed personas live in `seed/local.sql`.
 - `npm run typecheck` checks React, Worker, and test TypeScript.
 - `npm run build` produces the Worker and client bundle.
 - `npm run test:worker` runs isolated Worker/D1 tests.
-- `npm run test:e2e` creates an isolated workspace and personas for each parallel Playwright test.
+- `npm run db:reset:local` intentionally resets and reseeds the normal local D1 database.
+- `npm run test:e2e` resets `.wrangler/e2e`, then creates an isolated workspace and personas for each parallel Playwright test. It never writes test users to normal local D1 state.
+
+## Programming model
+
+Programs contain mesocycles, mesocycles contain workouts, and workouts contain exercise blocks and sets. Planned and executed values share each strength or cardio set row. There is no workout lifecycle. Program, mesocycle, and workout copy operations create independent rows and require an explicit `includeExecutedValues` choice.
 
 ## Authentication boundary
 

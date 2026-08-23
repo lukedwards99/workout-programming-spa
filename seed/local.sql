@@ -55,7 +55,6 @@ VALUES
   ('variation-run-outdoor', 'workspace-local', 'exercise-run', 'Outdoor', 1, 'user-admin');
 
 INSERT OR IGNORE INTO programs
-  (id, workspace_id, owner_user_id, name, notes, kind, status, visibility, revision, updated_by_user_id)
+  (id, workspace_id, owner_user_id, name, notes, visibility, revision, updated_by_user_id)
 VALUES
-  ('program-local-template', 'workspace-local', 'user-coach', 'Local Starter Program', 'A template ready to assign during local development.', 'template', 'active', 'current', 1, 'user-admin');
-
+  ('program-local', 'workspace-local', 'user-coach', 'Local Starter Program', 'A starter program for local development.', 'current', 1, 'user-admin');

@@ -33,7 +33,7 @@ sessionRoutes.post('/testing/fixtures', async (c) => {
   const body = await parseJson(c, z.object({ label: z.string().trim().min(1).max(80).optional() }));
   const suffix = newId(); const timestamp = now(); const label = body.label || 'Playwright';
   const workspaceId = `workspace-${suffix}`; const ownerId = `owner-${suffix}`; const coachId = `coach-${suffix}`; const clientId = `client-${suffix}`;
-  const relationshipId = newId(); const groupId = newId(); const exerciseId = newId(); const variationId = newId(); const templateId = newId();
+  const relationshipId = newId(); const groupId = newId(); const exerciseId = newId(); const variationId = newId(); const programId = newId();
   const users = [
     [ownerId, `${suffix}.owner@example.test`, `${label} Owner`],
     [coachId, `${suffix}.coach@example.test`, `${label} Coach`],
@@ -64,11 +64,10 @@ sessionRoutes.post('/testing/fixtures', async (c) => {
     c.env.DB.prepare(`INSERT INTO exercise_groups (id, workspace_id, name, notes, created_at, updated_at, updated_by_user_id) VALUES (?, ?, 'Strength', NULL, ?, ?, ?)`).bind(groupId, workspaceId, timestamp, timestamp, ownerId),
     c.env.DB.prepare(`INSERT INTO exercises (id, workspace_id, exercise_group_id, name, exercise_type, tutorial_url, notes, version, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, 'Back Squat', 'strength', NULL, NULL, 1, ?, ?, ?)`).bind(exerciseId, workspaceId, groupId, timestamp, timestamp, ownerId),
     c.env.DB.prepare(`INSERT INTO exercise_variations (id, workspace_id, exercise_id, name, is_primary, tutorial_url, notes, version, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, 'Barbell', 1, NULL, NULL, 1, ?, ?, ?)`).bind(variationId, workspaceId, exerciseId, timestamp, timestamp, ownerId),
-    c.env.DB.prepare(`INSERT INTO programs (id, workspace_id, owner_user_id, name, notes, kind, status, visibility, revision, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, 'Beta Template', NULL, 'template', 'draft', 'current', 1, ?, ?, ?)`).bind(templateId, workspaceId, coachId, timestamp, timestamp, ownerId),
-    c.env.DB.prepare(`INSERT INTO program_members (workspace_id, program_id, user_id, access_level, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, 'editor', ?, ?, ?)`).bind(workspaceId, templateId, coachId, timestamp, timestamp, ownerId),
+    c.env.DB.prepare(`INSERT INTO programs (id, workspace_id, owner_user_id, name, notes, visibility, revision, created_at, updated_at, updated_by_user_id) VALUES (?, ?, ?, 'Beta Program', NULL, 'current', 1, ?, ?, ?)`).bind(programId, workspaceId, coachId, timestamp, timestamp, ownerId),
   );
   await c.env.DB.batch(statements);
-  return data(c, { workspaceId, ownerId, coachId, clientId, templateId }, 201);
+  return data(c, { workspaceId, ownerId, coachId, clientId, programId }, 201);
 });
 
 sessionRoutes.post('/local-auth/session', async (c) => {

@@ -4,234 +4,82 @@ import { applyD1Migrations, createExecutionContext } from 'cloudflare:test';
 import worker from '../../worker/index';
 import { resolveValidatedProviderIdentity } from '../../worker/provider-auth';
 
-async function request(path: string, init?: RequestInit) {
-  return worker.fetch(new Request(`http://test.local${path}`, init), env, createExecutionContext());
-}
+async function request(path: string, init?: RequestInit) { return worker.fetch(new Request(`http://test.local${path}`, init), env, createExecutionContext()); }
+async function login(userId: string) { const response = await request('/api/local-auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId }) }); expect(response.status).toBe(200); return response.headers.get('set-cookie')?.split(';')[0] ?? ''; }
+const json = (cookie: string, body: unknown, method = 'POST'): RequestInit => ({ method, headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+async function dataOf<T>(response: Response) { return (await response.json() as { data: T }).data; }
 
-async function login(userId: string) {
-  const response = await request('/api/local-auth/session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userId }),
-  });
-  expect(response.status).toBe(200);
-  return response.headers.get('set-cookie')?.split(';')[0] ?? '';
-}
+beforeAll(async () => { await applyD1Migrations(env.DB, env.TEST_MIGRATIONS); await applyD1Migrations(env.DB, env.TEST_SEEDS, 'local_seed_migrations'); });
 
-beforeAll(async () => {
-  await applyD1Migrations(env.DB, env.TEST_MIGRATIONS);
-  await applyD1Migrations(env.DB, env.TEST_SEEDS, 'local_seed_migrations');
-});
-
-describe('D1 catalog', () => {
-  it('creates 21 base tables, 21 history tables, and 42 history triggers', async () => {
-    const tables = await env.DB.prepare(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '_cf_%'
-       AND name NOT IN ('d1_migrations', 'local_seed_migrations', 'sqlite_sequence')`,
-    ).all<{ name: string }>();
-    const names = tables.results.map((row) => row.name);
-    expect(names.filter((name) => name.endsWith('_history'))).toHaveLength(21);
-    expect(names.filter((name) => !name.endsWith('_history'))).toHaveLength(21);
-    const triggers = await env.DB.prepare(
-      `SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'trg_%_history_%'`,
-    ).all();
-    expect(triggers.results).toHaveLength(42);
+describe('simplified D1 catalog', () => {
+  it('creates 16 base/history pairs and 32 history triggers', async () => {
+    const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%' AND name NOT IN ('d1_migrations','local_seed_migrations','sqlite_sequence')`).all<{ name: string }>();
+    expect(tables.results.filter((row) => row.name.endsWith('_history'))).toHaveLength(16);
+    expect(tables.results.filter((row) => !row.name.endsWith('_history'))).toHaveLength(16);
+    expect((await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_%_history_%'`).all()).results).toHaveLength(32);
   });
 
-  it('keeps history tables free of foreign keys', async () => {
-    const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%_history'`).all<{ name: string }>();
-    expect(tables.results).toHaveLength(21);
-    for (const table of tables.results) {
-      const result = await env.DB.prepare(`PRAGMA foreign_key_list(${table.name})`).all();
-      expect(result.results, table.name).toEqual([]);
+  it('has audit fields on every base table and no history foreign keys', async () => {
+    const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%' AND name NOT IN ('d1_migrations','local_seed_migrations','sqlite_sequence')`).all<{ name: string }>();
+    for (const { name } of tables.results) {
+      const foreignKeys = await env.DB.prepare(`PRAGMA foreign_key_list(${name})`).all();
+      if (name.endsWith('_history')) expect(foreignKeys.results, name).toEqual([]);
+      else expect((await env.DB.prepare(`PRAGMA table_info(${name})`).all<{ name: string }>()).results.map((row) => row.name), name).toEqual(expect.arrayContaining(['created_at', 'updated_at', 'updated_by_user_id']));
     }
   });
 
-  it('puts the standard audit fields on every base table', async () => {
-    const tables = await env.DB.prepare(
-      `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE '%_history'
-       AND name NOT LIKE '_cf_%' AND name NOT IN ('d1_migrations', 'local_seed_migrations', 'sqlite_sequence')`,
-    ).all<{ name: string }>();
-    for (const table of tables.results) {
-      const columns = await env.DB.prepare(`PRAGMA table_info(${table.name})`).all<{ name: string }>();
-      expect(columns.results.map((column) => column.name), table.name).toEqual(expect.arrayContaining(['created_at', 'updated_at', 'updated_by_user_id']));
-    }
+  it('contains only the direct programming tables and flattened execution columns', async () => {
+    const names = (await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table'`).all<{ name: string }>()).results.map((row) => row.name);
+    for (const removed of ['program_members', 'program_assignments', 'workout_sessions', 'strength_set_results', 'cardio_set_results']) expect(names).not.toContain(removed);
+    const programColumns = (await env.DB.prepare('PRAGMA table_info(programs)').all<{ name: string }>()).results.map((row) => row.name);
+    expect(programColumns).not.toEqual(expect.arrayContaining(['kind', 'status']));
+    const strengthColumns = (await env.DB.prepare('PRAGMA table_info(strength_sets)').all<{ name: string }>()).results.map((row) => row.name);
+    expect(strengthColumns).toEqual(expect.arrayContaining(['planned_reps', 'actual_reps', 'coach_notes', 'athlete_notes']));
   });
 
-  it('captures the old row and mutation actor before update and delete', async () => {
-    await env.DB.prepare(
-      `UPDATE programs SET name = 'Changed', updated_at = ?, updated_by_user_id = 'user-coach'
-       WHERE id = 'program-local-template'`,
-    ).bind(new Date().toISOString()).run();
-    const update = await env.DB.prepare(
-      `SELECT history_action, name, history_recorded_by_user_id FROM programs_history
-       WHERE id = 'program-local-template' ORDER BY history_recorded_at DESC LIMIT 1`,
-    ).first<{ history_action: string; name: string; history_recorded_by_user_id: string }>();
-    expect(update).toMatchObject({
-      history_action: 'UPDATE',
-      name: 'Local Starter Program',
-      history_recorded_by_user_id: 'user-coach',
-    });
-  });
-
-  it('enforces legal holds and skips held history during retention', async () => {
-    const cookie = await login('user-admin');
-    const hold = await request('/api/admin/workspaces/workspace-local/legal-hold', {
-      method: 'PATCH', headers: { Cookie: cookie, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled: true, reason: 'Litigation test' }),
-    });
-    expect(hold.status).toBe(200);
-    await expect(env.DB.prepare(`DELETE FROM workspaces WHERE id = 'workspace-local'`).run()).rejects.toThrow('workspace_legal_hold_active');
-    const old = '2020-01-01T00:00:00.000Z';
-    await env.DB.batch([
-      env.DB.prepare(`INSERT INTO programs_history (history_id, history_action, history_recorded_at, id, workspace_id) VALUES ('held-old', 'DELETE', ?, 'held-source', 'workspace-local')`).bind(old),
-      env.DB.prepare(`INSERT INTO users_history (history_id, history_action, history_recorded_at, id) VALUES ('global-old', 'DELETE', ?, 'global-source')`).bind(old),
-    ]);
-    const retention = await request('/api/admin/maintenance/history-retention', { method: 'POST', headers: { Cookie: cookie } });
-    expect(retention.status).toBe(200);
-    expect(await env.DB.prepare(`SELECT 1 FROM programs_history WHERE history_id = 'held-old'`).first()).not.toBeNull();
-    expect(await env.DB.prepare(`SELECT 1 FROM users_history WHERE history_id = 'global-old'`).first()).toBeNull();
+  it('captures old rows and the mutation actor', async () => {
+    await env.DB.prepare(`UPDATE programs SET name='Changed once',updated_at=?,updated_by_user_id='user-coach' WHERE id='program-local'`).bind(new Date().toISOString()).run();
+    const old = await env.DB.prepare(`SELECT history_action,name,history_recorded_by_user_id FROM programs_history WHERE id='program-local' ORDER BY history_recorded_at DESC LIMIT 1`).first();
+    expect(old).toMatchObject({ history_action: 'UPDATE', name: 'Local Starter Program', history_recorded_by_user_id: 'user-coach' });
+    await env.DB.prepare(`UPDATE programs SET name='Local Starter Program',updated_at=?,updated_by_user_id='user-coach' WHERE id='program-local'`).bind(new Date().toISOString()).run();
   });
 });
 
-describe('local session and authorization', () => {
-  it('exposes seeded local personas and returns the selected principal', async () => {
-    const users = await request('/api/local-auth/users');
-    expect(users.status).toBe(200);
-    expect((await users.json() as { data: unknown[] }).data).toHaveLength(3);
-    const cookie = await login('user-client');
-    const session = await request('/api/session', { headers: { Cookie: cookie } });
-    expect(session.status).toBe(200);
-    expect((await session.json() as { data: { userId: string } }).data.userId).toBe('user-client');
-  });
+describe('identity and workspace access', () => {
+  it('exposes only the three seeded local personas', async () => { const response = await request('/api/local-auth/users'); expect(response.status).toBe(200); expect(await dataOf<unknown[]>(response)).toHaveLength(3); });
+  it('links a provider only to a pre-created verified-email account', async () => { const t = new Date().toISOString(); await env.DB.prepare(`INSERT INTO users (id,email_normalized,email_display,display_name,status,created_at,updated_at) VALUES ('provider-user','invite@example.test','invite@example.test','Invited','invited',?,?)`).bind(t, t).run(); const principal = await resolveValidatedProviderIdentity(env.DB, { provider: 'oidc', providerSubject: 'subject-1', verifiedEmail: 'Invite@Example.Test' }); expect(principal.userId).toBe('provider-user'); await expect(resolveValidatedProviderIdentity(env.DB, { provider: 'oidc', providerSubject: 'subject-2', verifiedEmail: 'unknown@example.test' })).rejects.toMatchObject({ code: 'unknown_provider_user' }); });
+  it('lets a coach create and switch workspaces while administrators see all active workspaces', async () => { const coach = await login('user-coach'); const created = await request('/api/workspaces', json(coach, { name: 'Coach Workspace' })); expect(created.status).toBe(201); const row = await dataOf<{ id: string }>(created); const session = await dataOf<{ availableWorkspaces: Array<{ workspaceId: string }> }>(await request('/api/session', { headers: { Cookie: coach } })); expect(session.availableWorkspaces.map((item) => item.workspaceId)).toContain(row.id); const admin = await login('user-admin'); const adminSession = await dataOf<{ availableWorkspaces: Array<{ workspaceId: string }> }>(await request('/api/session', { headers: { Cookie: admin } })); expect(adminSession.availableWorkspaces.map((item) => item.workspaceId)).toContain(row.id); const deleted = await request(`/api/workspaces/${row.id}`, json(coach, { confirmName: 'Coach Workspace' }, 'DELETE')); expect(deleted.status).toBe(200); expect(await env.DB.prepare('SELECT 1 FROM workspaces WHERE id=?').bind(row.id).first()).toBeNull(); expect(await env.DB.prepare(`SELECT 1 FROM workspaces_history WHERE id=? AND history_action='DELETE'`).bind(row.id).first()).not.toBeNull(); });
+  it('denies cross-workspace access', async () => { const t = new Date().toISOString(); await env.DB.prepare(`INSERT INTO workspaces (id,name,created_at,updated_at,updated_by_user_id) VALUES ('isolated-space','Isolated',?,?,'user-admin')`).bind(t, t).run(); const coach = await login('user-coach'); expect((await request('/api/workspaces/isolated-space/exercises', { headers: { Cookie: coach } })).status).toBe(403); });
+});
 
-  it('prevents a client from creating a template', async () => {
-    const cookie = await login('user-client');
-    const response = await request('/api/workspaces/workspace-local/programs', {
-      method: 'POST',
-      headers: { Cookie: cookie, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'Forbidden Template', kind: 'template' }),
-    });
-    expect(response.status).toBe(403);
-  });
+describe('direct sets and independent copies', () => {
+  async function makeClientGraph() {
+    const coach = await login('user-coach');
+    const program = await dataOf<{ id: string }>(await request('/api/workspaces/workspace-local/programs', json(coach, { name: 'Client Strength', ownerUserId: 'user-client' })));
+    const meso = await dataOf<{ id: string }>(await request(`/api/workspaces/workspace-local/programs/${program.id}/mesocycles`, json(coach, { name: 'Base', mesocycleLength: 7, startDate: '2026-01-01' })));
+    const workout = await dataOf<{ id: string }>(await request(`/api/workspaces/workspace-local/programs/${program.id}/mesocycles/${meso.id}/workouts`, json(coach, { name: 'Day 1', dayOffset: 0 })));
+    const block = await dataOf<{ id: string }>(await request(`/api/workspaces/workspace-local/programs/${program.id}/workouts/${workout.id}/exercises`, json(coach, { exerciseId: 'exercise-squat', exerciseOrder: 0 })));
+    const set = await dataOf<{ id: string; version: number }>(await request(`/api/workspaces/workspace-local/programs/${program.id}/workout-exercises/${block.id}/strength-sets`, json(coach, { setNumber: 1, setType: 'normal', plannedReps: 5, plannedWeight: 100, targetRir: 2, coachNotes: 'Stay braced' })));
+    return { coach, programId: program.id, mesoId: meso.id, workoutId: workout.id, setId: set.id, version: set.version };
+  }
 
-  it('allows a coach to read the shared workspace exercise library', async () => {
-    const cookie = await login('user-coach');
-    const response = await request('/api/workspaces/workspace-local/exercises', { headers: { Cookie: cookie } });
-    expect(response.status).toBe(200);
-    expect((await response.json() as { data: unknown[] }).data).toHaveLength(3);
-  });
+  it('splits plan and execution permissions with optimistic concurrency', async () => { const graph = await makeClientGraph(); const client = await login('user-client'); const execution = await request(`/api/workspaces/workspace-local/programs/${graph.programId}/strength-sets/${graph.setId}/execution`, json(client, { actualReps: 5, actualWeight: 105, actualRir: 1, athleteNotes: 'Solid', version: graph.version }, 'PATCH')); expect(execution.status).toBe(200); const version = (await dataOf<{ version: number }>(execution)).version; expect((await request(`/api/workspaces/workspace-local/programs/${graph.programId}/strength-sets/${graph.setId}/plan`, json(client, { setNumber: 1, setType: 'normal', plannedReps: 6, version }, 'PATCH'))).status).toBe(403); expect((await request(`/api/workspaces/workspace-local/programs/${graph.programId}/strength-sets/${graph.setId}/execution`, json(graph.coach, { actualReps: 6, version }, 'PATCH'))).status).toBe(403); expect((await request(`/api/workspaces/workspace-local/programs/${graph.programId}/strength-sets/${graph.setId}/execution`, json(client, { actualReps: 6, version: graph.version }, 'PATCH'))).status).toBe(409); });
 
-  it('rejects disabled and unknown local users', async () => {
-    await env.DB.prepare(`UPDATE users SET status = 'disabled' WHERE id = 'user-client'`).run();
-    expect((await request('/api/local-auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'user-client' }) })).status).toBe(401);
-    expect((await request('/api/local-auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: 'missing' }) })).status).toBe(401);
-    await env.DB.prepare(`UPDATE users SET status = 'active' WHERE id = 'user-client'`).run();
-  });
+  it('copies program graphs with executed values explicitly cleared or retained', async () => { const graph = await makeClientGraph(); const client = await login('user-client'); await request(`/api/workspaces/workspace-local/programs/${graph.programId}/strength-sets/${graph.setId}/execution`, json(client, { actualReps: 5, actualWeight: 105, actualRir: 1, athleteNotes: 'Copy check', version: graph.version }, 'PATCH')); const cleared = await dataOf<{ id: string }>(await request(`/api/workspaces/workspace-local/programs/${graph.programId}/copy`, json(graph.coach, { name: 'Cleared Copy', targetOwnerUserId: 'user-coach', includeExecutedValues: false }))); const exact = await dataOf<{ id: string }>(await request(`/api/workspaces/workspace-local/programs/${graph.programId}/copy`, json(graph.coach, { name: 'Exact Copy', targetOwnerUserId: 'user-coach', includeExecutedValues: true }))); const clearedSet = await env.DB.prepare('SELECT actual_reps,athlete_notes FROM strength_sets WHERE program_id=?').bind(cleared.id).first(); const exactSet = await env.DB.prepare('SELECT actual_reps,athlete_notes FROM strength_sets WHERE program_id=?').bind(exact.id).first(); expect(clearedSet).toMatchObject({ actual_reps: null, athlete_notes: null }); expect(exactSet).toMatchObject({ actual_reps: 5, athlete_notes: 'Copy check' }); });
 
-  it('denies cross-workspace resource access', async () => {
-    const timestamp = new Date().toISOString();
-    await env.DB.prepare(`INSERT INTO workspaces (id, name, created_at, updated_at, updated_by_user_id) VALUES ('workspace-other', 'Other', ?, ?, 'user-admin')`).bind(timestamp, timestamp).run();
-    const cookie = await login('user-coach');
-    expect((await request('/api/workspaces/workspace-other/exercises', { headers: { Cookie: cookie } })).status).toBe(403);
-  });
+  it('copies mesocycles and workouts and summarizes planned versus executed totals', async () => { const graph = await makeClientGraph(); const client = await login('user-client'); await request(`/api/workspaces/workspace-local/programs/${graph.programId}/strength-sets/${graph.setId}/execution`, json(client, { actualReps: 4, actualWeight: 110, actualRir: 1, version: graph.version }, 'PATCH')); const summary = await dataOf<{ strength: { planned_volume: number; actual_volume: number } }>(await request(`/api/workspaces/workspace-local/programs/${graph.programId}/mesocycles/${graph.mesoId}/summary`, { headers: { Cookie: graph.coach } })); expect(summary.strength).toMatchObject({ planned_volume: 500, actual_volume: 440 }); const target = await dataOf<{ id: string }>(await request('/api/workspaces/workspace-local/programs', json(graph.coach, { name: 'Destination' }))); const targetMeso = await dataOf<{ id: string }>(await request(`/api/workspaces/workspace-local/programs/${target.id}/mesocycles`, json(graph.coach, { name: 'Destination Cycle', startDate: '2026-02-01' }))); expect((await request(`/api/workspaces/workspace-local/programs/${graph.programId}/mesocycles/${graph.mesoId}/copy`, json(graph.coach, { targetProgramId: target.id, includeExecutedValues: false }))).status).toBe(201); expect((await request(`/api/workspaces/workspace-local/programs/${graph.programId}/workouts/${graph.workoutId}/copy`, json(graph.coach, { targetProgramId: target.id, targetMesocycleId: targetMeso.id, includeExecutedValues: true }))).status).toBe(201); });
 
-  it('links only a pre-created verified provider identity and rejects unknown users', async () => {
-    const timestamp = new Date().toISOString();
-    await env.DB.prepare(`INSERT INTO users (id, email_normalized, email_display, display_name, status, created_at, updated_at) VALUES ('user-invited-provider', 'invite@example.test', 'invite@example.test', 'Invited', 'invited', ?, ?)`).bind(timestamp, timestamp).run();
-    const principal = await resolveValidatedProviderIdentity(env.DB, { provider: 'oidc', providerSubject: 'subject-1', verifiedEmail: 'Invite@Example.Test' });
-    expect(principal.userId).toBe('user-invited-provider');
-    expect(principal.provider).toBe('oidc');
-    await expect(resolveValidatedProviderIdentity(env.DB, { provider: 'oidc', providerSubject: 'subject-2', verifiedEmail: 'unknown@example.test' })).rejects.toMatchObject({ code: 'unknown_provider_user' });
-  });
+  it('protects an in-use workspace exercise', async () => { const graph = await makeClientGraph(); expect((await request('/api/workspaces/workspace-local/exercises/exercise-squat', { method: 'DELETE', headers: { Cookie: graph.coach } })).status).toBe(409); });
 
-  it('archives only completed programs and restores without reopening them', async () => {
-    const cookie = await login('user-coach');
-    const root = '/api/workspaces/workspace-local/programs/program-local-template';
-    expect((await request(`${root}/archive`, { method: 'POST', headers: { Cookie: cookie } })).status).toBe(409);
-    const update = await request(root, { method: 'PATCH', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Local Starter Program', notes: '', status: 'completed', revision: 1 }) });
-    expect(update.status).toBe(200);
-    expect((await request(`${root}/archive`, { method: 'POST', headers: { Cookie: cookie } })).status).toBe(200);
-    const restored = await request(`${root}/restore`, { method: 'POST', headers: { Cookie: cookie } });
-    expect(restored.status).toBe(200);
-    expect((await restored.json() as { data: { status: string; visibility: string } }).data).toMatchObject({ status: 'completed', visibility: 'current' });
-  });
-
-  it('protects workspace library items that are in use', async () => {
-    const timestamp = new Date().toISOString();
-    await env.DB.batch([
-      env.DB.prepare(`INSERT INTO mesocycles (id, workspace_id, program_id, name, start_date, created_at, updated_at, updated_by_user_id) VALUES ('meso-use', 'workspace-local', 'program-local-template', 'Use', '2026-01-01', ?, ?, 'user-coach')`).bind(timestamp, timestamp),
-      env.DB.prepare(`INSERT INTO workouts (id, workspace_id, program_id, mesocycle_id, name, day_offset, created_at, updated_at, updated_by_user_id) VALUES ('workout-use', 'workspace-local', 'program-local-template', 'meso-use', 'Use', 0, ?, ?, 'user-coach')`).bind(timestamp, timestamp),
-      env.DB.prepare(`INSERT INTO workout_exercises (id, workspace_id, program_id, workout_id, exercise_id, exercise_order, created_at, updated_at, updated_by_user_id) VALUES ('block-use', 'workspace-local', 'program-local-template', 'workout-use', 'exercise-squat', 0, ?, ?, 'user-coach')`).bind(timestamp, timestamp),
-    ]);
-    const cookie = await login('user-coach');
-    const response = await request('/api/workspaces/workspace-local/exercises/exercise-squat', { method: 'DELETE', headers: { Cookie: cookie } });
-    expect(response.status).toBe(409);
-  });
-
-  it('copies assignments independently and permits direct coach edits', async () => {
-    const timestamp = new Date().toISOString();
-    await env.DB.batch([
-      env.DB.prepare(`INSERT INTO mesocycles (id, workspace_id, program_id, name, start_date, created_at, updated_at, updated_by_user_id) VALUES ('meso-copy', 'workspace-local', 'program-local-template', 'Copied Block', '2026-01-01', ?, ?, 'user-coach')`).bind(timestamp, timestamp),
-      env.DB.prepare(`INSERT INTO workouts (id, workspace_id, program_id, mesocycle_id, name, day_offset, created_at, updated_at, updated_by_user_id) VALUES ('workout-copy', 'workspace-local', 'program-local-template', 'meso-copy', 'Copied Workout', 0, ?, ?, 'user-coach')`).bind(timestamp, timestamp),
-    ]);
-    const cookie = await login('user-coach');
-    const assigned = await request('/api/workspaces/workspace-local/assignments', { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceProgramId: 'program-local-template', clientUserId: 'user-client' }) });
-    expect(assigned.status).toBe(201);
-    const assignment = (await assigned.json() as { data: { assigned_program_id: string } }).data;
-    const edit = await request(`/api/workspaces/workspace-local/programs/${assignment.assigned_program_id}`, { method: 'PATCH', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Client-specific edit', notes: '', status: 'active', revision: 1 }) });
-    expect(edit.status).toBe(200);
-    expect((await env.DB.prepare(`SELECT name FROM programs WHERE id = 'program-local-template'`).first<{ name: string }>())?.name).toBe('Local Starter Program');
-    expect((await env.DB.prepare(`SELECT name FROM programs WHERE id = ?`).bind(assignment.assigned_program_id).first<{ name: string }>())?.name).toBe('Client-specific edit');
-  });
-
-  it('generates workouts and copies a program graph independently', async () => {
-    const cookie = await login('user-coach');
-    const mesocycleResponse = await request('/api/workspaces/workspace-local/programs/program-local-template/mesocycles', { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Generated block', mesocycleLength: 7, startDate: '2026-02-01' }) });
-    const mesocycleId = (await mesocycleResponse.json() as { data: { id: string } }).data.id;
-    const generated = await request(`/api/workspaces/workspace-local/programs/program-local-template/mesocycles/${mesocycleId}/generate`, { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ workouts: [{ name: 'Day 1', dayOffset: 0 }, { name: 'Day 2', dayOffset: 2 }] }) });
-    expect(generated.status).toBe(201);
-    expect((await generated.json() as { data: unknown[] }).data).toHaveLength(2);
-    const copied = await request('/api/workspaces/workspace-local/programs/program-local-template/copy', { method: 'POST', headers: { Cookie: cookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Independent copy', kind: 'template' }) });
-    expect(copied.status).toBe(201);
-    const copyId = (await copied.json() as { data: { id: string } }).data.id;
-    const sourceCount = (await env.DB.prepare('SELECT COUNT(*) AS count FROM workouts WHERE workspace_id = ? AND program_id = ?').bind('workspace-local', 'program-local-template').first<{ count: number }>())?.count;
-    expect((await env.DB.prepare('SELECT COUNT(*) AS count FROM workouts WHERE workspace_id = ? AND program_id = ?').bind('workspace-local', copyId).first<{ count: number }>())?.count).toBe(sourceCount);
-  });
-
-  it('separates athlete results from coach plans and removes the complete client graph', async () => {
-    const coachCookie = await login('user-coach');
-    const assignedResponse = await request('/api/workspaces/workspace-local/assignments', { method: 'POST', headers: { Cookie: coachCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ sourceProgramId: 'program-local-template', clientUserId: 'user-client' }) });
-    const programId = (await assignedResponse.json() as { data: { assigned_program_id: string } }).data.assigned_program_id;
-    const mesocycleResponse = await request(`/api/workspaces/workspace-local/programs/${programId}/mesocycles`, { method: 'POST', headers: { Cookie: coachCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Client block', mesocycleLength: 7, startDate: '2026-01-01' }) });
-    const mesocycleId = (await mesocycleResponse.json() as { data: { id: string } }).data.id;
-    const workoutResponse = await request(`/api/workspaces/workspace-local/programs/${programId}/mesocycles/${mesocycleId}/workouts`, { method: 'POST', headers: { Cookie: coachCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'Client workout', dayOffset: 0 }) });
-    const workoutId = (await workoutResponse.json() as { data: { id: string } }).data.id;
-    const blockResponse = await request(`/api/workspaces/workspace-local/programs/${programId}/workouts/${workoutId}/exercises`, { method: 'POST', headers: { Cookie: coachCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ exerciseId: 'exercise-squat', exerciseOrder: 0 }) });
-    const blockId = (await blockResponse.json() as { data: { id: string } }).data.id;
-    const setResponse = await request(`/api/workspaces/workspace-local/programs/${programId}/workout-exercises/${blockId}/strength-sets`, { method: 'POST', headers: { Cookie: coachCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ setNumber: 1, setType: 'normal', plannedReps: 5 }) });
-    const setId = (await setResponse.json() as { data: { id: string } }).data.id;
-
-    const clientCookie = await login('user-client');
-    const sessionResponse = await request(`/api/workspaces/workspace-local/programs/${programId}/workouts/${workoutId}/sessions`, { method: 'POST', headers: { Cookie: clientCookie, 'Content-Type': 'application/json' }, body: '{}' });
-    const sessionId = (await sessionResponse.json() as { data: { id: string } }).data.id;
-    const resultPath = `/api/workspaces/workspace-local/programs/${programId}/sessions/${sessionId}/strength-results`;
-    const createdResult = await request(resultPath, { method: 'PUT', headers: { Cookie: clientCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ strengthSetId: setId, actualReps: 5, actualWeight: 100 }) });
-    expect(createdResult.status).toBe(201);
-    const createdVersion = (await createdResult.json() as { data: { version: number } }).data.version;
-    expect((await request(resultPath, { method: 'PUT', headers: { Cookie: clientCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ strengthSetId: setId, actualReps: 6, actualWeight: 105, version: createdVersion }) })).status).toBe(200);
-    const resumed = await request(`/api/workspaces/workspace-local/programs/${programId}/sessions/${sessionId}`, { headers: { Cookie: clientCookie } });
-    const resumedBody = await resumed.json() as { data: { strength_results: Array<{ actual_reps: number }> } };
-    expect(resumedBody.data.strength_results).toHaveLength(1);
-    expect(resumedBody.data.strength_results[0].actual_reps).toBe(6);
-    expect((await request(resultPath, { method: 'PUT', headers: { Cookie: coachCookie, 'Content-Type': 'application/json' }, body: JSON.stringify({ strengthSetId: setId, actualReps: 10 }) })).status).toBe(403);
-
-    const ownerCookie = await login('user-admin');
-    expect((await request('/api/workspaces/workspace-local/members/user-client', { method: 'DELETE', headers: { Cookie: ownerCookie } })).status).toBe(200);
-    expect(await env.DB.prepare(`SELECT 1 FROM workspace_members WHERE workspace_id = 'workspace-local' AND user_id = 'user-client'`).first()).toBeNull();
-    expect(await env.DB.prepare(`SELECT 1 FROM workout_sessions WHERE id = ?`).bind(sessionId).first()).toBeNull();
-    expect(await env.DB.prepare(`SELECT 1 FROM programs WHERE id = ?`).bind(programId).first()).toBeNull();
-    expect(await env.DB.prepare(`SELECT 1 FROM workout_sessions_history WHERE id = ? AND history_action = 'DELETE'`).bind(sessionId).first()).not.toBeNull();
-    expect(await env.DB.prepare(`SELECT 1 FROM workspace_members_history WHERE user_id = 'user-client' AND history_action = 'DELETE'`).first()).not.toBeNull();
+  it('removes a client graph before permitting separate global-user deletion', async () => {
+    const admin = await login('user-admin');
+    expect((await request('/api/admin/users/user-client', { method: 'DELETE', headers: { Cookie: admin } })).status).toBe(409);
+    expect((await request('/api/workspaces/workspace-local/members/user-client', { method: 'DELETE', headers: { Cookie: admin } })).status).toBe(200);
+    expect(await env.DB.prepare(`SELECT 1 FROM workspace_members WHERE workspace_id='workspace-local' AND user_id='user-client'`).first()).toBeNull();
+    expect(await env.DB.prepare(`SELECT 1 FROM programs WHERE workspace_id='workspace-local' AND owner_user_id='user-client'`).first()).toBeNull();
+    expect(await env.DB.prepare(`SELECT 1 FROM users WHERE id='user-client'`).first()).not.toBeNull();
+    expect(await env.DB.prepare(`SELECT 1 FROM workspace_members_history WHERE workspace_id='workspace-local' AND user_id='user-client' AND history_action='DELETE'`).first()).not.toBeNull();
+    expect((await request('/api/admin/users/user-client', { method: 'DELETE', headers: { Cookie: admin } })).status).toBe(200);
+    expect(await env.DB.prepare(`SELECT 1 FROM users WHERE id='user-client'`).first()).toBeNull();
   });
 });

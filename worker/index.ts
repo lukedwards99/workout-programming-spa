@@ -6,8 +6,7 @@ import { sessionRoutes } from './routes/session';
 import { adminRoutes } from './routes/admin';
 import { libraryRoutes } from './routes/library';
 import { programRoutes } from './routes/programs';
-import { assignmentRoutes } from './routes/assignments';
-import { trainingSessionRoutes } from './routes/sessions';
+import { clientRoutes } from './routes/clients';
 import { runHistoryRetention } from './maintenance';
 
 const app = new Hono<AppEnv>();
@@ -19,8 +18,7 @@ protectedApi.use('*', requireAuth);
 protectedApi.route('/', adminRoutes);
 protectedApi.route('/', libraryRoutes);
 protectedApi.route('/', programRoutes);
-protectedApi.route('/', assignmentRoutes);
-protectedApi.route('/', trainingSessionRoutes);
+protectedApi.route('/', clientRoutes);
 protectedApi.post('/admin/maintenance/history-retention', async (c) => {
   requirePlatformAdmin(c.get('principal'));
   if (!['local', 'test'].includes(c.env.APP_ENV)) throw new ApiError(404, 'not_found', 'Local maintenance invocation is unavailable.');
@@ -56,4 +54,3 @@ export default {
     ctx.waitUntil(runHistoryRetention(env.DB));
   },
 } satisfies ExportedHandler<Bindings>;
-

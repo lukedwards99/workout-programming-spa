@@ -42,13 +42,9 @@ CREATE TABLE workspaces (
   name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','suspended')),
   history_retention_days INTEGER NOT NULL DEFAULT 365 CHECK(history_retention_days > 0),
-  legal_hold_at TEXT,
-  legal_hold_reason TEXT,
-  legal_hold_by_user_id TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_by_user_id TEXT,
-  CHECK(legal_hold_at IS NULL OR (legal_hold_reason IS NOT NULL AND legal_hold_by_user_id IS NOT NULL))
+  updated_by_user_id TEXT
 );
 
 CREATE TABLE workspace_members (
@@ -86,55 +82,14 @@ CREATE TABLE programs (
   owner_user_id TEXT NOT NULL,
   name TEXT NOT NULL,
   notes TEXT,
-  kind TEXT NOT NULL DEFAULT 'personal' CHECK(kind IN ('personal','template','assigned')),
-  status TEXT NOT NULL DEFAULT 'draft' CHECK(status IN ('draft','active','completed')),
   visibility TEXT NOT NULL DEFAULT 'current' CHECK(visibility IN ('current','archived')),
   revision INTEGER NOT NULL DEFAULT 1 CHECK(revision >= 1),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_by_user_id TEXT,
   UNIQUE(workspace_id, id),
-  CHECK(visibility = 'current' OR status = 'completed'),
   FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
   FOREIGN KEY(workspace_id, owner_user_id) REFERENCES workspace_members(workspace_id, user_id) ON DELETE RESTRICT
-);
-
-CREATE TABLE program_members (
-  workspace_id TEXT NOT NULL,
-  program_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  access_level TEXT NOT NULL CHECK(access_level IN ('editor','athlete','viewer')),
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_by_user_id TEXT,
-  PRIMARY KEY(workspace_id, program_id, user_id),
-  FOREIGN KEY(workspace_id, program_id) REFERENCES programs(workspace_id, id) ON DELETE CASCADE,
-  FOREIGN KEY(workspace_id, user_id) REFERENCES workspace_members(workspace_id, user_id) ON DELETE CASCADE
-);
-
-CREATE TABLE program_assignments (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL,
-  source_program_id TEXT,
-  assigned_program_id TEXT NOT NULL,
-  coach_user_id TEXT NOT NULL,
-  client_user_id TEXT NOT NULL,
-  source_revision INTEGER CHECK(source_revision >= 1),
-  status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','completed')),
-  starts_on TEXT,
-  ends_on TEXT,
-  assigned_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  completed_at TEXT,
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_by_user_id TEXT,
-  UNIQUE(assigned_program_id),
-  CHECK(coach_user_id <> client_user_id),
-  FOREIGN KEY(workspace_id) REFERENCES workspaces(id) ON DELETE CASCADE,
-  FOREIGN KEY(source_program_id) REFERENCES programs(id) ON DELETE SET NULL,
-  FOREIGN KEY(assigned_program_id) REFERENCES programs(id) ON DELETE CASCADE,
-  FOREIGN KEY(workspace_id, coach_user_id) REFERENCES workspace_members(workspace_id, user_id) ON DELETE RESTRICT,
-  FOREIGN KEY(workspace_id, client_user_id) REFERENCES workspace_members(workspace_id, user_id) ON DELETE RESTRICT
 );
 
 CREATE TABLE mesocycles (
@@ -243,9 +198,13 @@ CREATE TABLE strength_sets (
   set_number INTEGER NOT NULL CHECK(set_number >= 1),
   set_type TEXT NOT NULL DEFAULT 'normal' CHECK(set_type IN ('warmup','normal','dropset','failure','rest-pause')),
   planned_reps INTEGER CHECK(planned_reps >= 0),
+  actual_reps INTEGER CHECK(actual_reps >= 0),
   planned_weight REAL CHECK(planned_weight >= 0),
+  actual_weight REAL CHECK(actual_weight >= 0),
   target_rir INTEGER CHECK(target_rir >= 0),
+  actual_rir INTEGER CHECK(actual_rir >= 0),
   coach_notes TEXT,
+  athlete_notes TEXT,
   version INTEGER NOT NULL DEFAULT 1 CHECK(version >= 1),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
@@ -262,78 +221,22 @@ CREATE TABLE cardio_sets (
   workout_exercise_id TEXT NOT NULL,
   set_number INTEGER NOT NULL CHECK(set_number >= 1),
   planned_duration_seconds INTEGER CHECK(planned_duration_seconds >= 0),
+  actual_duration_seconds INTEGER CHECK(actual_duration_seconds >= 0),
   planned_distance REAL CHECK(planned_distance >= 0),
+  actual_distance REAL CHECK(actual_distance >= 0),
   distance_unit TEXT CHECK(distance_unit IN ('mi','km','m')),
   target_rpe INTEGER CHECK(target_rpe BETWEEN 1 AND 10),
+  actual_rpe INTEGER CHECK(actual_rpe BETWEEN 1 AND 10),
   coach_notes TEXT,
+  athlete_notes TEXT,
   version INTEGER NOT NULL DEFAULT 1 CHECK(version >= 1),
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_by_user_id TEXT,
   UNIQUE(workspace_id, program_id, id),
   UNIQUE(workspace_id, program_id, workout_exercise_id, set_number),
-  CHECK(planned_distance IS NULL OR distance_unit IS NOT NULL),
+  CHECK((planned_distance IS NULL AND actual_distance IS NULL) OR distance_unit IS NOT NULL),
   FOREIGN KEY(workspace_id, program_id, workout_exercise_id) REFERENCES workout_exercises(workspace_id, program_id, id) ON DELETE CASCADE
-);
-
-CREATE TABLE workout_sessions (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL,
-  program_id TEXT NOT NULL,
-  workout_id TEXT NOT NULL,
-  athlete_user_id TEXT NOT NULL,
-  attempt_number INTEGER NOT NULL DEFAULT 1 CHECK(attempt_number >= 1),
-  status TEXT NOT NULL DEFAULT 'planned' CHECK(status IN ('planned','in_progress','completed','skipped')),
-  scheduled_for TEXT,
-  started_at TEXT,
-  completed_at TEXT,
-  athlete_notes TEXT,
-  version INTEGER NOT NULL DEFAULT 1 CHECK(version >= 1),
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_by_user_id TEXT,
-  UNIQUE(workspace_id, program_id, id),
-  UNIQUE(workspace_id, program_id, workout_id, athlete_user_id, attempt_number),
-  FOREIGN KEY(workspace_id, program_id, workout_id) REFERENCES workouts(workspace_id, program_id, id) ON DELETE CASCADE,
-  FOREIGN KEY(workspace_id, athlete_user_id) REFERENCES workspace_members(workspace_id, user_id) ON DELETE RESTRICT
-);
-
-CREATE TABLE strength_set_results (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL,
-  program_id TEXT NOT NULL,
-  workout_session_id TEXT NOT NULL,
-  strength_set_id TEXT NOT NULL,
-  actual_reps INTEGER CHECK(actual_reps >= 0),
-  actual_weight REAL CHECK(actual_weight >= 0),
-  actual_rir INTEGER CHECK(actual_rir >= 0),
-  athlete_notes TEXT,
-  version INTEGER NOT NULL DEFAULT 1 CHECK(version >= 1),
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_by_user_id TEXT,
-  UNIQUE(workout_session_id, strength_set_id),
-  FOREIGN KEY(workspace_id, program_id, workout_session_id) REFERENCES workout_sessions(workspace_id, program_id, id) ON DELETE CASCADE,
-  FOREIGN KEY(workspace_id, program_id, strength_set_id) REFERENCES strength_sets(workspace_id, program_id, id) ON DELETE RESTRICT
-);
-
-CREATE TABLE cardio_set_results (
-  id TEXT PRIMARY KEY,
-  workspace_id TEXT NOT NULL,
-  program_id TEXT NOT NULL,
-  workout_session_id TEXT NOT NULL,
-  cardio_set_id TEXT NOT NULL,
-  actual_duration_seconds INTEGER CHECK(actual_duration_seconds >= 0),
-  actual_distance REAL CHECK(actual_distance >= 0),
-  actual_rpe INTEGER CHECK(actual_rpe BETWEEN 1 AND 10),
-  athlete_notes TEXT,
-  version INTEGER NOT NULL DEFAULT 1 CHECK(version >= 1),
-  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_by_user_id TEXT,
-  UNIQUE(workout_session_id, cardio_set_id),
-  FOREIGN KEY(workspace_id, program_id, workout_session_id) REFERENCES workout_sessions(workspace_id, program_id, id) ON DELETE CASCADE,
-  FOREIGN KEY(workspace_id, program_id, cardio_set_id) REFERENCES cardio_sets(workspace_id, program_id, id) ON DELETE RESTRICT
 );
 
 CREATE TABLE audit_events (
@@ -363,15 +266,7 @@ CREATE INDEX idx_coach_clients_coach ON coach_client_relationships(workspace_id,
 
 CREATE INDEX idx_coach_clients_client ON coach_client_relationships(workspace_id, client_user_id, status);
 
-CREATE INDEX idx_programs_workspace_owner ON programs(workspace_id, owner_user_id, visibility, status);
-
-CREATE INDEX idx_program_members_user ON program_members(workspace_id, user_id, access_level);
-
-CREATE INDEX idx_assignments_client ON program_assignments(workspace_id, client_user_id, status);
-
-CREATE INDEX idx_assignments_coach ON program_assignments(workspace_id, coach_user_id, status);
-
-CREATE INDEX idx_assignments_source ON program_assignments(source_program_id, source_revision);
+CREATE INDEX idx_programs_workspace_owner ON programs(workspace_id, owner_user_id, visibility);
 
 CREATE INDEX idx_mesocycles_program_order ON mesocycles(workspace_id, program_id, sort_order, start_date);
 
@@ -392,14 +287,6 @@ CREATE INDEX idx_workout_exercises_exercise ON workout_exercises(workspace_id, e
 CREATE INDEX idx_strength_sets_block ON strength_sets(workspace_id, program_id, workout_exercise_id, set_number);
 
 CREATE INDEX idx_cardio_sets_block ON cardio_sets(workspace_id, program_id, workout_exercise_id, set_number);
-
-CREATE INDEX idx_sessions_athlete_date ON workout_sessions(workspace_id, athlete_user_id, scheduled_for, status);
-
-CREATE INDEX idx_sessions_program_status ON workout_sessions(workspace_id, program_id, status);
-
-CREATE INDEX idx_strength_results_session ON strength_set_results(workspace_id, program_id, workout_session_id);
-
-CREATE INDEX idx_cardio_results_session ON cardio_set_results(workspace_id, program_id, workout_session_id);
 
 CREATE INDEX idx_audit_workspace_time ON audit_events(workspace_id, created_at);
 
@@ -469,9 +356,6 @@ SELECT
   workspaces.name,
   workspaces.status,
   workspaces.history_retention_days,
-  workspaces.legal_hold_at,
-  workspaces.legal_hold_reason,
-  workspaces.legal_hold_by_user_id,
   workspaces.created_at,
   workspaces.updated_at,
   workspaces.updated_by_user_id
@@ -526,8 +410,6 @@ SELECT
   programs.owner_user_id,
   programs.name,
   programs.notes,
-  programs.kind,
-  programs.status,
   programs.visibility,
   programs.revision,
   programs.created_at,
@@ -536,48 +418,6 @@ SELECT
 FROM programs WHERE 0;
 CREATE UNIQUE INDEX pk_programs_history ON programs_history(history_id);
 CREATE INDEX idx_programs_history_source ON programs_history(id, history_recorded_at);
-
-CREATE TABLE program_members_history AS
-SELECT
-  CAST(NULL AS TEXT) AS history_id,
-  CAST(NULL AS TEXT) AS history_action,
-  CAST(NULL AS TEXT) AS history_recorded_at,
-  CAST(NULL AS TEXT) AS history_recorded_by_user_id,
-  program_members.workspace_id,
-  program_members.program_id,
-  program_members.user_id,
-  program_members.access_level,
-  program_members.created_at,
-  program_members.updated_at,
-  program_members.updated_by_user_id
-FROM program_members WHERE 0;
-CREATE UNIQUE INDEX pk_program_members_history ON program_members_history(history_id);
-CREATE INDEX idx_program_members_history_source ON program_members_history(workspace_id, program_id, user_id, history_recorded_at);
-
-CREATE TABLE program_assignments_history AS
-SELECT
-  CAST(NULL AS TEXT) AS history_id,
-  CAST(NULL AS TEXT) AS history_action,
-  CAST(NULL AS TEXT) AS history_recorded_at,
-  CAST(NULL AS TEXT) AS history_recorded_by_user_id,
-  program_assignments.id,
-  program_assignments.workspace_id,
-  program_assignments.source_program_id,
-  program_assignments.assigned_program_id,
-  program_assignments.coach_user_id,
-  program_assignments.client_user_id,
-  program_assignments.source_revision,
-  program_assignments.status,
-  program_assignments.starts_on,
-  program_assignments.ends_on,
-  program_assignments.assigned_at,
-  program_assignments.completed_at,
-  program_assignments.created_at,
-  program_assignments.updated_at,
-  program_assignments.updated_by_user_id
-FROM program_assignments WHERE 0;
-CREATE UNIQUE INDEX pk_program_assignments_history ON program_assignments_history(history_id);
-CREATE INDEX idx_program_assignments_history_source ON program_assignments_history(id, history_recorded_at);
 
 CREATE TABLE mesocycles_history AS
 SELECT
@@ -716,9 +556,13 @@ SELECT
   strength_sets.set_number,
   strength_sets.set_type,
   strength_sets.planned_reps,
+  strength_sets.actual_reps,
   strength_sets.planned_weight,
+  strength_sets.actual_weight,
   strength_sets.target_rir,
+  strength_sets.actual_rir,
   strength_sets.coach_notes,
+  strength_sets.athlete_notes,
   strength_sets.version,
   strength_sets.created_at,
   strength_sets.updated_at,
@@ -739,10 +583,14 @@ SELECT
   cardio_sets.workout_exercise_id,
   cardio_sets.set_number,
   cardio_sets.planned_duration_seconds,
+  cardio_sets.actual_duration_seconds,
   cardio_sets.planned_distance,
+  cardio_sets.actual_distance,
   cardio_sets.distance_unit,
   cardio_sets.target_rpe,
+  cardio_sets.actual_rpe,
   cardio_sets.coach_notes,
+  cardio_sets.athlete_notes,
   cardio_sets.version,
   cardio_sets.created_at,
   cardio_sets.updated_at,
@@ -750,77 +598,6 @@ SELECT
 FROM cardio_sets WHERE 0;
 CREATE UNIQUE INDEX pk_cardio_sets_history ON cardio_sets_history(history_id);
 CREATE INDEX idx_cardio_sets_history_source ON cardio_sets_history(id, history_recorded_at);
-
-CREATE TABLE workout_sessions_history AS
-SELECT
-  CAST(NULL AS TEXT) AS history_id,
-  CAST(NULL AS TEXT) AS history_action,
-  CAST(NULL AS TEXT) AS history_recorded_at,
-  CAST(NULL AS TEXT) AS history_recorded_by_user_id,
-  workout_sessions.id,
-  workout_sessions.workspace_id,
-  workout_sessions.program_id,
-  workout_sessions.workout_id,
-  workout_sessions.athlete_user_id,
-  workout_sessions.attempt_number,
-  workout_sessions.status,
-  workout_sessions.scheduled_for,
-  workout_sessions.started_at,
-  workout_sessions.completed_at,
-  workout_sessions.athlete_notes,
-  workout_sessions.version,
-  workout_sessions.created_at,
-  workout_sessions.updated_at,
-  workout_sessions.updated_by_user_id
-FROM workout_sessions WHERE 0;
-CREATE UNIQUE INDEX pk_workout_sessions_history ON workout_sessions_history(history_id);
-CREATE INDEX idx_workout_sessions_history_source ON workout_sessions_history(id, history_recorded_at);
-
-CREATE TABLE strength_set_results_history AS
-SELECT
-  CAST(NULL AS TEXT) AS history_id,
-  CAST(NULL AS TEXT) AS history_action,
-  CAST(NULL AS TEXT) AS history_recorded_at,
-  CAST(NULL AS TEXT) AS history_recorded_by_user_id,
-  strength_set_results.id,
-  strength_set_results.workspace_id,
-  strength_set_results.program_id,
-  strength_set_results.workout_session_id,
-  strength_set_results.strength_set_id,
-  strength_set_results.actual_reps,
-  strength_set_results.actual_weight,
-  strength_set_results.actual_rir,
-  strength_set_results.athlete_notes,
-  strength_set_results.version,
-  strength_set_results.created_at,
-  strength_set_results.updated_at,
-  strength_set_results.updated_by_user_id
-FROM strength_set_results WHERE 0;
-CREATE UNIQUE INDEX pk_strength_set_results_history ON strength_set_results_history(history_id);
-CREATE INDEX idx_strength_set_results_history_source ON strength_set_results_history(id, history_recorded_at);
-
-CREATE TABLE cardio_set_results_history AS
-SELECT
-  CAST(NULL AS TEXT) AS history_id,
-  CAST(NULL AS TEXT) AS history_action,
-  CAST(NULL AS TEXT) AS history_recorded_at,
-  CAST(NULL AS TEXT) AS history_recorded_by_user_id,
-  cardio_set_results.id,
-  cardio_set_results.workspace_id,
-  cardio_set_results.program_id,
-  cardio_set_results.workout_session_id,
-  cardio_set_results.cardio_set_id,
-  cardio_set_results.actual_duration_seconds,
-  cardio_set_results.actual_distance,
-  cardio_set_results.actual_rpe,
-  cardio_set_results.athlete_notes,
-  cardio_set_results.version,
-  cardio_set_results.created_at,
-  cardio_set_results.updated_at,
-  cardio_set_results.updated_by_user_id
-FROM cardio_set_results WHERE 0;
-CREATE UNIQUE INDEX pk_cardio_set_results_history ON cardio_set_results_history(history_id);
-CREATE INDEX idx_cardio_set_results_history_source ON cardio_set_results_history(id, history_recorded_at);
 
 CREATE TABLE audit_events_history AS
 SELECT
@@ -889,15 +666,15 @@ END;
 CREATE TRIGGER trg_workspaces_history_update
 BEFORE UPDATE ON workspaces
 BEGIN
-  INSERT INTO workspaces_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, name, status, history_retention_days, legal_hold_at, legal_hold_reason, legal_hold_by_user_id, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.name, OLD.status, OLD.history_retention_days, OLD.legal_hold_at, OLD.legal_hold_reason, OLD.legal_hold_by_user_id, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO workspaces_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, name, status, history_retention_days, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.name, OLD.status, OLD.history_retention_days, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_workspaces_history_delete
 BEFORE DELETE ON workspaces
 BEGIN
-  INSERT INTO workspaces_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, name, status, history_retention_days, legal_hold_at, legal_hold_reason, legal_hold_by_user_id, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.name, OLD.status, OLD.history_retention_days, OLD.legal_hold_at, OLD.legal_hold_reason, OLD.legal_hold_by_user_id, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO workspaces_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, name, status, history_retention_days, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.name, OLD.status, OLD.history_retention_days, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_workspace_members_history_update
@@ -931,43 +708,15 @@ END;
 CREATE TRIGGER trg_programs_history_update
 BEFORE UPDATE ON programs
 BEGIN
-  INSERT INTO programs_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, owner_user_id, name, notes, kind, status, visibility, revision, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.owner_user_id, OLD.name, OLD.notes, OLD.kind, OLD.status, OLD.visibility, OLD.revision, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO programs_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, owner_user_id, name, notes, visibility, revision, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.owner_user_id, OLD.name, OLD.notes, OLD.visibility, OLD.revision, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_programs_history_delete
 BEFORE DELETE ON programs
 BEGIN
-  INSERT INTO programs_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, owner_user_id, name, notes, kind, status, visibility, revision, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.owner_user_id, OLD.name, OLD.notes, OLD.kind, OLD.status, OLD.visibility, OLD.revision, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_program_members_history_update
-BEFORE UPDATE ON program_members
-BEGIN
-  INSERT INTO program_members_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, workspace_id, program_id, user_id, access_level, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.workspace_id, OLD.program_id, OLD.user_id, OLD.access_level, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_program_members_history_delete
-BEFORE DELETE ON program_members
-BEGIN
-  INSERT INTO program_members_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, workspace_id, program_id, user_id, access_level, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.workspace_id, OLD.program_id, OLD.user_id, OLD.access_level, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_program_assignments_history_update
-BEFORE UPDATE ON program_assignments
-BEGIN
-  INSERT INTO program_assignments_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, source_program_id, assigned_program_id, coach_user_id, client_user_id, source_revision, status, starts_on, ends_on, assigned_at, completed_at, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.source_program_id, OLD.assigned_program_id, OLD.coach_user_id, OLD.client_user_id, OLD.source_revision, OLD.status, OLD.starts_on, OLD.ends_on, OLD.assigned_at, OLD.completed_at, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_program_assignments_history_delete
-BEFORE DELETE ON program_assignments
-BEGIN
-  INSERT INTO program_assignments_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, source_program_id, assigned_program_id, coach_user_id, client_user_id, source_revision, status, starts_on, ends_on, assigned_at, completed_at, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.source_program_id, OLD.assigned_program_id, OLD.coach_user_id, OLD.client_user_id, OLD.source_revision, OLD.status, OLD.starts_on, OLD.ends_on, OLD.assigned_at, OLD.completed_at, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO programs_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, owner_user_id, name, notes, visibility, revision, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.owner_user_id, OLD.name, OLD.notes, OLD.visibility, OLD.revision, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_mesocycles_history_update
@@ -1057,71 +806,29 @@ END;
 CREATE TRIGGER trg_strength_sets_history_update
 BEFORE UPDATE ON strength_sets
 BEGIN
-  INSERT INTO strength_sets_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_exercise_id, set_number, set_type, planned_reps, planned_weight, target_rir, coach_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_exercise_id, OLD.set_number, OLD.set_type, OLD.planned_reps, OLD.planned_weight, OLD.target_rir, OLD.coach_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO strength_sets_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_exercise_id, set_number, set_type, planned_reps, actual_reps, planned_weight, actual_weight, target_rir, actual_rir, coach_notes, athlete_notes, version, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_exercise_id, OLD.set_number, OLD.set_type, OLD.planned_reps, OLD.actual_reps, OLD.planned_weight, OLD.actual_weight, OLD.target_rir, OLD.actual_rir, OLD.coach_notes, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_strength_sets_history_delete
 BEFORE DELETE ON strength_sets
 BEGIN
-  INSERT INTO strength_sets_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_exercise_id, set_number, set_type, planned_reps, planned_weight, target_rir, coach_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_exercise_id, OLD.set_number, OLD.set_type, OLD.planned_reps, OLD.planned_weight, OLD.target_rir, OLD.coach_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO strength_sets_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_exercise_id, set_number, set_type, planned_reps, actual_reps, planned_weight, actual_weight, target_rir, actual_rir, coach_notes, athlete_notes, version, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_exercise_id, OLD.set_number, OLD.set_type, OLD.planned_reps, OLD.actual_reps, OLD.planned_weight, OLD.actual_weight, OLD.target_rir, OLD.actual_rir, OLD.coach_notes, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_cardio_sets_history_update
 BEFORE UPDATE ON cardio_sets
 BEGIN
-  INSERT INTO cardio_sets_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_exercise_id, set_number, planned_duration_seconds, planned_distance, distance_unit, target_rpe, coach_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_exercise_id, OLD.set_number, OLD.planned_duration_seconds, OLD.planned_distance, OLD.distance_unit, OLD.target_rpe, OLD.coach_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO cardio_sets_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_exercise_id, set_number, planned_duration_seconds, actual_duration_seconds, planned_distance, actual_distance, distance_unit, target_rpe, actual_rpe, coach_notes, athlete_notes, version, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_exercise_id, OLD.set_number, OLD.planned_duration_seconds, OLD.actual_duration_seconds, OLD.planned_distance, OLD.actual_distance, OLD.distance_unit, OLD.target_rpe, OLD.actual_rpe, OLD.coach_notes, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_cardio_sets_history_delete
 BEFORE DELETE ON cardio_sets
 BEGIN
-  INSERT INTO cardio_sets_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_exercise_id, set_number, planned_duration_seconds, planned_distance, distance_unit, target_rpe, coach_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_exercise_id, OLD.set_number, OLD.planned_duration_seconds, OLD.planned_distance, OLD.distance_unit, OLD.target_rpe, OLD.coach_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_workout_sessions_history_update
-BEFORE UPDATE ON workout_sessions
-BEGIN
-  INSERT INTO workout_sessions_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_id, athlete_user_id, attempt_number, status, scheduled_for, started_at, completed_at, athlete_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_id, OLD.athlete_user_id, OLD.attempt_number, OLD.status, OLD.scheduled_for, OLD.started_at, OLD.completed_at, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_workout_sessions_history_delete
-BEFORE DELETE ON workout_sessions
-BEGIN
-  INSERT INTO workout_sessions_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_id, athlete_user_id, attempt_number, status, scheduled_for, started_at, completed_at, athlete_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_id, OLD.athlete_user_id, OLD.attempt_number, OLD.status, OLD.scheduled_for, OLD.started_at, OLD.completed_at, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_strength_set_results_history_update
-BEFORE UPDATE ON strength_set_results
-BEGIN
-  INSERT INTO strength_set_results_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_session_id, strength_set_id, actual_reps, actual_weight, actual_rir, athlete_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_session_id, OLD.strength_set_id, OLD.actual_reps, OLD.actual_weight, OLD.actual_rir, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_strength_set_results_history_delete
-BEFORE DELETE ON strength_set_results
-BEGIN
-  INSERT INTO strength_set_results_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_session_id, strength_set_id, actual_reps, actual_weight, actual_rir, athlete_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_session_id, OLD.strength_set_id, OLD.actual_reps, OLD.actual_weight, OLD.actual_rir, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_cardio_set_results_history_update
-BEFORE UPDATE ON cardio_set_results
-BEGIN
-  INSERT INTO cardio_set_results_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_session_id, cardio_set_id, actual_duration_seconds, actual_distance, actual_rpe, athlete_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_session_id, OLD.cardio_set_id, OLD.actual_duration_seconds, OLD.actual_distance, OLD.actual_rpe, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
-END;
-
-CREATE TRIGGER trg_cardio_set_results_history_delete
-BEFORE DELETE ON cardio_set_results
-BEGIN
-  INSERT INTO cardio_set_results_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_session_id, cardio_set_id, actual_duration_seconds, actual_distance, actual_rpe, athlete_notes, version, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_session_id, OLD.cardio_set_id, OLD.actual_duration_seconds, OLD.actual_distance, OLD.actual_rpe, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO cardio_sets_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, workspace_id, program_id, workout_exercise_id, set_number, planned_duration_seconds, actual_duration_seconds, planned_distance, actual_distance, distance_unit, target_rpe, actual_rpe, coach_notes, athlete_notes, version, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.workout_exercise_id, OLD.set_number, OLD.planned_duration_seconds, OLD.actual_duration_seconds, OLD.planned_distance, OLD.actual_distance, OLD.distance_unit, OLD.target_rpe, OLD.actual_rpe, OLD.coach_notes, OLD.athlete_notes, OLD.version, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_audit_events_history_update

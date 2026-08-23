@@ -95,10 +95,9 @@ export async function audit(
 
 const mutableTables = new Set([
   'users', 'auth_identities', 'platform_user_roles', 'workspaces', 'workspace_members',
-  'coach_client_relationships', 'programs', 'program_members', 'program_assignments',
+  'coach_client_relationships', 'programs',
   'mesocycles', 'workouts', 'exercise_groups', 'exercises', 'exercise_variations',
-  'workout_exercises', 'strength_sets', 'cardio_sets', 'workout_sessions',
-  'strength_set_results', 'cardio_set_results', 'audit_events',
+  'workout_exercises', 'strength_sets', 'cardio_sets', 'audit_events',
 ]);
 
 export function stampStatement(
@@ -126,20 +125,17 @@ export async function canReadProgram(db: D1Database, principal: AuthPrincipal, w
   const row = await first<{ allowed: number }>(db.prepare(
     `SELECT 1 AS allowed FROM programs p
      WHERE p.workspace_id = ? AND p.id = ? AND (
-       p.owner_user_id = ? OR EXISTS (
-         SELECT 1 FROM program_members pm
-         WHERE pm.workspace_id = p.workspace_id AND pm.program_id = p.id AND pm.user_id = ?
-       ) OR EXISTS (
-         SELECT 1 FROM program_assignments pa
-         WHERE pa.workspace_id = p.workspace_id AND pa.assigned_program_id = p.id
-           AND (pa.coach_user_id = ? OR pa.client_user_id = ?)
-       )
+       p.owner_user_id = ? OR ( ? = 'coach' AND EXISTS (
+         SELECT 1 FROM coach_client_relationships ccr
+         WHERE ccr.workspace_id = p.workspace_id AND ccr.coach_user_id = ?
+           AND ccr.client_user_id = p.owner_user_id AND ccr.status = 'active'
+       ))
      )`,
-  ).bind(workspaceId, programId, principal.userId, principal.userId, principal.userId, principal.userId));
+  ).bind(workspaceId, programId, principal.userId, workspace.role, principal.userId));
   return Boolean(row);
 }
 
-export async function canEditProgram(db: D1Database, principal: AuthPrincipal, workspaceId: string, programId: string) {
+export async function canEditProgramPlan(db: D1Database, principal: AuthPrincipal, workspaceId: string, programId: string) {
   if (isPlatformAdmin(principal)) return true;
   const workspace = membership(principal, workspaceId);
   if (!workspace || workspace.role === 'client') return false;
@@ -148,15 +144,25 @@ export async function canEditProgram(db: D1Database, principal: AuthPrincipal, w
     `SELECT 1 AS allowed FROM programs p
      WHERE p.workspace_id = ? AND p.id = ? AND (
        p.owner_user_id = ? OR EXISTS (
-         SELECT 1 FROM program_members pm
-         WHERE pm.workspace_id = p.workspace_id AND pm.program_id = p.id
-           AND pm.user_id = ? AND pm.access_level = 'editor'
-       ) OR EXISTS (
-         SELECT 1 FROM program_assignments pa
-         WHERE pa.workspace_id = p.workspace_id AND pa.assigned_program_id = p.id AND pa.coach_user_id = ?
+         SELECT 1 FROM coach_client_relationships ccr
+         WHERE ccr.workspace_id = p.workspace_id AND ccr.coach_user_id = ?
+           AND ccr.client_user_id = p.owner_user_id AND ccr.status = 'active'
        )
      )`,
-  ).bind(workspaceId, programId, principal.userId, principal.userId, principal.userId));
+  ).bind(workspaceId, programId, principal.userId, principal.userId));
   return Boolean(row);
 }
 
+export async function canEditProgramExecution(db: D1Database, principal: AuthPrincipal, workspaceId: string, programId: string) {
+  if (isPlatformAdmin(principal)) return true;
+  const workspace = membership(principal, workspaceId);
+  if (!workspace) return false;
+  if (workspace.role === 'owner') return true;
+  if (workspace.role !== 'client') return false;
+  const row = await first<{ allowed: number }>(db.prepare(
+    'SELECT 1 AS allowed FROM programs WHERE workspace_id = ? AND id = ? AND owner_user_id = ?',
+  ).bind(workspaceId, programId, principal.userId));
+  return Boolean(row);
+}
+
+export const canEditProgram = canEditProgramPlan;

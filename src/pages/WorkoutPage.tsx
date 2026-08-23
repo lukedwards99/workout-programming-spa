@@ -1,101 +1,41 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { libraryApi, programsApi, trainingApi, type WorkoutSessionDetail } from '../api/cloudApi';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { libraryApi, programsApi } from '../api/cloudApi';
 import FormModal from '../components/FormModal';
 import { useSession } from '../contexts/SessionContext';
-import type { Exercise, WorkoutDetail, WorkoutExerciseBlock } from '../types/cloud';
+import type { CardioSet, Exercise, Mesocycle, Program, StrengthSet, WorkoutDetail, WorkoutExerciseBlock } from '../types/cloud';
 
 export default function WorkoutPage() {
-  const { programId = '', workoutId = '' } = useParams();
-  const { workspaceId, principal } = useSession();
-  const membership = principal?.memberships.find((item) => item.workspaceId === workspaceId);
-  const canPlan = membership?.role === 'owner' || membership?.role === 'coach';
-  const canPerform = membership?.role === 'owner' || membership?.role === 'client';
-  const [workout, setWorkout] = useState<WorkoutDetail | null>(null);
-  const [exercises, setExercises] = useState<Exercise[]>([]);
-  const [session, setSession] = useState<WorkoutSessionDetail | null>(null);
-  const [exerciseId, setExerciseId] = useState('');
-  const [showExercise, setShowExercise] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    if (!workspaceId) return;
-    try {
-      const [detail, library, sessions] = await Promise.all([programsApi.workout(workspaceId, programId, workoutId), libraryApi.exercises(workspaceId), trainingApi.list(workspaceId, programId)]);
-      const active = sessions.find((item) => item.workout_id === workoutId && item.status === 'in_progress');
-      const activeDetail = active ? await trainingApi.get(workspaceId, programId, active.id) : null;
-      setWorkout(detail); setExercises(library); setSession(activeDetail); setError(null);
-    } catch (reason) { setError((reason as Error).message); }
-  }, [workspaceId, programId, workoutId]);
+  const { programId = '', workoutId = '' } = useParams(), navigate = useNavigate(); const { workspaceId, principal } = useSession();
+  const access = principal?.availableWorkspaces.find((item) => item.workspaceId === workspaceId); const canPlan = access?.role !== 'client';
+  const [programRow, setProgramRow] = useState<Program|null>(null), [workout, setWorkout] = useState<WorkoutDetail|null>(null), [exercises, setExercises] = useState<Exercise[]>([]), [programs, setPrograms] = useState<Program[]>([]), [cycles, setCycles] = useState<Mesocycle[]>([]);
+  const [exerciseId, setExerciseId] = useState(''), [showExercise, setShowExercise] = useState(false), [showCopy, setShowCopy] = useState(false), [targetProgram, setTargetProgram] = useState(''), [targetCycle, setTargetCycle] = useState(''), [copyName, setCopyName] = useState(''), [includeExecuted, setIncludeExecuted] = useState(false), [error, setError] = useState('');
+  const canExecute = access?.role === 'admin' || access?.role === 'owner' || (access?.role === 'client' && programRow?.owner_user_id === principal?.userId);
+  const load = useCallback(async () => { if (!workspaceId) return; try { const [detail, library, p, allPrograms] = await Promise.all([programsApi.workout(workspaceId, programId, workoutId), libraryApi.exercises(workspaceId), programsApi.get(workspaceId, programId), programsApi.list(workspaceId)]); setWorkout(detail); setExercises(library); setProgramRow(p); setPrograms(allPrograms); setTargetProgram((current) => current || programId); setCopyName(`${detail.name} copy`); setError(''); } catch (e) { setError((e as Error).message); } }, [workspaceId, programId, workoutId]);
   useEffect(() => { void load(); }, [load]);
-
-  const addExercise = async (event: FormEvent) => {
-    event.preventDefault(); if (!workspaceId || !exerciseId || !workout) return;
-    try { await programsApi.addExercise(workspaceId, programId, workoutId, { exerciseId, exerciseOrder: workout.exercise_blocks.length }); setShowExercise(false); setExerciseId(''); await load(); }
-    catch (reason) { setError((reason as Error).message); }
-  };
-  const addSet = async (block: WorkoutExerciseBlock) => {
-    if (!workspaceId) return;
-    const setNumber = block.sets.length + 1;
-    try {
-      if (block.exercise_type === 'strength') await programsApi.addStrengthSet(workspaceId, programId, block.id, { setNumber, setType: 'normal', plannedReps: 8 });
-      else await programsApi.addCardioSet(workspaceId, programId, block.id, { setNumber, plannedDurationSeconds: 600 });
-      await load();
-    } catch (reason) { setError((reason as Error).message); }
-  };
-  const start = async () => { if (workspaceId) try { const created = await trainingApi.start(workspaceId, programId, workoutId); setSession({ ...created, strength_results: [], cardio_results: [] }); } catch (reason) { setError((reason as Error).message); } };
-  const finish = async (status: 'completed' | 'skipped') => { if (workspaceId && session) try { await trainingApi.finish(workspaceId, programId, session, status); setSession(null); } catch (reason) { setError((reason as Error).message); } };
-
-  if (!workout) return <div className="empty-state">{error ?? 'Loading workout…'}</div>;
+  useEffect(() => { if (!workspaceId || !targetProgram) return; programsApi.mesocycles(workspaceId, targetProgram).then((rows) => { setCycles(rows); setTargetCycle((current) => rows.some((row) => row.id === current) ? current : rows[0]?.id ?? ''); }).catch((e) => setError((e as Error).message)); }, [workspaceId, targetProgram]);
+  async function addExercise(e: FormEvent) { e.preventDefault(); if (!workspaceId || !exerciseId || !workout) return; await programsApi.addExercise(workspaceId, programId, workoutId, { exerciseId, exerciseOrder: workout.exercise_blocks.length }); setShowExercise(false); setExerciseId(''); await load(); }
+  async function addSet(block: WorkoutExerciseBlock) { if (!workspaceId) return; const setNumber = block.sets.length + 1; block.exercise_type === 'strength' ? await programsApi.addStrengthSet(workspaceId, programId, block.id, { setNumber, setType: 'normal', plannedReps: 8 }) : await programsApi.addCardioSet(workspaceId, programId, block.id, { setNumber, plannedDurationSeconds: 600 }); await load(); }
+  if (!workout) return <div className="empty-state">{error || 'Loading workout…'}</div>;
   return <>
     <div className="breadcrumb"><Link to={`/programs/${programId}`}>Program</Link><span>/</span>{workout.name}</div>
-    <div className="page-header"><div><h1>{workout.name}</h1><p className="page-subtitle">{canPlan ? 'Plan mode: edit targets and structure.' : 'Performance mode: record your own actual results.'}</p></div><div className="actions">{canPlan && <button className="btn btn-primary" onClick={() => setShowExercise(true)}>Add exercise</button>}{canPerform && !session && <button className="btn btn-success" onClick={() => void start()}>Start workout</button>}</div></div>
+    <div className="page-header"><div><h1>{workout.name}</h1><p className="page-subtitle">Planned and executed values stay together on each set.</p></div><div className="actions">{canPlan && <><button className="btn btn-outline" onClick={() => { setIncludeExecuted(false); setShowCopy(true); }}>Copy workout</button><button className="btn btn-primary" onClick={() => setShowExercise(true)}>Add exercise</button></>}</div></div>
     {error && <div className="alert alert-danger">{error}</div>}
-    {session && <div className="alert alert-success session-banner"><span>Workout in progress. Record actuals below.</span><div className="actions"><button className="btn btn-outline btn-sm" onClick={() => void finish('skipped')}>Skip</button><button className="btn btn-success btn-sm" onClick={() => void finish('completed')}>Complete</button></div></div>}
-    {workout.exercise_blocks.length === 0 ? <div className="empty-state"><p>No exercises in this workout.</p></div> : workout.exercise_blocks.map((block) => <section className="card exercise-block" key={block.id}>
-      <div className="section-header"><div><h2>{block.exercise_name}{block.variation_name ? ` — ${block.variation_name}` : ''}</h2><p className="muted">{block.group_name} · {block.exercise_type}</p></div>{canPlan && <div className="actions"><button className="btn btn-outline btn-sm" onClick={() => void addSet(block)}>Add set</button><button className="btn btn-danger btn-sm" onClick={async () => { if (workspaceId) { await programsApi.removeExercise(workspaceId, programId, block.id); await load(); } }}>Remove</button></div>}</div>
-      {block.sets.length === 0 ? <p className="muted">No planned sets.</p> : <div className="table-wrap"><table><thead><tr><th>Set</th><th>Target</th>{session && <th>Actual</th>}</tr></thead><tbody>{block.sets.map((set) => <tr key={set.id}><td>{set.set_number}</td><td>{canPlan ? <PlanSetEditor set={set} workspaceId={workspaceId!} programId={programId} onError={setError} /> : ('planned_reps' in set ? `${set.planned_reps ?? '—'} reps @ ${set.planned_weight ?? '—'}` : `${set.planned_duration_seconds ?? '—'} sec / ${set.planned_distance ?? '—'} ${set.distance_unit ?? ''}`)}</td>{session && <td><ResultEditor block={block} set={set} session={session} workspaceId={workspaceId!} programId={programId} onError={setError} /></td>}</tr>)}</tbody></table></div>}
+    {!workout.exercise_blocks.length ? <div className="empty-state"><p>No exercises in this workout.</p></div> : workout.exercise_blocks.map((block) => <section className="card exercise-block" key={block.id}><div className="section-header"><div><h2>{block.exercise_name}{block.variation_name ? ` — ${block.variation_name}` : ''}</h2><p className="muted">{block.group_name} · {block.exercise_type}</p></div>{canPlan && <div className="actions"><button className="btn btn-outline btn-sm" onClick={() => void addSet(block)}>Add set</button><button className="btn btn-danger btn-sm" onClick={async () => { if (workspaceId) { await programsApi.removeExercise(workspaceId, programId, block.id); await load(); } }}>Remove</button></div>}</div>
+      {!block.sets.length ? <p className="muted">No sets.</p> : <div className="table-wrap"><table className="direct-set-table"><thead><tr><th>Set</th><th>Planned</th><th>Executed</th></tr></thead><tbody>{block.sets.map((set) => <SetRow key={set.id} set={set} type={block.exercise_type} workspaceId={workspaceId!} programId={programId} canPlan={Boolean(canPlan)} canExecute={Boolean(canExecute)} onSaved={load} onError={setError} />)}</tbody></table></div>}
     </section>)}
-    <FormModal show={showExercise} onHide={() => setShowExercise(false)} title="Add workspace exercise" onSubmit={addExercise} submitDisabled={!exerciseId}><div className="form-group"><label>Exercise</label><select value={exerciseId} onChange={(event) => setExerciseId(event.target.value)}><option value="">Choose…</option>{exercises.map((item) => <option value={item.id} key={item.id}>{item.name} ({item.exercise_type})</option>)}</select></div></FormModal>
+    <FormModal show={showExercise} onHide={() => setShowExercise(false)} title="Add workspace exercise" onSubmit={addExercise} submitDisabled={!exerciseId}><div className="form-group"><label>Exercise</label><select value={exerciseId} onChange={(e) => setExerciseId(e.target.value)}><option value="">Choose…</option>{exercises.map((item) => <option value={item.id} key={item.id}>{item.name} ({item.exercise_type})</option>)}</select></div></FormModal>
+    <FormModal show={showCopy} onHide={() => setShowCopy(false)} title="Copy workout" onSubmit={async (e) => { e.preventDefault(); if (!workspaceId || !targetCycle) return; const copy = await programsApi.copyWorkout(workspaceId, programId, workoutId, { targetProgramId: targetProgram, targetMesocycleId: targetCycle, name: copyName, includeExecutedValues: includeExecuted }); setShowCopy(false); navigate(`/programs/${targetProgram}/workouts/${copy.id}`); }} submitDisabled={!targetProgram || !targetCycle || !copyName.trim()}><div className="form-group"><label>Name</label><input value={copyName} onChange={(e) => setCopyName(e.target.value)} /></div><div className="form-group"><label>Destination program</label><select value={targetProgram} onChange={(e) => setTargetProgram(e.target.value)}>{programs.map((p) => <option key={p.id} value={p.id}>{p.name} — {p.owner_name}</option>)}</select></div><div className="form-group"><label>Destination mesocycle</label><select value={targetCycle} onChange={(e) => setTargetCycle(e.target.value)}><option value="">Choose…</option>{cycles.map((cycle) => <option key={cycle.id} value={cycle.id}>{cycle.name}</option>)}</select></div><label className="form-check"><input type="checkbox" checked={includeExecuted} onChange={(e) => setIncludeExecuted(e.target.checked)} /> Include executed values and athlete notes</label></FormModal>
   </>;
 }
 
-function PlanSetEditor({ set, workspaceId, programId, onError }: { set: WorkoutExerciseBlock['sets'][number]; workspaceId: string; programId: string; onError: (value: string) => void }) {
-  const strength = 'planned_reps' in set;
-  const [first, setFirst] = useState(String(strength ? set.planned_reps ?? '' : set.planned_duration_seconds ?? ''));
-  const [second, setSecond] = useState(String(strength ? set.planned_weight ?? '' : set.planned_distance ?? ''));
-  const [version, setVersion] = useState(set.version);
-  const [saved, setSaved] = useState(false);
-  const save = async () => {
-    try {
-      const updated = strength
-        ? await programsApi.updateStrengthSet(workspaceId, programId, set.id, { setNumber: set.set_number, setType: set.set_type, plannedReps: first ? Number(first) : null, plannedWeight: second ? Number(second) : null, targetRir: set.target_rir, coachNotes: set.coach_notes ?? '', version })
-        : await programsApi.updateCardioSet(workspaceId, programId, set.id, { setNumber: set.set_number, plannedDurationSeconds: first ? Number(first) : null, plannedDistance: second ? Number(second) : null, distanceUnit: set.distance_unit, targetRpe: set.target_rpe, coachNotes: set.coach_notes ?? '', version });
-      setVersion(updated.version);
-      setSaved(true);
-    } catch (reason) { onError((reason as Error).message); }
-  };
-  return <div className="result-entry"><input aria-label={strength ? 'Planned reps' : 'Planned seconds'} type="number" min="0" placeholder={strength ? 'reps' : 'seconds'} value={first} onChange={(event) => { setFirst(event.target.value); setSaved(false); }} /><input aria-label={strength ? 'Planned weight' : 'Planned distance'} type="number" min="0" step="any" placeholder={strength ? 'weight' : 'distance'} value={second} onChange={(event) => { setSecond(event.target.value); setSaved(false); }} /><button className="btn btn-sm btn-outline" onClick={() => void save()}>{saved ? 'Saved' : 'Save'}</button></div>;
-}
-
-function ResultEditor({ block, set, session, workspaceId, programId, onError }: { block: WorkoutExerciseBlock; set: WorkoutExerciseBlock['sets'][number]; session: WorkoutSessionDetail; workspaceId: string; programId: string; onError: (value: string) => void }) {
-  const existing = block.exercise_type === 'strength'
-    ? session.strength_results.find((row) => row.strength_set_id === set.id)
-    : session.cardio_results.find((row) => row.cardio_set_id === set.id);
-  const initialFirst = existing && 'strength_set_id' in existing ? existing.actual_reps : existing?.actual_duration_seconds;
-  const initialSecond = existing && 'strength_set_id' in existing ? existing.actual_weight : existing?.actual_distance;
-  const [first, setFirst] = useState(String(initialFirst ?? ''));
-  const [second, setSecond] = useState(String(initialSecond ?? ''));
-  const [version, setVersion] = useState(existing?.version);
-  const [saved, setSaved] = useState(Boolean(existing));
-  const save = async () => {
-    try {
-      const updated = block.exercise_type === 'strength'
-        ? await trainingApi.strengthResult(workspaceId, programId, session.id, { strengthSetId: set.id, actualReps: first ? Number(first) : null, actualWeight: second ? Number(second) : null, ...(version ? { version } : {}) })
-        : await trainingApi.cardioResult(workspaceId, programId, session.id, { cardioSetId: set.id, actualDurationSeconds: first ? Number(first) : null, actualDistance: second ? Number(second) : null, ...(version ? { version } : {}) });
-      setVersion(updated.version);
-      setSaved(true);
-    } catch (reason) { onError((reason as Error).message); }
-  };
-  return <div className="result-entry"><input aria-label={block.exercise_type === 'strength' ? 'Actual reps' : 'Actual seconds'} type="number" min="0" placeholder={block.exercise_type === 'strength' ? 'reps' : 'seconds'} value={first} onChange={(event) => { setFirst(event.target.value); setSaved(false); }} /><input aria-label={block.exercise_type === 'strength' ? 'Actual weight' : 'Actual distance'} type="number" min="0" step="any" placeholder={block.exercise_type === 'strength' ? 'weight' : 'distance'} value={second} onChange={(event) => { setSecond(event.target.value); setSaved(false); }} /><button className="btn btn-sm btn-outline" onClick={() => void save()}>{saved ? 'Saved' : 'Save'}</button></div>;
+function nullableNumber(value: string) { return value === '' ? null : Number(value); }
+function SetRow({ set, type, workspaceId, programId, canPlan, canExecute, onSaved, onError }: { set: StrengthSet|CardioSet; type: 'strength'|'cardio'; workspaceId: string; programId: string; canPlan: boolean; canExecute: boolean; onSaved: () => Promise<void>; onError: (value: string) => void }) {
+  const strength = type === 'strength'; const s = set as StrengthSet, c = set as CardioSet;
+  const [p1, setP1] = useState(String(strength ? s.planned_reps ?? '' : c.planned_duration_seconds ?? '')), [p2, setP2] = useState(String(strength ? s.planned_weight ?? '' : c.planned_distance ?? '')), [p3, setP3] = useState(String(strength ? s.target_rir ?? '' : c.target_rpe ?? '')), [coachNotes, setCoachNotes] = useState(set.coach_notes ?? '');
+  const [a1, setA1] = useState(String(strength ? s.actual_reps ?? '' : c.actual_duration_seconds ?? '')), [a2, setA2] = useState(String(strength ? s.actual_weight ?? '' : c.actual_distance ?? '')), [a3, setA3] = useState(String(strength ? s.actual_rir ?? '' : c.actual_rpe ?? '')), [athleteNotes, setAthleteNotes] = useState(set.athlete_notes ?? '');
+  async function savePlan() { try { strength ? await programsApi.updateStrengthPlan(workspaceId, programId, set.id, { setNumber: set.set_number, setType: s.set_type, plannedReps: nullableNumber(p1), plannedWeight: nullableNumber(p2), targetRir: nullableNumber(p3), coachNotes, version: set.version }) : await programsApi.updateCardioPlan(workspaceId, programId, set.id, { setNumber: set.set_number, plannedDurationSeconds: nullableNumber(p1), plannedDistance: nullableNumber(p2), distanceUnit: c.distance_unit ?? (p2 ? 'mi' : null), targetRpe: nullableNumber(p3), coachNotes, version: set.version }); await onSaved(); } catch (e) { onError((e as Error).message); } }
+  async function saveExecution() { try { strength ? await programsApi.updateStrengthExecution(workspaceId, programId, set.id, { actualReps: nullableNumber(a1), actualWeight: nullableNumber(a2), actualRir: nullableNumber(a3), athleteNotes, version: set.version }) : await programsApi.updateCardioExecution(workspaceId, programId, set.id, { actualDurationSeconds: nullableNumber(a1), actualDistance: nullableNumber(a2), actualRpe: nullableNumber(a3), athleteNotes, version: set.version }); await onSaved(); } catch (e) { onError((e as Error).message); } }
+  const inputs = (planned: boolean) => <div className="set-grid"><input aria-label={`${planned ? 'Planned' : 'Actual'} ${strength ? 'reps' : 'seconds'}`} type="number" min="0" placeholder={strength ? 'reps' : 'seconds'} value={planned ? p1 : a1} onChange={(e) => planned ? setP1(e.target.value) : setA1(e.target.value)} disabled={planned ? !canPlan : !canExecute} /><input aria-label={`${planned ? 'Planned' : 'Actual'} ${strength ? 'weight' : 'distance'}`} type="number" min="0" step="any" placeholder={strength ? 'weight' : 'distance'} value={planned ? p2 : a2} onChange={(e) => planned ? setP2(e.target.value) : setA2(e.target.value)} disabled={planned ? !canPlan : !canExecute} /><input aria-label={`${planned ? 'Target' : 'Actual'} ${strength ? 'RIR' : 'RPE'}`} type="number" min="0" placeholder={strength ? 'RIR' : 'RPE'} value={planned ? p3 : a3} onChange={(e) => planned ? setP3(e.target.value) : setA3(e.target.value)} disabled={planned ? !canPlan : !canExecute} /><input aria-label={planned ? 'Coach notes' : 'Athlete notes'} placeholder={planned ? 'coach notes' : 'athlete notes'} value={planned ? coachNotes : athleteNotes} onChange={(e) => planned ? setCoachNotes(e.target.value) : setAthleteNotes(e.target.value)} disabled={planned ? !canPlan : !canExecute} />{(planned ? canPlan : canExecute) && <button className="btn btn-sm btn-outline" onClick={() => void (planned ? savePlan() : saveExecution())}>Save</button>}</div>;
+  return <tr><td>{set.set_number}</td><td>{inputs(true)}</td><td>{inputs(false)}</td></tr>;
 }

@@ -5,6 +5,14 @@ export interface WorkspaceMembership {
   status: 'active' | 'suspended';
 }
 
+export interface WorkspaceAccess {
+  workspaceId: string;
+  workspaceName: string;
+  role: 'admin' | 'owner' | 'coach' | 'client';
+  status: 'active' | 'suspended';
+  isMember: boolean;
+}
+
 export interface AuthPrincipal {
   userId: string;
   displayName: string;
@@ -13,6 +21,7 @@ export interface AuthPrincipal {
   providerSubject: string;
   platformRoles: string[];
   memberships: WorkspaceMembership[];
+  availableWorkspaces: WorkspaceAccess[];
 }
 
 export interface Bindings {

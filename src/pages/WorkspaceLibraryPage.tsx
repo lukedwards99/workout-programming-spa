@@ -7,8 +7,8 @@ import type { Exercise, ExerciseGroup } from '../types/cloud';
 
 export default function WorkspaceLibraryPage() {
   const { workspaceId, principal } = useSession();
-  const membership = principal?.memberships.find((item) => item.workspaceId === workspaceId);
-  const canEdit = membership?.role === 'owner' || membership?.role === 'coach';
+  const access = principal?.availableWorkspaces.find((item) => item.workspaceId === workspaceId);
+  const canEdit = access?.role === 'admin' || access?.role === 'owner' || access?.role === 'coach';
   const [groups, setGroups] = useState<ExerciseGroup[]>([]); const [exercises, setExercises] = useState<Exercise[]>([]);
   const [search, setSearch] = useState(''); const [showGroup, setShowGroup] = useState(false); const [showExercise, setShowExercise] = useState(false);
   const [groupId, setGroupId] = useState(''); const [name, setName] = useState(''); const [type, setType] = useState<'strength' | 'cardio'>('strength');
