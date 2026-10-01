@@ -22,7 +22,9 @@ Create environments `dev` (branch `dev` only) and `production` (branch `main` on
 - `CLOUDFLARE_ACCESS_ALLOWED_EMAIL`: `luke.edwards20@gmail.com`
 - `LANE_RESET_APPROVED`: `<account ID>:dev` or `<account ID>:main`
 
-The deployment credential uses Workers Editor, D1 Write, Access Apps Write, Access Policies Write, and Account Settings Read in this account. Do not grant billing, email, R2, queue, or other-account permissions. The account-owned `LiftLog GitHub Actions` token expires October 1, 2027; rotate it in both environment secrets before expiration. Keep credentials in GitHub environment secrets; never commit or log them. Establish an email-code identity provider in the personal Zero Trust organization before the first hosted login.
+The deployment credential uses Workers Editor, D1 Write, Access Apps Write, Access Policies Write, and Account Settings Read in this account. Do not grant billing, email, R2, queue, or other-account permissions. The account-owned `LiftLog GitHub Actions` token expires October 1, 2027; rotate it in both environment secrets before expiration. Keep credentials in GitHub environment secrets; never commit or log them.
+
+Hosted login uses the personal organization's existing Cloudflare account identity provider, pinned by ID in `scripts/cloudflare/config.mjs`, with six-hour application sessions. Only `luke.edwards20@gmail.com` is allowed. No email-code provider is added, and other applications' identity settings remain unchanged.
 
 Workers Editor can deploy existing Workers but cannot create or delete them. Initial setup creates both Workers in maintenance mode using the operator's personal Cloudflare login and `laneConfig(branch, undefined, { maintenance: true })`. These stable Workers carry the repository/lane ownership variables before CI takes over. Recreating a deleted Worker requires this same operator bootstrap; do not broaden the CI credential to Workers Admin just for routine deployments.
 
@@ -44,4 +46,4 @@ Before retiring legacy hosting, verify real Access login/logout, navigation and 
 
 ## Verification
 
-`npm run check` checks generated bindings, TypeScript, real Worker/D1 tests, deployment/promotion tests, local browser flows, the embedded frontend build, and Wrangler's deploy dry run. Hosted smoke checks are part of deployment; real email-code login and cross-environment reset isolation also need verification at initial cutover.
+`npm run check` checks generated bindings, TypeScript, real Worker/D1 tests, deployment/promotion tests, local browser flows, the embedded frontend build, and Wrangler's deploy dry run. Hosted smoke checks are part of deployment; real Cloudflare login and cross-environment reset isolation also need verification at initial cutover.

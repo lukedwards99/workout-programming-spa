@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACCOUNT_ID, EMAIL, SUBDOMAIN, REPOSITORY, validateInputs, laneConfig } from '../../scripts/cloudflare/config.mjs';
+import { ACCOUNT_ID, ACCESS_IDP_ID, EMAIL, SUBDOMAIN, REPOSITORY, validateInputs, laneConfig } from '../../scripts/cloudflare/config.mjs';
 import { assertPolicy, createOperations } from '../../scripts/cloudflare/operations.mjs';
 import { assertPromotionSource, deploymentState, checkPromotion } from '../../scripts/check-promotion.mjs';
 const inputs = { CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID, CLOUDFLARE_WORKERS_SUBDOMAIN: SUBDOMAIN,
@@ -56,5 +56,25 @@ test('resource collisions stop preflight before any mutation', async () => {
   try {
     await assert.rejects(createOperations(inputs).preflight(validateInputs('dev', inputs)), /unowned/);
     assert.ok(calls.every(method => method === 'GET'));
+  } finally { globalThis.fetch = original; }
+});
+
+test('Access updates preserve app identity and pin only the approved Cloudflare login provider', async () => {
+  const original = globalThis.fetch;
+  const writes = [];
+  globalThis.fetch = async (url, init) => {
+    if (init.method !== 'GET') writes.push({ url, ...init, body: JSON.parse(init.body) });
+    return { ok: true, json: async () => ({ success: true,
+      result: init.method === 'GET' ? [{ name: 'liftlog-dev', id: 'worker-id' }] : { id: 'app-id' } }) };
+  };
+  try {
+    await createOperations(inputs).ensureAccess(validateInputs('dev', inputs), { app: { id: 'app-id' }, policy: { id: 'policy-id' } });
+    assert.equal(writes.length, 1);
+    assert.equal(writes[0].method, 'PUT');
+    assert.ok(writes[0].url.endsWith(`/accounts/${ACCOUNT_ID}/access/apps/app-id`));
+    assert.deepEqual(writes[0].body.allowed_idps, [ACCESS_IDP_ID]);
+    assert.equal(writes[0].body.allow_authenticate_via_warp, false);
+    assert.equal(writes[0].body.session_duration, '6h');
+    assert.deepEqual(writes[0].body.destinations, [{ type: 'worker', worker_id: 'worker-id' }]);
   } finally { globalThis.fetch = original; }
 });
