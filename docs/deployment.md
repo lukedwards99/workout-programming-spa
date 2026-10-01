@@ -22,7 +22,9 @@ Create environments `dev` (branch `dev` only) and `production` (branch `main` on
 - `CLOUDFLARE_ACCESS_ALLOWED_EMAIL`: `luke.edwards20@gmail.com`
 - `LANE_RESET_APPROVED`: `<account ID>:dev` or `<account ID>:main`
 
-The deployment credential needs Worker deployment/settings access, D1 write access, and Access application/policy management in this account. Do not grant billing, email, R2, queue, or other-account permissions. Token creation and any required Zero Trust onboarding are operator setup steps. Keep credentials in GitHub environment secrets; never commit or log them. Establish an email-code identity provider in the personal Zero Trust organization before the first hosted login.
+The deployment credential uses Workers Editor, D1 Write, Access Apps Write, Access Policies Write, and Account Settings Read in this account. Do not grant billing, email, R2, queue, or other-account permissions. The account-owned `LiftLog GitHub Actions` token expires October 1, 2027; rotate it in both environment secrets before expiration. Keep credentials in GitHub environment secrets; never commit or log them. Establish an email-code identity provider in the personal Zero Trust organization before the first hosted login.
+
+Workers Editor can deploy existing Workers but cannot create or delete them. Initial setup creates both Workers in maintenance mode using the operator's personal Cloudflare login and `laneConfig(branch, undefined, { maintenance: true })`. These stable Workers carry the repository/lane ownership variables before CI takes over. Recreating a deleted Worker requires this same operator bootstrap; do not broaden the CI credential to Workers Admin just for routine deployments.
 
 The `verify` check runs `npm run check` on PRs. `promotion policy` runs trusted base-branch code, allows feature PRs into dev, and accepts main PRs only from the same repository's dev branch after its latest deployment for the exact head commit succeeds. PR policy requires merge commits, no mandatory second reviewer, and blocks branch deletion/force-push. Keep main as the default branch.
 
