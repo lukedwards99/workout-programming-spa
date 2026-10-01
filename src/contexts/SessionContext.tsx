@@ -44,14 +44,21 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, [applyPrincipal]);
 
   useEffect(() => {
+    const lost = () => applyPrincipal(null);
+    window.addEventListener('liftlog-session-lost', lost);
     refresh().catch(console.error).finally(() => setReady(true));
-  }, [refresh]);
+    return () => window.removeEventListener('liftlog-session-lost', lost);
+  }, [refresh, applyPrincipal]);
 
   const login = useCallback(async (userId: string) => {
     applyPrincipal(await sessionApi.login(userId));
   }, [applyPrincipal]);
 
   const logout = useCallback(async () => {
+    if (__HOSTED__) {
+      window.location.assign('/cdn-cgi/access/logout');
+      return;
+    }
     await sessionApi.logout();
     applyPrincipal(null);
   }, [applyPrincipal]);

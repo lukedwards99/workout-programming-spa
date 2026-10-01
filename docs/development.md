@@ -11,7 +11,9 @@ The schema lives in `migrations/`. Local seed personas live in `seed/local.sql`.
 - `npm run db:setup` applies migrations and the idempotent local seed.
 - `npm run dev` initializes D1 and starts the integrated app.
 - `npm run typecheck` checks React, Worker, and test TypeScript.
-- `npm run build` produces the Worker and client bundle.
+- `npm run build` produces local preview bundles; `npm run build:hosted` embeds the hosted frontend into the deployment Worker.
+- `npm run check` runs all required verification, including a hosted deployment dry run.
+- `npm run types:check` verifies generated bindings; regenerate with `npx wrangler types worker/bindings.generated.d.ts --include-runtime=false --strict-vars=false` after changing Wrangler bindings.
 - `npm run test:worker` runs isolated Worker/D1 tests.
 - `npm run db:reset:local` intentionally resets and reseeds the normal local D1 database.
 - `npm run test:e2e` resets `.wrangler/e2e`, then creates an isolated workspace and personas for each parallel Playwright test. It never writes test users to normal local D1 state.
@@ -22,6 +24,6 @@ Programs contain mesocycles, mesocycles contain workouts, and workouts contain e
 
 ## Authentication boundary
 
-Local persona routes are available only when `APP_ENV` is `local` or `test` and local authentication is enabled. They set an HttpOnly, `SameSite=Lax` cookie. Future adapters should validate provider credentials, match provider subject first, then link only a single pre-created account with the same verified normalized email. Unknown identities must be rejected.
+Local persona routes are available only when `APP_ENV` is `local` or `test` and local authentication is enabled. They set an HttpOnly, `SameSite=Lax` cookie. Hosted authentication uses Cloudflare Access runtime identity, links verified normalized email only to a pre-created active/invited account, and rejects unknown or disabled users. The API applies the local-only guard before accepting any persona cookie.
 
-No remote D1 database or external identity provider is configured on this branch.
+See [deployment and recovery](deployment.md) for the personal Cloudflare dev/main environments and their reset behavior.

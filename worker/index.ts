@@ -11,6 +11,16 @@ import { runHistoryRetention } from './maintenance';
 
 const app = new Hono<AppEnv>();
 
+app.use('/api/*', async (c, next) => {
+  c.header('Cache-Control', 'no-store');
+  // Cookie-authenticated mutations must originate from this application.
+  const origin = c.req.header('Origin');
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(c.req.method) && origin && origin !== new URL(c.req.url).origin) {
+    throw new ApiError(403, 'invalid_origin', 'Cross-origin writes are not allowed.');
+  }
+  await next();
+});
+
 app.route('/api', sessionRoutes);
 
 const protectedApi = new Hono<AppEnv>();

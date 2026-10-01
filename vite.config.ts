@@ -7,6 +7,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [react(), cloudflare({ persistState: mode === 'e2e' ? { path: '.wrangler/e2e' } : true })],
   base: '/',
   define: {
+    __HOSTED__: JSON.stringify(mode === 'hosted'),
     __BUILD_DATE__: JSON.stringify(new Date().toLocaleString('en-US', {
       year: 'numeric',
       month: 'long',

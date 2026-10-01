@@ -24,10 +24,8 @@ export interface AuthPrincipal {
   availableWorkspaces: WorkspaceAccess[];
 }
 
-export interface Bindings {
-  DB: D1Database;
-  APP_ENV: 'local' | 'test' | 'preview' | 'production';
-  LOCAL_AUTH_ENABLED: string;
+export interface Bindings extends Omit<Cloudflare.Env, 'APP_ENV'> {
+  APP_ENV: 'local' | 'test' | 'dev' | 'production';
 }
 
 export type AppEnv = {

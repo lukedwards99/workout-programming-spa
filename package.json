@@ -19,7 +19,13 @@
     "typecheck": "tsc --noEmit",
     "test:worker": "vitest run --config vitest.config.ts",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "build:hosted": "vite build --mode hosted && node scripts/build-hosted.mjs",
+    "dry-run:hosted": "wrangler deploy --config .wrangler/hosted-check.json --dry-run --outdir .wrangler/hosted-dry-run",
+    "test:deployment": "node --test tests/deployment/*.test.mjs",
+    "check": "node scripts/check.mjs",
+    "deploy:lane": "node scripts/deploy-lane.mjs",
+    "types:check": "wrangler types worker/bindings.generated.d.ts --include-runtime=false --strict-vars=false --check"
   },
   "dependencies": {
     "bootstrap": "^5.3.2",
@@ -42,5 +48,9 @@
     "vite": "^8.2.2",
     "vitest": "^4.1.11",
     "wrangler": "^4.125.0"
+  },
+  "private": true,
+  "engines": {
+    "node": "24.15.x"
   }
 }

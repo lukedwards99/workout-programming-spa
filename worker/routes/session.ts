@@ -8,6 +8,11 @@ import { loadPrincipal, LOCAL_USER_COOKIE, requireAuth } from '../auth';
 export const sessionRoutes = new Hono<AppEnv>();
 
 sessionRoutes.get('/health', (c) => data(c, { status: 'ok', environment: c.env.APP_ENV }));
+sessionRoutes.get('/session/config', (c) => data(c, {
+  authMode: ['local', 'test'].includes(c.env.APP_ENV) && c.env.LOCAL_AUTH_ENABLED === 'true' ? 'local' : 'access',
+  environment: c.env.APP_ENV,
+  disposableData: !['local', 'test'].includes(c.env.APP_ENV),
+}));
 
 sessionRoutes.get('/local-auth/users', async (c) => {
   if (c.env.LOCAL_AUTH_ENABLED !== 'true' || !['local', 'test'].includes(c.env.APP_ENV)) {

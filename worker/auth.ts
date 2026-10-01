@@ -2,6 +2,7 @@ import type { MiddlewareHandler } from 'hono';
 import { getCookie } from 'hono/cookie';
 import type { AppEnv, AuthPrincipal, WorkspaceAccess, WorkspaceMembership } from './types';
 import { all, ApiError, first } from './lib';
+import { resolveValidatedProviderIdentity } from './provider-auth';
 
 export const LOCAL_USER_COOKIE = 'liftlog_local_user';
 
@@ -89,6 +90,11 @@ export function loadPrincipalForIdentity(db: D1Database, provider: string, provi
 }
 
 export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (!['local', 'test'].includes(c.env.APP_ENV) || c.env.LOCAL_AUTH_ENABLED !== 'true') {
+    c.set('principal', await principalFromAccess(c.env.DB, c.executionCtx));
+    await next();
+    return;
+  }
   const userId = getCookie(c, LOCAL_USER_COOKIE);
   if (!userId) throw new ApiError(401, 'unauthenticated', 'Sign in to continue.');
   const principal = await loadPrincipal(c.env.DB, userId);
@@ -96,3 +102,17 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   c.set('principal', principal);
   await next();
 };
+
+// Only the runtime-authenticated invocation is trusted, never request headers.
+export async function principalFromAccess(db: D1Database, context: object): Promise<AuthPrincipal> {
+  const access = (context as { access?: { getIdentity(): Promise<{ email?: string } | undefined> } }).access;
+  let identity;
+  try { identity = await access?.getIdentity(); } catch { /* Fail closed. */ }
+  const email = typeof identity?.email === 'string' ? identity.email.trim().toLowerCase() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 320) {
+    throw new ApiError(401, 'identity_required', 'Sign in through Cloudflare Access to continue.');
+  }
+  return resolveValidatedProviderIdentity(db, {
+    provider: 'cloudflare-access', providerSubject: email, verifiedEmail: email,
+  });
+}
