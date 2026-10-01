@@ -1,75 +1,41 @@
-import { useState, useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { initDatabase } from './db/databaseService';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import Navigation from './components/Navigation';
+import { useSession } from './contexts/SessionContext';
+import LocalLoginPage from './pages/LocalLoginPage';
 import HomePage from './pages/HomePage';
 import ProgramPage from './pages/ProgramPage';
-import ProgramMesocyclesTab from './pages/ProgramMesocyclesTab';
-import ProgramExercisesPage from './pages/ProgramExercisesPage';
-import ProgramDataPage from './pages/ProgramDataPage';
-import ProgramSummaryPage from './pages/ProgramSummaryPage';
-import TutorialPage from './pages/TutorialPage';
-import AboutPage from './pages/AboutPage';
-import MesocyclePage from './pages/MesocyclePage';
 import WorkoutPage from './pages/WorkoutPage';
-import { SummarySetTypeFilterProvider } from './components/summary/SummarySetTypeFilter';
+import WorkspaceLibraryPage from './pages/WorkspaceLibraryPage';
+import AdminUsersPage from './pages/AdminUsersPage';
+import ClientsPage from './pages/ClientsPage';
+import WorkspacesPage from './pages/WorkspacesPage';
+import AboutPage from './pages/AboutPage';
 
 export default function App() {
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    initDatabase()
-      .then(() => setReady(true))
-      .catch((e: Error) => setError(e.message));
-  }, []);
-
-  if (error) {
-    return (
-      <div className="loading-screen">
-        <div>
-          <p style={{ color: 'var(--danger)' }}>Failed to initialize database:</p>
-          <p>{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!ready) {
-    return <div className="loading-screen">Loading database...</div>;
-  }
-
-  return (
-    <div className="app" data-testid="app-ready">
-      <SummarySetTypeFilterProvider>
-        <Navigation />
-        <div className="container">
-          <Routes>
+  const { principal, ready, workspaceId } = useSession();
+  if (!ready) return <div className="loading-screen">Connecting to LiftLog…</div>;
+  if (!principal) return __HOSTED__ ? <main className="container py-5">
+    <h1>Sign in to LiftLog</h1>
+    <p>Your session could not be verified. Check your connection and sign in with your allowed email address.</p>
+    <a className="btn btn-primary" href="/cdn-cgi/access/logout">Sign in again</a>
+  </main> : <LocalLoginPage />;
+  return <div className="app" data-testid="app-ready">
+    <Navigation />
+    {__HOSTED__ && <div className="alert alert-warning m-3" role="status">Development preview: all data in this environment resets on every deployment.</div>}
+    <main className="container">
+      <Routes>
+        <Route path="/workspaces" element={<WorkspacesPage />} />
+        {!workspaceId ? <Route path="*" element={<Navigate to="/workspaces" replace />} /> : <>
           <Route path="/" element={<HomePage />} />
-          <Route path="/tutorial" element={<TutorialPage />} />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="/programs/:programId" element={<ProgramPage />}>
-            <Route index element={<ProgramMesocyclesTab />} />
-            <Route path="exercises" element={<ProgramExercisesPage />} />
-            <Route path="data" element={<ProgramDataPage />} />
-            <Route path="summary" element={<ProgramSummaryPage />} />
-          </Route>
-          <Route path="/programs/:programId/mesocycles/:mesocycleId" element={<MesocyclePage />} />
+          <Route path="/programs/:programId" element={<ProgramPage />} />
           <Route path="/programs/:programId/workouts/:workoutId" element={<WorkoutPage />} />
-          {/* Legacy route redirects */}
-          <Route path="/mesocycles/:mesocycleId" element={<MesocycleFallback />} />
-          <Route path="/workouts/:workoutId" element={<WorkoutFallback />} />
-          </Routes>
-        </div>
-      </SummarySetTypeFilterProvider>
-    </div>
-  );
-}
-
-function MesocycleFallback() {
-  return <div className="empty-state"><p>Please navigate via a program. Legacy URLs are no longer supported.</p></div>;
-}
-
-function WorkoutFallback() {
-  return <div className="empty-state"><p>Please navigate via a program. Legacy URLs are no longer supported.</p></div>;
+          <Route path="/library" element={<WorkspaceLibraryPage />} />
+          <Route path="/clients" element={<ClientsPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </>}
+      </Routes>
+    </main>
+  </div>;
 }

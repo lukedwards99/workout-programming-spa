@@ -1,0 +1,27 @@
+name: Promotion policy
+
+on:
+  pull_request_target:
+    branches: [main, dev]
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  promotion-policy:
+    name: promotion policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      # Run the policy from the protected base, never from the proposed PR.
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24.15.0
+      - run: node scripts/check-promotion.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

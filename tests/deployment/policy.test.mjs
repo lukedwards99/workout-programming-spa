@@ -1,0 +1,60 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { ACCOUNT_ID, EMAIL, SUBDOMAIN, REPOSITORY, validateInputs, laneConfig } from '../../scripts/cloudflare/config.mjs';
+import { assertPolicy, createOperations } from '../../scripts/cloudflare/operations.mjs';
+import { assertPromotionSource, deploymentState, checkPromotion } from '../../scripts/check-promotion.mjs';
+const inputs = { CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID, CLOUDFLARE_WORKERS_SUBDOMAIN: SUBDOMAIN,
+  CLOUDFLARE_ACCESS_ALLOWED_EMAIL: EMAIL, CLOUDFLARE_API_TOKEN: 'test-token', GITHUB_REPOSITORY: REPOSITORY,
+  GITHUB_REF_NAME: 'dev', GITHUB_REF_TYPE: 'branch', LANE_RESET_APPROVED: `${ACCOUNT_ID}:dev` };
+
+test('rejects wrong accounts, branches, repository, allowlist, token and reset approval', () => {
+  assert.equal(validateInputs('dev', inputs).worker, 'liftlog-dev');
+  for (const key of Object.keys(inputs).filter(key => key !== 'CLOUDFLARE_API_TOKEN')) assert.throws(() => validateInputs('dev', { ...inputs, [key]: 'wrong' }), key);
+  assert.throws(() => validateInputs('feature', inputs));
+  assert.throws(() => validateInputs('dev', { ...inputs, CLOUDFLARE_API_TOKEN: '' }));
+});
+test('hosted environments are separate and cannot enable local auth or asset routing', () => {
+  const dev = laneConfig('dev', 'dev-database'), main = laneConfig('main', 'main-database');
+  assert.notEqual(dev.name, main.name);
+  for (const config of [dev, main]) {
+    assert.equal(config.account_id, ACCOUNT_ID); assert.equal(config.vars.LOCAL_AUTH_ENABLED, 'false');
+    assert.equal(config.preview_urls, false); assert.equal(config.assets, undefined);
+    for (const resource of ['queues', 'r2_buckets', 'containers', 'send_email']) assert.equal(config[resource], undefined);
+  }
+  const maintenance = laneConfig('dev', undefined, { maintenance: true });
+  assert.equal(maintenance.d1_databases, undefined); assert.deepEqual(maintenance.triggers.crons, []);
+});
+test('refuses to broaden or replace unrelated Access policies', () => {
+  assert.doesNotThrow(() => assertPolicy({ decision: 'allow', include: [{ email: { email: EMAIL } }] }));
+  for (const policy of [{ decision: 'bypass' }, { decision: 'allow', include: [{ everyone: {} }] },
+    { decision: 'allow', include: [{ email: { email: EMAIL } }], require: [{ email_domain: { domain: 'example.com' } }] }]) assert.throws(() => assertPolicy(policy));
+});
+test('promotion requires same-repository dev and latest successful exact-commit deployment', async () => {
+  const pr = { base: { ref: 'main' }, head: { ref: 'dev', sha: 'head-sha', repo: { full_name: REPOSITORY } } };
+  assert.equal(assertPromotionSource(pr, REPOSITORY), true);
+  assert.throws(() => assertPromotionSource({ ...pr, head: { ...pr.head, ref: 'feature' } }, REPOSITORY));
+  assert.throws(() => assertPromotionSource({ ...pr, head: { ...pr.head, repo: { full_name: 'fork/repo' } } }, REPOSITORY));
+  const run = { id: 1, head_sha: 'head-sha', head_branch: 'dev', event: 'push', path: '.github/workflows/deploy-lanes.yml', status: 'completed', conclusion: 'success' };
+  assert.equal(deploymentState([], 'head-sha'), 'pending');
+  assert.equal(deploymentState([run], 'other-sha'), 'pending');
+  assert.equal(deploymentState([run], 'head-sha'), 'success');
+  assert.equal(deploymentState([run, { ...run, id: 2, conclusion: 'failure' }], 'head-sha'), 'failure');
+  assert.equal(deploymentState([{ ...run, status: 'in_progress' }], 'head-sha'), 'pending');
+  await assert.rejects(checkPromotion({ event: { pull_request: pr }, repository: REPOSITORY, token: 'test', attempts: 1,
+    fetcher: async () => ({ ok: true, json: async () => ({ workflow_runs: [] }) }) }), /No successful/);
+});
+test('resource collisions stop preflight before any mutation', async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push(init.method);
+    let result = [];
+    if (url.includes('/workers/workers?')) result = [{ name: 'liftlog-dev', id: 'worker-id' }];
+    if (url.endsWith('/settings')) result = { bindings: [], tags: [] };
+    return { ok: true, json: async () => ({ success: true, result }) };
+  };
+  try {
+    await assert.rejects(createOperations(inputs).preflight(validateInputs('dev', inputs)), /unowned/);
+    assert.ok(calls.every(method => method === 'GET'));
+  } finally { globalThis.fetch = original; }
+});

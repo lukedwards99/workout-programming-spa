@@ -1,0 +1,118 @@
+import type { MiddlewareHandler } from 'hono';
+import { getCookie } from 'hono/cookie';
+import type { AppEnv, AuthPrincipal, WorkspaceAccess, WorkspaceMembership } from './types';
+import { all, ApiError, first } from './lib';
+import { resolveValidatedProviderIdentity } from './provider-auth';
+
+export const LOCAL_USER_COOKIE = 'liftlog_local_user';
+
+async function principalFromIdentity(db: D1Database, provider: string, providerSubject: string): Promise<AuthPrincipal | null> {
+  const identity = await first<{
+    user_id: string;
+    display_name: string;
+    email_normalized: string;
+    status: string;
+    provider: string;
+    provider_subject: string;
+  }>(db.prepare(
+    `SELECT u.id AS user_id, u.display_name, u.email_normalized, u.status,
+            ai.provider, ai.provider_subject
+     FROM users u
+     JOIN auth_identities ai ON ai.user_id = u.id
+     WHERE ai.provider = ? AND ai.provider_subject = ?`,
+  ).bind(provider, providerSubject));
+  if (!identity || identity.status !== 'active') return null;
+  const userId = identity.user_id;
+
+  const platformRoles = await all<{ role: string }>(db.prepare(
+    'SELECT role FROM platform_user_roles WHERE user_id = ? ORDER BY role',
+  ).bind(userId));
+  const memberships = await all<{
+    workspace_id: string;
+    workspace_name: string;
+    role: WorkspaceMembership['role'];
+    status: WorkspaceMembership['status'];
+  }>(db.prepare(
+    `SELECT wm.workspace_id, w.name AS workspace_name, wm.role, wm.status
+     FROM workspace_members wm JOIN workspaces w ON w.id = wm.workspace_id
+     WHERE wm.user_id = ? ORDER BY w.name`,
+  ).bind(userId));
+  const isAdmin = platformRoles.some((item) => item.role === 'admin');
+  const available = isAdmin
+    ? await all<{
+        workspace_id: string;
+        workspace_name: string;
+        member_role: WorkspaceMembership['role'] | null;
+        member_status: WorkspaceMembership['status'] | null;
+      }>(db.prepare(
+        `SELECT w.id AS workspace_id, w.name AS workspace_name,
+                wm.role AS member_role, wm.status AS member_status
+         FROM workspaces w
+         LEFT JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = ?
+         WHERE w.status = 'active' ORDER BY w.name`,
+      ).bind(userId))
+    : memberships.filter((item) => item.status === 'active').map((item) => ({
+        workspace_id: item.workspace_id,
+        workspace_name: item.workspace_name,
+        member_role: item.role,
+        member_status: item.status,
+      }));
+
+  return {
+    userId: identity.user_id,
+    displayName: identity.display_name,
+    verifiedEmail: identity.email_normalized,
+    provider: identity.provider,
+    providerSubject: identity.provider_subject,
+    platformRoles: platformRoles.map((item) => item.role),
+    memberships: memberships.map((item) => ({
+      workspaceId: item.workspace_id,
+      workspaceName: item.workspace_name,
+      role: item.role,
+      status: item.status,
+    })),
+    availableWorkspaces: available.map((item): WorkspaceAccess => ({
+      workspaceId: item.workspace_id,
+      workspaceName: item.workspace_name,
+      role: isAdmin ? 'admin' : item.member_role!,
+      status: item.member_status ?? 'active',
+      isMember: item.member_role !== null,
+    })),
+  };
+}
+
+export function loadPrincipal(db: D1Database, userId: string): Promise<AuthPrincipal | null> {
+  return principalFromIdentity(db, 'local', userId);
+}
+
+export function loadPrincipalForIdentity(db: D1Database, provider: string, providerSubject: string): Promise<AuthPrincipal | null> {
+  return principalFromIdentity(db, provider, providerSubject);
+}
+
+export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
+  if (!['local', 'test'].includes(c.env.APP_ENV) || c.env.LOCAL_AUTH_ENABLED !== 'true') {
+    c.set('principal', await principalFromAccess(c.env.DB, c.executionCtx));
+    await next();
+    return;
+  }
+  const userId = getCookie(c, LOCAL_USER_COOKIE);
+  if (!userId) throw new ApiError(401, 'unauthenticated', 'Sign in to continue.');
+  const principal = await loadPrincipal(c.env.DB, userId);
+  if (!principal) throw new ApiError(401, 'unauthenticated', 'The local session is no longer valid.');
+  c.set('principal', principal);
+  await next();
+};
+
+// Only the runtime-authenticated invocation is trusted, never request headers.
+export async function principalFromAccess(db: D1Database, context: object): Promise<AuthPrincipal> {
+  const access = (context as { access?: { getIdentity(): Promise<{ email?: string } | undefined> } }).access;
+  let identity;
+  try { identity = await access?.getIdentity(); } catch { /* Fail closed. */ }
+  const email = typeof identity?.email === 'string' ? identity.email.trim().toLowerCase() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 320) {
+    throw new ApiError(401, 'identity_required', 'Sign in through Cloudflare Access to continue.');
+  }
+  return resolveValidatedProviderIdentity(db, {
+    provider: 'cloudflare-access', providerSubject: email, verifiedEmail: email,
+  });
+}

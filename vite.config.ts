@@ -1,11 +1,13 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import { cloudflare } from '@cloudflare/vite-plugin'
 
 // https://vitejs.dev/config/
-export default defineConfig(() => ({
-  plugins: [react()],
+export default defineConfig(({ mode }) => ({
+  plugins: [react(), cloudflare({ persistState: mode === 'e2e' ? { path: '.wrangler/e2e' } : true })],
   base: '/',
   define: {
+    __HOSTED__: JSON.stringify(mode === 'hosted'),
     __BUILD_DATE__: JSON.stringify(new Date().toLocaleString('en-US', {
       year: 'numeric',
       month: 'long',

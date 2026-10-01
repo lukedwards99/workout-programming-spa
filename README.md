@@ -1,59 +1,34 @@
 # LiftLog
 
-LiftLog is a browser-based workout programming tool for building strength and cardio programs, mesocycles, workouts, and exercise libraries. It runs entirely on your device: there are no accounts, servers, or cloud storage.
-
-Your training data is stored in your browser using IndexedDB and SQLite compiled to WebAssembly. Keep backups of anything you want to preserve outside that browser.
-
-## Try LiftLog
-
-- [Production app](https://liftlog-lukedwards99.pages.dev/)
-- Development app: `https://develop.liftlog-lukedwards99.pages.dev/`
-  (available after the next push to `develop`)
-
-## What it does
-
-- Organize training programs into dated mesocycles and scheduled workouts.
-- Build a separate typed Strength/Cardio exercise library for each program, including variations and notes.
-- Plan and record strength sets with type, reps, weight, and RIR, plus cardio sets with duration, distance, and RPE.
-- Copy workouts, generate repeated workout schedules, and review programmed training summaries.
-- Export and restore program backups and exchange exercise libraries as JSON.
-
-## Documentation
-
-- [Documentation overview](docs/index.md)
-- [Using LiftLog](docs/using-liftlog.md)
-- [Data management and backups](docs/data-management.md)
-- [Development guide](docs/development.md)
+A React workout-programming app with a same-origin Hono Worker and Cloudflare D1 database.
 
 ## Develop locally
 
-Prerequisites: Node.js 20 and npm.
+Use Node **24.15.0** (`.node-version`), then:
 
-```bash
+```sh
 npm ci
 npm run dev
 ```
 
-The development server runs at `http://localhost:5173`.
+Startup applies migrations and idempotent local seeds. Select a local owner, coach, or client persona. Local databases are isolated from hosted environments and survive ordinary restarts.
 
-Useful commands:
-
-```bash
-npm run typecheck
-npm run build
-npm run preview
-npm run test:e2e
-npm run test:e2e:ui
+```sh
+npm run check             # types, Worker/deployment/browser tests, hosted build and dry run
+npm run db:reset:local    # intentionally reset local data
 ```
 
-If Playwright has not installed its browser binary on your machine, run `npx playwright install` before the E2E commands.
+## Hosted workflow
 
-## Project layout
+Feature branch → pull request into **dev** → test the dev deployment → pull request from **dev** into **main**.
 
-```text
-src/             React application, domain APIs, and browser-local data layer
-tests/e2e/       Playwright end-to-end coverage
-docs/            User and developer documentation
-```
+| Branch | GitHub environment | URL |
+| --- | --- | --- |
+| dev | dev | https://liftlog-dev.luke-edwards20.workers.dev |
+| main | production | https://liftlog-production.luke-edwards20.workers.dev |
 
-For implementation details, testing expectations, and deployment behavior, see the [development guide](docs/development.md).
+Both hosted environments are disposable: **every deployment, including a manual rerun, recreates that environment's database**. The initial state contains Luke's admin account and an owner workspace, with no demo workouts. Main's environment name does not imply durable production data.
+
+Cloudflare Access protects each Worker and permits only `luke.edwards20@gmail.com`, using an emailed login code. No application email service is needed. Local persona selection and test fixture endpoints are unavailable remotely.
+
+See [development](docs/development.md), [deployment and recovery](docs/deployment.md), and [using LiftLog](docs/using-liftlog.md).
