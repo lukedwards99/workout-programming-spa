@@ -8,6 +8,7 @@ export interface WorkspaceMembership {
 }
 
 export interface AuthPrincipal {
+  testing?: { canSwitch: boolean; authenticatedEmail: string; isImpersonating: boolean };
   userId: string;
   displayName: string;
   verifiedEmail: string;
@@ -25,6 +26,7 @@ export interface AuthPrincipal {
 }
 
 export interface LocalUser {
+  roles?: string;
   id: string;
   display_name: string;
   email_display: string;
@@ -32,6 +34,8 @@ export interface LocalUser {
 }
 
 export interface Program {
+  mesocycle_count?: number;
+  workout_count?: number;
   id: string;
   workspace_id: string;
   owner_user_id: string;

@@ -16,6 +16,10 @@ test('rejects wrong accounts, branches, repository, allowlist, token and reset a
 test('hosted environments are separate and cannot enable local auth or asset routing', () => {
   const dev = laneConfig('dev', 'dev-database'), main = laneConfig('main', 'main-database');
   assert.notEqual(dev.name, main.name);
+  assert.equal(dev.vars.DEV_IDENTITY_SWITCH_ENABLED, 'true');
+  assert.equal(dev.vars.DEV_IDENTITY_SWITCH_EMAIL, EMAIL);
+  assert.equal(main.vars.DEV_IDENTITY_SWITCH_ENABLED, 'false');
+  assert.equal(main.vars.DEV_IDENTITY_SWITCH_EMAIL, '');
   for (const config of [dev, main]) {
     assert.equal(config.account_id, ACCOUNT_ID); assert.equal(config.vars.LOCAL_AUTH_ENABLED, 'false');
     assert.equal(config.preview_urls, false); assert.equal(config.assets, undefined);

@@ -38,6 +38,8 @@ Bootstrap dev first. The initial dev → main PR installs the trusted promotion 
 
 The script verifies account inputs, artifact commit provenance, Worker ownership variables, the D1 ownership marker, and Access application/policy ownership. It deploys a maintenance response without database bindings or cron triggers, establishes Access, recreates only the selected database, applies migrations and the hosted seed, and activates the built Worker. Post-deployment checks verify the owner/workspace seed and unauthenticated Access redirects. Failures after maintenance restore maintenance; a successful rerun completes a fresh reset.
 
+Dev additionally applies `cloudflare/dev-personas.sql` for a simulated coach and athlete, and enables identity switching only for the configured Access owner/administrator. Main has neither the test seed nor the switch flag. This does not broaden Cloudflare Access. See [testing account access](test-identities.md).
+
 D1 ownership is recorded in `_liftlog_deployment_owner`. A database without a valid ownership marker is never deleted automatically. If a network interruption occurs between database creation and marker initialization, inspect the recorded operation and database identity before manually resolving that orphan; do not bypass the collision check or adopt an unrelated database.
 
 To recover a broken release, revert the change through a PR and redeploy. This recreates disposable data. Do not use a Worker-only version rollback after a database recreation: an old version may reference a deleted database ID. Re-run deployment from the appropriate branch instead.

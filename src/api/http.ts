@@ -31,6 +31,7 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
     }
   }
   const payload = await response.json() as { data?: T; error?: ApiFailure };
+  if (response.status === 401) window.dispatchEvent(new Event('liftlog-session-lost'));
   if (!response.ok || payload.error) {
     throw new ApiClientError(response.status, payload.error ?? { code: 'request_failed', message: 'The request failed.' });
   }

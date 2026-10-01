@@ -2,6 +2,15 @@ import { apiRequest, jsonBody } from './http';
 import type { AuthPrincipal, LocalUser } from '../types/cloud';
 
 export const sessionApi = {
+  testUsers(): Promise<LocalUser[]> {
+    return apiRequest('/test-auth/users');
+  },
+  switchUser(userId: string): Promise<AuthPrincipal> {
+    return apiRequest('/test-auth/session', { method: 'POST', ...jsonBody({ userId }) });
+  },
+  resetUser() {
+    return apiRequest('/test-auth/session', { method: 'DELETE' });
+  },
   get(): Promise<AuthPrincipal> {
     return apiRequest('/session');
   },
@@ -15,4 +24,3 @@ export const sessionApi = {
     return apiRequest('/session', { method: 'DELETE' });
   },
 };
-

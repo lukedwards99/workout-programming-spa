@@ -29,6 +29,8 @@ export function laneConfig(branch, databaseId, { maintenance = false, sha = 'ver
     main: resolve(maintenance ? 'worker/maintenance-entry.ts' : 'dist/hosted/index.ts'),
     compatibility_date: '2026-09-30', workers_dev: true, preview_urls: false,
     vars: { APP_ENV: branch === 'dev' ? 'dev' : 'production', LOCAL_AUTH_ENABLED: 'false',
+      DEV_IDENTITY_SWITCH_ENABLED: branch === 'dev' && !maintenance ? 'true' : 'false',
+      DEV_IDENTITY_SWITCH_EMAIL: branch === 'dev' && !maintenance ? EMAIL : '',
       MANAGED_BY: REPOSITORY, DEPLOYMENT_LANE: branch, DEPLOYMENT_SHA: sha },
     ...(databaseId ? { d1_databases: [{ binding: 'DB', database_name: names.database,
       database_id: databaseId, migrations_dir: resolve('migrations') }] } : {}),

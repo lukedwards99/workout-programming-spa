@@ -11,6 +11,9 @@ interface SessionValue {
   login: (userId: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  switchUser: (userId: string) => Promise<void>;
+  resetUser: () => Promise<void>;
+  sessionError: string;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -20,6 +23,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [principal, setPrincipal] = useState<AuthPrincipal | null>(null);
   const [workspaceId, setWorkspaceIdState] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [sessionError, setSessionError] = useState('');
 
   const applyPrincipal = useCallback((next: AuthPrincipal | null) => {
     setPrincipal(next);
@@ -37,8 +41,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       applyPrincipal(await sessionApi.get());
+      setSessionError('');
     } catch (error) {
-      if (error instanceof ApiClientError && error.status === 401) applyPrincipal(null);
+      if (error instanceof ApiClientError && error.status === 401) { applyPrincipal(null); setSessionError(''); }
       else throw error;
     }
   }, [applyPrincipal]);
@@ -46,20 +51,33 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const lost = () => applyPrincipal(null);
     window.addEventListener('liftlog-session-lost', lost);
-    refresh().catch(console.error).finally(() => setReady(true));
+    refresh().catch((error: Error) => setSessionError(error.message)).finally(() => setReady(true));
     return () => window.removeEventListener('liftlog-session-lost', lost);
   }, [refresh, applyPrincipal]);
 
   const login = useCallback(async (userId: string) => {
     applyPrincipal(await sessionApi.login(userId));
+    await refresh();
+    window.localStorage.setItem('liftlog-session-change', crypto.randomUUID());
+  }, [applyPrincipal, refresh]);
+
+  const switchUser = useCallback(async (userId: string) => {
+    applyPrincipal(await sessionApi.switchUser(userId));
+    window.localStorage.setItem('liftlog-session-change', crypto.randomUUID());
   }, [applyPrincipal]);
+  const resetUser = useCallback(async () => {
+    await sessionApi.resetUser();
+    await refresh();
+    window.localStorage.setItem('liftlog-session-change', crypto.randomUUID());
+  }, [refresh]);
 
   const logout = useCallback(async () => {
+    await sessionApi.logout();
+    window.localStorage.setItem('liftlog-session-change', crypto.randomUUID());
     if (__HOSTED__) {
       window.location.assign('/cdn-cgi/access/logout');
       return;
     }
-    await sessionApi.logout();
     applyPrincipal(null);
   }, [applyPrincipal]);
 
@@ -69,7 +87,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setWorkspaceIdState(next);
   }, [principal]);
 
-  const value = useMemo(() => ({ principal, workspaceId, ready, setWorkspaceId, login, logout, refresh }), [principal, workspaceId, ready, setWorkspaceId, login, logout, refresh]);
+  useEffect(() => {
+    const changed = (e: StorageEvent) => {
+      if (e.key === 'liftlog-session-change') void refresh().catch((error: Error) => setSessionError(error.message));
+    };
+    window.addEventListener('storage', changed);
+    return () => window.removeEventListener('storage', changed);
+  }, [refresh]);
+
+  const value = useMemo(() => ({ principal, workspaceId, ready, setWorkspaceId, login, logout, refresh, switchUser, resetUser, sessionError }), [principal, workspaceId, ready, setWorkspaceId, login, logout, refresh, switchUser, resetUser, sessionError]);
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 

@@ -27,3 +27,5 @@ Programs contain mesocycles, mesocycles contain workouts, and workouts contain e
 Local persona routes are available only when `APP_ENV` is `local` or `test` and local authentication is enabled. They set an HttpOnly, `SameSite=Lax` cookie. Hosted authentication uses Cloudflare Access runtime identity, links verified normalized email only to a pre-created active/invited account, and rejects unknown or disabled users. The API applies the local-only guard before accepting any persona cookie.
 
 See [deployment and recovery](deployment.md) for the personal Cloudflare dev/main environments and their reset behavior.
+
+The temporary `/api/test-auth/*` wrapper is separate from local login. It requires the real Access administrator on hosted dev, is disabled on production, and keeps the existing authorization checks against the selected test account. See [testing account access](test-identities.md) for sessions, seeded emails, and removal instructions.

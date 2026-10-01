@@ -8,7 +8,9 @@
   },
   "vars": {
     "APP_ENV": "local",
-    "LOCAL_AUTH_ENABLED": "true"
+    "LOCAL_AUTH_ENABLED": "true",
+    "DEV_IDENTITY_SWITCH_ENABLED": "false",
+    "DEV_IDENTITY_SWITCH_EMAIL": ""
   },
   "d1_databases": [
     {
