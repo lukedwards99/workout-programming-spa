@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { ACCOUNT_ID, EMAIL, REPOSITORY } from './config.mjs';
+import { ACCOUNT_ID, ACCESS_IDP_ID, EMAIL, REPOSITORY } from './config.mjs';
 
 export function createOperations(env = process.env) {
   async function api(path, { method = 'GET', body } = {}) {
@@ -66,7 +66,9 @@ export function createOperations(env = process.env) {
       name: `${names.access} allowlist`, decision: 'allow', include: [{ email: { email: EMAIL } }],
     } });
     const body = { name: names.access, type: 'self_hosted', destinations: [{ type: 'worker', worker_id: worker.id }],
-      app_launcher_visible: false, session_duration: '6h', policies: [{ id: policy.id, account_id: ACCOUNT_ID, precedence: 1 }] };
+      app_launcher_visible: false, session_duration: '6h', allowed_idps: [ACCESS_IDP_ID],
+      allow_authenticate_via_warp: false,
+      policies: [{ id: policy.id, account_id: ACCOUNT_ID, precedence: 1 }] };
     return api(inventory.app ? `/access/apps/${inventory.app.id}` : '/access/apps', {
       method: inventory.app ? 'PUT' : 'POST', body,
     });
