@@ -1,7 +1,8 @@
 import type { Context, MiddlewareHandler } from 'hono';
 import { deleteCookie, getCookie } from 'hono/cookie';
-import type { AppEnv, AuthPrincipal, WorkspaceAccess, WorkspaceMembership } from './types';
+import type { AppEnv, AuthPrincipal, WorkspaceAccess } from './types';
 import { all, ApiError, first } from './lib';
+import { accessibleSpaces } from './spaces';
 import { resolveValidatedProviderIdentity } from './provider-auth';
 
 export const LOCAL_USER_COOKIE = 'liftlog_local_user';
@@ -29,36 +30,9 @@ async function principalFromIdentity(db: D1Database, provider: string, providerS
   const platformRoles = await all<{ role: string }>(db.prepare(
     'SELECT role FROM platform_user_roles WHERE user_id = ? ORDER BY role',
   ).bind(userId));
-  const memberships = await all<{
-    workspace_id: string;
-    workspace_name: string;
-    role: WorkspaceMembership['role'];
-    status: WorkspaceMembership['status'];
-  }>(db.prepare(
-    `SELECT wm.workspace_id, w.name AS workspace_name, wm.role, wm.status
-     FROM workspace_members wm JOIN workspaces w ON w.id = wm.workspace_id
-     WHERE wm.user_id = ? ORDER BY w.name`,
-  ).bind(userId));
   const isAdmin = platformRoles.some((item) => item.role === 'admin');
-  const available = isAdmin
-    ? await all<{
-        workspace_id: string;
-        workspace_name: string;
-        member_role: WorkspaceMembership['role'] | null;
-        member_status: WorkspaceMembership['status'] | null;
-      }>(db.prepare(
-        `SELECT w.id AS workspace_id, w.name AS workspace_name,
-                wm.role AS member_role, wm.status AS member_status
-         FROM workspaces w
-         LEFT JOIN workspace_members wm ON wm.workspace_id = w.id AND wm.user_id = ?
-         WHERE w.status = 'active' ORDER BY w.name`,
-      ).bind(userId))
-    : memberships.filter((item) => item.status === 'active').map((item) => ({
-        workspace_id: item.workspace_id,
-        workspace_name: item.workspace_name,
-        member_role: item.role,
-        member_status: item.status,
-      }));
+  const available = await accessibleSpaces(db, userId, isAdmin);
+  const memberships = available.filter(item => item.role);
 
   return {
     userId: identity.user_id,
@@ -70,15 +44,23 @@ async function principalFromIdentity(db: D1Database, provider: string, providerS
     memberships: memberships.map((item) => ({
       workspaceId: item.workspace_id,
       workspaceName: item.workspace_name,
+      kind: item.kind,
+      clientUserId: item.client_user_id,
+      personalOwnerUserId: item.personal_owner_user_id,
+      parentWorkspaceId: item.parent_workspace_id,
       role: item.role,
       status: item.status,
     })),
     availableWorkspaces: available.map((item): WorkspaceAccess => ({
       workspaceId: item.workspace_id,
       workspaceName: item.workspace_name,
-      role: isAdmin ? 'admin' : item.member_role!,
-      status: item.member_status ?? 'active',
-      isMember: item.member_role !== null,
+      kind: item.kind,
+      clientUserId: item.client_user_id,
+      personalOwnerUserId: item.personal_owner_user_id,
+      parentWorkspaceId: item.parent_workspace_id,
+      role: isAdmin ? 'admin' : item.role,
+      status: item.status,
+      isMember: Boolean(item.is_member),
     })),
   };
 }

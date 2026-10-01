@@ -1,15 +1,16 @@
 export interface WorkspaceMembership {
+  kind: 'organization' | 'personal' | 'client';
+  clientUserId: string | null;
+  personalOwnerUserId: string | null;
+  parentWorkspaceId: string | null;
   workspaceId: string;
   workspaceName: string;
   role: 'owner' | 'coach' | 'client';
   status: 'active' | 'suspended';
 }
 
-export interface WorkspaceAccess {
-  workspaceId: string;
-  workspaceName: string;
+export interface WorkspaceAccess extends Omit<WorkspaceMembership, 'role'> {
   role: 'admin' | 'owner' | 'coach' | 'client';
-  status: 'active' | 'suspended';
   isMember: boolean;
 }
 

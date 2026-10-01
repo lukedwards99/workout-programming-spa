@@ -55,6 +55,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('liftlog-session-lost', lost);
   }, [refresh, applyPrincipal]);
 
+  useEffect(() => {
+    if (!principal) return;
+    const update = () => { if (document.visibilityState === 'visible') void refresh().catch(console.error); };
+    window.addEventListener('focus', update);
+    document.addEventListener('visibilitychange', update);
+    return () => { window.removeEventListener('focus', update); document.removeEventListener('visibilitychange', update); };
+  }, [principal?.userId, refresh]);
+
   const login = useCallback(async (userId: string) => {
     applyPrincipal(await sessionApi.login(userId));
     await refresh();

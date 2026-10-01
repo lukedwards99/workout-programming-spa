@@ -59,19 +59,37 @@ INSERT OR IGNORE INTO programs
 VALUES
   ('program-local', 'workspace-local', 'user-coach', 'Local Starter Program', 'A starter program for local development.', 'current', 1, 'user-admin');
 
+-- A second coach and unassigned client make assignment permissions testable locally.
+INSERT OR IGNORE INTO users (id,email_normalized,email_display,display_name,status,updated_by_user_id) VALUES
+('user-coach-two','coach-two@liftlog.local','coach-two@liftlog.local','Local Coach Two','active','user-admin'),
+('user-unassigned','unassigned@liftlog.local','unassigned@liftlog.local','Unassigned Client','active','user-admin');
+INSERT OR IGNORE INTO auth_identities (id,user_id,provider,provider_subject,email_at_link,updated_by_user_id) VALUES
+('identity-coach-two','user-coach-two','local','user-coach-two','coach-two@liftlog.local','user-admin'),
+('identity-unassigned','user-unassigned','local','user-unassigned','unassigned@liftlog.local','user-admin');
+INSERT OR IGNORE INTO workspace_members (workspace_id,user_id,role,status,updated_by_user_id) VALUES
+('workspace-local','user-coach-two','coach','active','user-admin'),
+('workspace-local','user-unassigned','client','active','user-admin');
+-- Seed an independent starter library in the demo client space.
+INSERT OR IGNORE INTO exercise_groups (id,workspace_id,name,notes,updated_by_user_id)
+SELECT 'client-space-user-client:'||id,'client-space-user-client',name,notes,'user-admin' FROM exercise_groups WHERE workspace_id='workspace-local';
+INSERT OR IGNORE INTO exercises (id,workspace_id,exercise_group_id,name,exercise_type,tutorial_url,notes,updated_by_user_id)
+SELECT 'client-space-user-client:'||id,'client-space-user-client','client-space-user-client:'||exercise_group_id,name,exercise_type,tutorial_url,notes,'user-admin' FROM exercises WHERE workspace_id='workspace-local';
+INSERT OR IGNORE INTO exercise_variations (id,workspace_id,exercise_id,name,is_primary,tutorial_url,notes,updated_by_user_id)
+SELECT 'client-space-user-client:'||id,'client-space-user-client','client-space-user-client:'||exercise_id,name,is_primary,tutorial_url,notes,'user-admin' FROM exercise_variations WHERE workspace_id='workspace-local';
+
 -- Synthetic local training data. Idempotent inserts preserve changes made during testing.
 INSERT OR IGNORE INTO programs (id, workspace_id, owner_user_id, name, notes, updated_by_user_id)
 VALUES ('program-foundation', 'workspace-local', 'user-admin', 'Strength foundation', 'Synthetic local demo: a simple strength and conditioning block.', 'user-admin'),
-       ('program-balance', 'workspace-local', 'user-client', 'Build & balance', 'Synthetic local demo assigned to the client account.', 'user-admin');
+       ('program-balance', 'client-space-user-client', 'user-client', 'Build & balance', 'Synthetic local demo assigned to the client account.', 'user-admin');
 INSERT OR IGNORE INTO mesocycles (id, workspace_id, program_id, name, mesocycle_length, start_date, sort_order, updated_by_user_id)
 VALUES ('cycle-foundation', 'workspace-local', 'program-foundation', 'Build a base', 28, '2026-09-28', 0, 'user-admin'),
-       ('cycle-balance', 'workspace-local', 'program-balance', 'Steady progress', 28, '2026-09-28', 0, 'user-admin'),
+       ('cycle-balance', 'client-space-user-client', 'program-balance', 'Steady progress', 28, '2026-09-28', 0, 'user-admin'),
        ('cycle-coach', 'workspace-local', 'program-local', 'First training block', 7, '2026-09-28', 0, 'user-admin');
 INSERT OR IGNORE INTO workouts (id, workspace_id, program_id, mesocycle_id, name, day_offset, sort_order, updated_by_user_id)
 VALUES ('workout-lower', 'workspace-local', 'program-foundation', 'cycle-foundation', 'Lower body · Squat focus', 0, 0, 'user-admin'),
        ('workout-upper', 'workspace-local', 'program-foundation', 'cycle-foundation', 'Upper body · Press focus', 2, 1, 'user-admin'),
        ('workout-conditioning', 'workspace-local', 'program-foundation', 'cycle-foundation', 'Easy conditioning', 4, 2, 'user-admin'),
-       ('workout-balance', 'workspace-local', 'program-balance', 'cycle-balance', 'Full body strength', 0, 0, 'user-admin'),
+       ('workout-balance', 'client-space-user-client', 'program-balance', 'cycle-balance', 'Full body strength', 0, 0, 'user-admin'),
        ('workout-coach', 'workspace-local', 'program-local', 'cycle-coach', 'Strength session', 0, 0, 'user-admin');
 INSERT OR IGNORE INTO exercises (id, workspace_id, exercise_group_id, name, exercise_type, notes, updated_by_user_id)
 VALUES ('exercise-rdl', 'workspace-local', 'group-strength', 'Romanian Deadlift', 'strength', 'Keep a soft bend in your knees. Move through your hips.', 'user-admin'),
@@ -85,8 +103,8 @@ VALUES ('block-lower-squat', 'workspace-local', 'program-foundation', 'workout-l
        ('block-upper-bench', 'workspace-local', 'program-foundation', 'workout-upper', 'exercise-bench', 'variation-bench-standard', 0, 'user-admin'),
        ('block-upper-row', 'workspace-local', 'program-foundation', 'workout-upper', 'exercise-row', NULL, 1, 'user-admin'),
        ('block-cardio-run', 'workspace-local', 'program-foundation', 'workout-conditioning', 'exercise-run', 'variation-run-outdoor', 0, 'user-admin'),
-       ('block-balance-squat', 'workspace-local', 'program-balance', 'workout-balance', 'exercise-squat', 'variation-squat-standard', 0, 'user-admin'),
-       ('block-balance-bench', 'workspace-local', 'program-balance', 'workout-balance', 'exercise-bench', 'variation-bench-standard', 1, 'user-admin');
+       ('block-balance-squat', 'client-space-user-client', 'program-balance', 'workout-balance', 'client-space-user-client:exercise-squat', 'client-space-user-client:variation-squat-standard', 0, 'user-admin'),
+       ('block-balance-bench', 'client-space-user-client', 'program-balance', 'workout-balance', 'client-space-user-client:exercise-bench', 'client-space-user-client:variation-bench-standard', 1, 'user-admin');
 INSERT OR IGNORE INTO strength_sets (id, workspace_id, program_id, workout_exercise_id, set_number, set_type, planned_reps, planned_weight, target_rir, coach_notes, updated_by_user_id)
 VALUES ('set-squat-1', 'workspace-local', 'program-foundation', 'block-lower-squat', 1, 'warmup', 8, 45, 4, 'Take your time. Find your depth.', 'user-admin'),
        ('set-squat-2', 'workspace-local', 'program-foundation', 'block-lower-squat', 2, 'normal', 8, 95, 2, 'Brace before each rep.', 'user-admin'),
@@ -96,7 +114,7 @@ VALUES ('set-squat-1', 'workspace-local', 'program-foundation', 'block-lower-squ
        ('set-lunge-1', 'workspace-local', 'program-foundation', 'block-lower-lunge', 1, 'normal', 10, 20, 2, 'Reps per leg.', 'user-admin'),
        ('set-bench-1', 'workspace-local', 'program-foundation', 'block-upper-bench', 1, 'normal', 8, 65, 2, NULL, 'user-admin'),
        ('set-row-1', 'workspace-local', 'program-foundation', 'block-upper-row', 1, 'normal', 12, 25, 2, NULL, 'user-admin'),
-       ('set-balance-squat', 'workspace-local', 'program-balance', 'block-balance-squat', 1, 'normal', 8, 65, 2, 'Smooth reps, consistent depth.', 'user-admin'),
-       ('set-balance-bench', 'workspace-local', 'program-balance', 'block-balance-bench', 1, 'normal', 8, 45, 2, NULL, 'user-admin');
+       ('set-balance-squat', 'client-space-user-client', 'program-balance', 'block-balance-squat', 1, 'normal', 8, 65, 2, 'Smooth reps, consistent depth.', 'user-admin'),
+       ('set-balance-bench', 'client-space-user-client', 'program-balance', 'block-balance-bench', 1, 'normal', 8, 45, 2, NULL, 'user-admin');
 INSERT OR IGNORE INTO cardio_sets (id, workspace_id, program_id, workout_exercise_id, set_number, planned_duration_seconds, planned_distance, distance_unit, target_rpe, coach_notes, updated_by_user_id)
 VALUES ('set-cardio-run', 'workspace-local', 'program-foundation', 'block-cardio-run', 1, 1200, 2, 'mi', 4, 'Keep it conversational.', 'user-admin');

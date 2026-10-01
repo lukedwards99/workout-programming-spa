@@ -122,6 +122,7 @@ export async function canReadProgram(db: D1Database, principal: AuthPrincipal, w
   const workspace = membership(principal, workspaceId);
   if (!workspace) return false;
   if (workspace.role === 'owner') return true;
+  if (workspace.kind === 'client' && workspace.role === 'coach') return true;
   const row = await first<{ allowed: number }>(db.prepare(
     `SELECT 1 AS allowed FROM programs p
      WHERE p.workspace_id = ? AND p.id = ? AND (
@@ -140,6 +141,7 @@ export async function canEditProgramPlan(db: D1Database, principal: AuthPrincipa
   const workspace = membership(principal, workspaceId);
   if (!workspace || workspace.role === 'client') return false;
   if (workspace.role === 'owner') return true;
+  if (workspace.kind === 'client' && workspace.role === 'coach') return true;
   const row = await first<{ allowed: number }>(db.prepare(
     `SELECT 1 AS allowed FROM programs p
      WHERE p.workspace_id = ? AND p.id = ? AND (

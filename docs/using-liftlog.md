@@ -1,25 +1,37 @@
 # Using LiftLog
 
-## Local personas and workspaces
+## Accounts and spaces
 
-Start the app and choose the administrator, coach, or client persona. Administrators can enter every active workspace. Coaches can switch between their active workspace memberships. Administrators and coaches can create workspaces; the creator becomes an owner. Workspace owners and platform administrators may delete a workspace after typing its exact name.
+Accounts are manually provisioned during beta. There is no public signup. Locally, choose an administrator, either coach, or a client to test role-specific access.
 
-Accounts are manually provisioned during beta. There is no public signup.
+An **organization roster** contains owners, coaches, and clients. Adding a client to the roster automatically creates their **one client space**. All of their programs, results, and exercise library belong to that space. Clients can enter only their own space.
+
+Coaches can have many assigned client spaces and create multiple **personal spaces** for training, templates, or other coaching work. Personal spaces are private to their creator and platform admins. Use **Spaces** or the **Space** picker to switch contexts. Owners can enter client spaces belonging to their organization; platform admins can enter all spaces. Only platform admins can create organization rosters.
+
+Client spaces cannot be deleted or have members added manually. Organizations containing client spaces cannot be deleted. A personal space can be deleted by its owner or an admin after typing its exact name.
+
+## Client assignments
+
+**Client assignments** is available to coaches, organization owners, and admins. It lists each active client, assigned coach, organization, and client space. Search by client or coach, or filter to **My clients** and **Unassigned**.
+
+A coach can **Claim client** when no coach is assigned. Each client has at most one active coach. The assigned coach can **Open space** to view programs, plan training, and maintain that space’s library.
+
+**Release client** returns the client to the unassigned list and removes the coach’s access immediately. It preserves the client’s space, programs, results, and exercises. Only an organization owner or platform admin can **Force release** another coach’s client or use **Assign coach** to select a coach from the organization. Coaches cannot claim someone who is already assigned.
+
+Admins can **Suspend** a client’s organization membership from **Admin Users**. This releases their assignment and disables access while preserving the space and all training data. **Reactivate** restores the membership; the client can then be claimed again. Client roles stay attached to their dedicated space.
 
 ## Programs and copying
 
-Every program has one workspace member as its owner and can be current or archived. Archiving does not depend on any completion state.
+Programs can be current or archived, contain mesocycles, and contain workouts. Programs in a client space belong to that client automatically.
 
-Programs contain mesocycles, and mesocycles contain workouts. Administrators, owners, and coaches can copy a complete program, a mesocycle, or an individual workout within the active workspace. Each copy is independent. Every copy dialog asks whether to include executed values and athlete notes; this option is off by default.
+Coaches, owners, and admins can copy a complete program into any space they can plan in. Select a **Destination space** in the copy dialog. Referenced exercises and variations are copied into that space’s library as independent entries. Each copy is independent; edits in one space cannot alter the source space. Mesocycles and individual workouts can be copied between programs within the active space.
+
+Copy dialogs ask whether to include executed values and athlete notes. This option is off by default.
 
 ## Exercise library
 
-Exercise groups, exercises, and variations belong to the workspace and can be reused across its programs. Owners and coaches can maintain the library. Items already referenced by current programs are protected from deletion.
-
-## Clients
-
-Coach/client relationships control which client-owned programs a coach can read and plan. A coach can create a new program for a client or copy an existing program to that client. Removing a client deletes the client’s current workspace relationships and client-owned programs after history capture, then removes only that workspace membership. The global user remains.
+Exercise groups, exercises, and variations belong to the selected space and can be reused across its programs. Owners and assigned coaches can maintain the library. Clients can view it. Items referenced by programs are protected from deletion.
 
 ## Planned and executed values
 
-The workout table always shows planned and executed values together on each set. Owners and administrators can edit all fields. Coaches can edit planned fields on their own programs and related clients’ programs. Clients can edit executed fields only on programs they own. Strength and cardio totals are summarized across each mesocycle.
+The workout table shows planned and executed values together on each set. Owners and admins can edit all fields. Coaches can edit planned fields in their personal and assigned client spaces. Clients can edit executed fields only on their own programs. Strength and cardio totals are summarized across each mesocycle.

@@ -1,5 +1,5 @@
 import { useState, type KeyboardEvent } from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import Offcanvas from 'react-bootstrap/Offcanvas';
 import { useSession } from '../contexts/SessionContext';
 import Icon, { type IconName } from './Icon';
@@ -8,16 +8,18 @@ import TestUserSwitcher from './TestUserSwitcher';
 export default function Navigation() {
   const { principal, workspaceId, setWorkspaceId, logout } = useSession();
   const { pathname } = useLocation();
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
   const access = principal?.availableWorkspaces.find((item) => item.workspaceId === workspaceId);
-  const canManage = ['owner', 'coach', 'admin'].includes(access?.role ?? '');
+  const canManage = principal?.platformRoles.includes('admin') || principal?.memberships.some(m => m.kind === 'organization' && ['owner', 'coach'].includes(m.role));
+  const roleLabel = access?.kind === 'personal' ? 'Personal space' : access?.kind === 'client' && access.role === 'coach' ? 'Assigned coach' : access?.kind === 'organization' && access.role === 'owner' ? 'Organization owner' : access?.role ?? 'No space role';
   const isAdmin = principal?.platformRoles.includes('admin');
   const sections: { label: string; path: string; icon: IconName; show: boolean }[] = [
     { label: 'Programs', path: '/', icon: 'programs', show: true },
     { label: 'Exercise Library', path: '/library', icon: 'barbell', show: true },
-    { label: 'Clients', path: '/clients', icon: 'users', show: canManage },
-    { label: 'Workspaces', path: '/workspaces', icon: 'workspace', show: true },
+    { label: 'Client assignments', path: '/clients', icon: 'users', show: Boolean(canManage) },
+    { label: 'Spaces', path: '/workspaces', icon: 'workspace', show: Boolean(canManage) },
     { label: 'Admin Users', path: '/admin/users', icon: 'shield', show: Boolean(isAdmin) },
   ];
   const current = sections.find((s) => s.path !== '/' && pathname.startsWith(s.path))?.label ?? 'Training workspace';
@@ -47,8 +49,8 @@ export default function Navigation() {
     </Offcanvas>
     <header className="topbar">
       <button className="mobile-menu icon-button" aria-label="Open navigation" aria-controls="main-navigation-drawer" aria-expanded={open} onClick={() => setOpen(true)}><Icon name="menu" /></button>
-      <div className="workspace-select"><span>{current}</span>{principal && principal.availableWorkspaces.length > 1 ? <select aria-label="Workspace" value={workspaceId ?? ''} onChange={(e) => setWorkspaceId(e.target.value)}>{principal.availableWorkspaces.filter((w) => w.status === 'active').map((w) => <option key={w.workspaceId} value={w.workspaceId}>{w.workspaceName}</option>)}</select> : <strong>{access?.workspaceName ?? 'Choose a workspace'}</strong>}</div>
-      <div className="account-strip"><span className="avatar">{principal?.displayName.split(' ').map((n) => n[0]).slice(0, 2).join('')}</span><div><strong>{principal?.displayName}</strong><span>{access?.role ?? 'No workspace role'}</span></div></div>
+      <div className="workspace-select"><span>{current}</span>{principal && principal.availableWorkspaces.length > 1 ? <select aria-label="Space" value={workspaceId ?? ''} onChange={(e) => { setWorkspaceId(e.target.value); navigate('/'); }}>{principal.availableWorkspaces.filter((w) => w.status === 'active').map((w) => <option key={w.workspaceId} value={w.workspaceId}>{w.workspaceName} · {w.kind === 'client' ? 'Client' : w.kind === 'personal' ? 'Personal' : 'Organization'}</option>)}</select> : <strong>{access?.workspaceName ?? 'Choose a space'}</strong>}</div>
+      <div className="account-strip"><span className="avatar">{principal?.displayName.split(' ').map((n) => n[0]).slice(0, 2).join('')}</span><div><strong>{principal?.displayName}</strong><span>{roleLabel}</span></div></div>
     </header>
     {principal?.testing?.canSwitch && <div className="test-session-bar"><div><span className="test-tag">Test mode</span><span>{principal.verifiedEmail}</span><small>{principal.testing.isImpersonating ? 'Simulated identity' : 'Account preview'}</small></div><TestUserSwitcher /></div>}
   </>;

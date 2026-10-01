@@ -27,13 +27,13 @@ export default function App() {
     <main id="main-content" className="app-content" key={`${principal.userId}:${workspaceId}`}>
       <Routes>
         <Route path="/workspaces" element={<WorkspacesPage />} />
+        <Route path="/clients" element={<ClientsPage />} />
+        <Route path="/admin/users" element={<AdminUsersPage />} />
         {!workspaceId ? <Route path="*" element={<Navigate to="/workspaces" replace />} /> : <>
           <Route path="/" element={<HomePage />} />
           <Route path="/programs/:programId" element={<ProgramPage />} />
           <Route path="/programs/:programId/workouts/:workoutId" element={<WorkoutPage />} />
           <Route path="/library" element={<WorkspaceLibraryPage />} />
-          <Route path="/clients" element={<ClientsPage />} />
-          <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </>}

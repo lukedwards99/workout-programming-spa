@@ -56,7 +56,17 @@ const tables = [
     ['name', 'TEXT NOT NULL'],
     ['status', "TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','suspended'))"],
     ['history_retention_days', 'INTEGER NOT NULL DEFAULT 365 CHECK(history_retention_days > 0)'],
+    ['kind', "TEXT NOT NULL DEFAULT 'organization' CHECK(kind IN ('organization','personal','client'))"],
+    ['client_user_id', 'TEXT UNIQUE'],
+    ['personal_owner_user_id', 'TEXT'],
+    ['parent_workspace_id', 'TEXT'],
   ], {
+    constraints: [
+      'FOREIGN KEY(client_user_id) REFERENCES users(id) ON DELETE RESTRICT',
+      'FOREIGN KEY(personal_owner_user_id) REFERENCES users(id) ON DELETE RESTRICT',
+      'FOREIGN KEY(parent_workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT',
+      "CHECK((kind='client' AND client_user_id IS NOT NULL AND parent_workspace_id IS NOT NULL AND personal_owner_user_id IS NULL) OR (kind='personal' AND personal_owner_user_id IS NOT NULL AND client_user_id IS NULL AND parent_workspace_id IS NULL) OR (kind='organization' AND client_user_id IS NULL AND personal_owner_user_id IS NULL AND parent_workspace_id IS NULL))",
+    ],
     indexes: [['idx_workspaces_status', 'status']],
   }),
   table('workspace_members', [
@@ -323,15 +333,45 @@ BEGIN
 END;`;
 }
 
+const spaceRules = `
+CREATE UNIQUE INDEX idx_client_single_active_coach ON coach_client_relationships(client_user_id) WHERE status='active';
+-- Provision exactly one space when a client joins the roster, including role changes.
+CREATE TRIGGER provision_client_space_insert AFTER INSERT ON workspace_members
+WHEN NEW.role='client' AND (SELECT kind FROM workspaces WHERE id=NEW.workspace_id)='organization'
+BEGIN
+ INSERT OR IGNORE INTO workspaces (id,name,kind,client_user_id,parent_workspace_id,updated_by_user_id)
+ SELECT 'client-space-'||NEW.user_id,display_name||'’s space','client',NEW.user_id,NEW.workspace_id,NEW.updated_by_user_id FROM users WHERE id=NEW.user_id;
+ INSERT OR IGNORE INTO workspace_members (workspace_id,user_id,role,status,updated_by_user_id)
+ SELECT id,NEW.user_id,'client',NEW.status,NEW.updated_by_user_id FROM workspaces WHERE client_user_id=NEW.user_id;
+END;
+CREATE TRIGGER provision_client_space_update AFTER UPDATE OF role ON workspace_members
+WHEN NEW.role='client' AND (SELECT kind FROM workspaces WHERE id=NEW.workspace_id)='organization'
+BEGIN
+ INSERT OR IGNORE INTO workspaces (id,name,kind,client_user_id,parent_workspace_id,updated_by_user_id)
+ SELECT 'client-space-'||NEW.user_id,display_name||'’s space','client',NEW.user_id,NEW.workspace_id,NEW.updated_by_user_id FROM users WHERE id=NEW.user_id;
+ INSERT OR IGNORE INTO workspace_members (workspace_id,user_id,role,status,updated_by_user_id)
+ SELECT id,NEW.user_id,'client',NEW.status,NEW.updated_by_user_id FROM workspaces WHERE client_user_id=NEW.user_id;
+END;
+CREATE TRIGGER client_program_space_insert BEFORE INSERT ON programs
+WHEN EXISTS(SELECT 1 FROM workspaces WHERE client_user_id=NEW.owner_user_id AND id<>NEW.workspace_id)
+OR EXISTS(SELECT 1 FROM workspaces WHERE id=NEW.workspace_id AND kind='client' AND client_user_id<>NEW.owner_user_id)
+BEGIN SELECT RAISE(ABORT,'client_space_required'); END;
+CREATE TRIGGER client_program_space_update BEFORE UPDATE OF workspace_id,owner_user_id ON programs
+WHEN EXISTS(SELECT 1 FROM workspaces WHERE client_user_id=NEW.owner_user_id AND id<>NEW.workspace_id)
+OR EXISTS(SELECT 1 FROM workspaces WHERE id=NEW.workspace_id AND kind='client' AND client_user_id<>NEW.owner_user_id)
+BEGIN SELECT RAISE(ABORT,'client_space_required'); END;
+`;
+
 const sql = [
   'PRAGMA foreign_keys = ON;',
   ...tables.map(createBase),
   ...tables.flatMap((t) => t.indexes.map(([name, columns]) => `CREATE INDEX ${name} ON ${t.name}(${columns});`)),
   ...tables.map(createHistory),
   ...tables.map(createTriggers),
+  spaceRules,
   '',
 ].join('\n\n');
 
 await fs.mkdir(new URL('../migrations/', import.meta.url), { recursive: true });
-await fs.writeFile(new URL('../migrations/0001_initial.sql', import.meta.url), sql);
+await fs.writeFile(new URL('../migrations/0001_initial.sql', import.meta.url), sql.trimEnd() + '\n');
 console.log(`Generated ${tables.length} base tables, ${tables.length} history tables, and ${tables.length * 2} triggers.`);

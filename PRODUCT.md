@@ -6,10 +6,14 @@ LiftLog is a personal training and coaching workspace for building programs and 
 
 - Preserve the hierarchy: workspace → independently owned program → mesocycle → workout → exercise block → strength or cardio sets.
 - Planned and executed values live together. Programs, mesocycles, and workouts can be copied, with executed values included only by explicit choice.
-- Exercise groups and variations belong to a workspace. Coach/client relationships and workspace roles control access. Clients see their programs and log their execution; coaches program for linked clients; owners and platform admins manage access.
+- Adding a client to an organization roster automatically creates their one client-owned space. The organization holds the roster; the client's programs, workout results, and exercise library stay in the client space.
+- Each client has at most one active assigned coach. The staff-only assignment directory shows the client, assigned coach, and client space together. Coaches can claim unassigned clients and release their own assignments; organization owners and administrators can force release and choose another coach.
+- Client-space access is derived on every request. Releasing an assignment immediately removes the coach's access while retaining the client's space and training data. Clients see their programs and log their execution; assigned coaches program for them; owners and platform admins manage access.
+- Coaches can create multiple private personal spaces for their own training and programming. Personal spaces and client spaces have separate exercise libraries. Copying a program into another space creates independent exercise and variation references there, so later library changes do not alter the source.
 - Cloudflare Workers serves the same-origin application/API, D1 stores data, and Cloudflare Access verifies hosted identity.
 - A temporary test identity wrapper must allow selecting different email accounts. It must preserve server-side authorization and clearly communicate the simulated identity.
 - Existing hosted deployment lanes reset their disposable databases on deployment. This rewrite does not change that policy.
+- The client-space model updates the initial schema for a reset database only. No migration or backfill of existing data is part of this change.
 
 ## Requested change
 
