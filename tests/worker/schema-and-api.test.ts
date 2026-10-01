@@ -15,13 +15,14 @@ describe('simplified D1 catalog', () => {
   it('creates 16 base/history pairs and 32 history triggers', async () => {
     const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%' AND name NOT IN ('d1_migrations','local_seed_migrations','sqlite_sequence')`).all<{ name: string }>();
     expect(tables.results.filter((row) => row.name.endsWith('_history'))).toHaveLength(16);
-    expect(tables.results.filter((row) => !row.name.endsWith('_history'))).toHaveLength(16);
+    expect(tables.results.filter((row) => !row.name.endsWith('_history') && row.name !== 'test_identity_sessions')).toHaveLength(16);
     expect((await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='trigger' AND name LIKE 'trg_%_history_%'`).all()).results).toHaveLength(32);
   });
 
   it('has audit fields on every base table and no history foreign keys', async () => {
     const tables = await env.DB.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE '_cf_%' AND name NOT IN ('d1_migrations','local_seed_migrations','sqlite_sequence')`).all<{ name: string }>();
     for (const { name } of tables.results) {
+      if (name === 'test_identity_sessions') continue; // Ephemeral authentication state, outside the workout catalog.
       const foreignKeys = await env.DB.prepare(`PRAGMA foreign_key_list(${name})`).all();
       if (name.endsWith('_history')) expect(foreignKeys.results, name).toEqual([]);
       else expect((await env.DB.prepare(`PRAGMA table_info(${name})`).all<{ name: string }>()).results.map((row) => row.name), name).toEqual(expect.arrayContaining(['created_at', 'updated_at', 'updated_by_user_id']));

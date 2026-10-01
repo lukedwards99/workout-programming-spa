@@ -14,6 +14,7 @@ export interface WorkspaceAccess {
 }
 
 export interface AuthPrincipal {
+  testing?: { canSwitch: boolean; authenticatedEmail: string; isImpersonating: boolean };
   userId: string;
   displayName: string;
   verifiedEmail: string;

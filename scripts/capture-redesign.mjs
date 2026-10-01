@@ -1,0 +1,36 @@
+import { chromium } from '@playwright/test';
+import { mkdir, copyFile } from 'node:fs/promises';
+const origin = process.env.LIFTLOG_SCREENSHOT_URL || 'http://127.0.0.1:5173';
+await mkdir('docs/screenshots', { recursive: true });
+await mkdir('.impeccable/review', { recursive: true });
+const browser = await chromium.launch();
+const errors = [];
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
+page.on('pageerror', e => errors.push(e.message));
+async function capture(name, route, ready, width = 1440, height = 1000) {
+  await page.setViewportSize({ width, height });
+  await page.goto(origin + route);
+  await ready();
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => window.scrollTo(0, 0));
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth > innerWidth);
+  if (overflow) errors.push(`Page overflows at ${width}: ${route}`);
+  await page.screenshot({ path: `docs/screenshots/${name}.png`, fullPage: true });
+}
+await capture('login-desktop', '/', () => page.getByRole('button', { name: /Local Admin/ }).waitFor());
+await page.getByRole('button', { name: /Local Admin/ }).click();
+await capture('programs-desktop', '/', () => page.getByRole('link', { name: 'Strength foundation', exact: true }).waitFor());
+await capture('programs-mobile', '/', () => page.getByRole('link', { name: 'Strength foundation', exact: true }).waitFor(), 390, 844);
+await capture('program-desktop', '/programs/program-foundation', () => page.getByRole('link', { name: /Lower body/ }).waitFor());
+await capture('workout-desktop', '/programs/program-foundation/workouts/workout-lower', () => page.getByRole('button', { name: 'Save plan' }).first().waitFor());
+await capture('workout-mobile', '/programs/program-foundation/workouts/workout-lower', () => page.getByRole('button', { name: 'Save plan' }).first().waitFor(), 390, 844);
+await capture('library-desktop', '/library', () => page.getByText('Romanian Deadlift', { exact: true }).waitFor());
+await page.getByRole('button', { name: 'Switch test user' }).click();
+await page.getByRole('dialog').getByRole('button', { name: /Local Client/ }).waitFor();
+await page.waitForFunction(() => getComputedStyle(document.querySelector('.modal')).opacity === '1');
+await page.screenshot({ path: 'docs/screenshots/test-accounts-desktop.png', fullPage: true });
+await copyFile('docs/screenshots/programs-desktop.png', '.impeccable/review/desktop.png');
+await copyFile('docs/screenshots/programs-mobile.png', '.impeccable/review/mobile.png');
+await browser.close();
+console.log(JSON.stringify({ captured: 8, errors }));
+if (errors.length) process.exitCode = 1;

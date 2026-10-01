@@ -1,0 +1,501 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-01T02:09:59Z",
+  "title": "Design System: LiftLog",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Warm Paper",
+        "tonalRamp": [
+          "oklch(15% 0.0080 98.88)",
+          "oklch(28% 0.0080 98.88)",
+          "oklch(40% 0.0080 98.88)",
+          "oklch(52% 0.0080 98.88)",
+          "oklch(64% 0.0080 98.88)",
+          "oklch(76% 0.0080 98.88)",
+          "oklch(88% 0.0080 98.88)",
+          "oklch(95% 0.0080 98.88)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Clean Sheet",
+        "tonalRamp": [
+          "oklch(15% 0.0054 95.10)",
+          "oklch(28% 0.0054 95.10)",
+          "oklch(40% 0.0054 95.10)",
+          "oklch(52% 0.0054 95.10)",
+          "oklch(64% 0.0054 95.10)",
+          "oklch(76% 0.0054 95.10)",
+          "oklch(88% 0.0054 95.10)",
+          "oklch(95% 0.0054 95.10)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Pine Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0276 165.34)",
+          "oklch(28% 0.0276 165.34)",
+          "oklch(40% 0.0276 165.34)",
+          "oklch(52% 0.0276 165.34)",
+          "oklch(64% 0.0276 165.34)",
+          "oklch(76% 0.0276 165.34)",
+          "oklch(88% 0.0276 165.34)",
+          "oklch(95% 0.0276 165.34)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Soft Ink",
+        "tonalRamp": [
+          "oklch(15% 0.0200 153.23)",
+          "oklch(28% 0.0200 153.23)",
+          "oklch(40% 0.0200 153.23)",
+          "oklch(52% 0.0200 153.23)",
+          "oklch(64% 0.0200 153.23)",
+          "oklch(76% 0.0200 153.23)",
+          "oklch(88% 0.0200 153.23)",
+          "oklch(95% 0.0200 153.23)"
+        ]
+      },
+      "pine": {
+        "role": "primary",
+        "displayName": "Pine",
+        "tonalRamp": [
+          "oklch(15% 0.0495 168.24)",
+          "oklch(28% 0.0495 168.24)",
+          "oklch(40% 0.0495 168.24)",
+          "oklch(52% 0.0495 168.24)",
+          "oklch(64% 0.0495 168.24)",
+          "oklch(76% 0.0495 168.24)",
+          "oklch(88% 0.0495 168.24)",
+          "oklch(95% 0.0495 168.24)"
+        ]
+      },
+      "pine-deep": {
+        "role": "primary",
+        "displayName": "Deep Pine",
+        "tonalRamp": [
+          "oklch(15% 0.0434 165.91)",
+          "oklch(28% 0.0434 165.91)",
+          "oklch(40% 0.0434 165.91)",
+          "oklch(52% 0.0434 165.91)",
+          "oklch(64% 0.0434 165.91)",
+          "oklch(76% 0.0434 165.91)",
+          "oklch(88% 0.0434 165.91)",
+          "oklch(95% 0.0434 165.91)"
+        ]
+      },
+      "green": {
+        "role": "primary",
+        "displayName": "Leaf Green",
+        "tonalRamp": [
+          "oklch(15% 0.0936 158.76)",
+          "oklch(28% 0.0936 158.76)",
+          "oklch(40% 0.0936 158.76)",
+          "oklch(52% 0.0936 158.76)",
+          "oklch(64% 0.0936 158.76)",
+          "oklch(76% 0.0936 158.76)",
+          "oklch(88% 0.0936 158.76)",
+          "oklch(95% 0.0936 158.76)"
+        ]
+      },
+      "green-hover": {
+        "role": "primary",
+        "displayName": "Deep Leaf",
+        "tonalRamp": [
+          "oklch(15% 0.0796 159.45)",
+          "oklch(28% 0.0796 159.45)",
+          "oklch(40% 0.0796 159.45)",
+          "oklch(52% 0.0796 159.45)",
+          "oklch(64% 0.0796 159.45)",
+          "oklch(76% 0.0796 159.45)",
+          "oklch(88% 0.0796 159.45)",
+          "oklch(95% 0.0796 159.45)"
+        ]
+      },
+      "sage": {
+        "role": "neutral",
+        "displayName": "Sage",
+        "tonalRamp": [
+          "oklch(15% 0.0160 130.42)",
+          "oklch(28% 0.0160 130.42)",
+          "oklch(40% 0.0160 130.42)",
+          "oklch(52% 0.0160 130.42)",
+          "oklch(64% 0.0160 130.42)",
+          "oklch(76% 0.0160 130.42)",
+          "oklch(88% 0.0160 130.42)",
+          "oklch(95% 0.0160 130.42)"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Paper Rule",
+        "tonalRamp": [
+          "oklch(15% 0.0154 123.06)",
+          "oklch(28% 0.0154 123.06)",
+          "oklch(40% 0.0154 123.06)",
+          "oklch(52% 0.0154 123.06)",
+          "oklch(64% 0.0154 123.06)",
+          "oklch(76% 0.0154 123.06)",
+          "oklch(88% 0.0154 123.06)",
+          "oklch(95% 0.0154 123.06)"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Terracotta",
+        "tonalRamp": [
+          "oklch(15% 0.1389 29.49)",
+          "oklch(28% 0.1389 29.49)",
+          "oklch(40% 0.1389 29.49)",
+          "oklch(52% 0.1389 29.49)",
+          "oklch(64% 0.1389 29.49)",
+          "oklch(76% 0.1389 29.49)",
+          "oklch(88% 0.1389 29.49)",
+          "oklch(95% 0.1389 29.49)"
+        ]
+      },
+      "danger-bg": {
+        "role": "secondary",
+        "displayName": "Pale Clay",
+        "tonalRamp": [
+          "oklch(15% 0.0176 39.40)",
+          "oklch(28% 0.0176 39.40)",
+          "oklch(40% 0.0176 39.40)",
+          "oklch(52% 0.0176 39.40)",
+          "oklch(64% 0.0176 39.40)",
+          "oklch(76% 0.0176 39.40)",
+          "oklch(88% 0.0176 39.40)",
+          "oklch(95% 0.0176 39.40)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus Green",
+        "tonalRamp": [
+          "oklch(15% 0.0920 158.60)",
+          "oklch(28% 0.0920 158.60)",
+          "oklch(40% 0.0920 158.60)",
+          "oklch(52% 0.0920 158.60)",
+          "oklch(64% 0.0920 158.60)",
+          "oklch(76% 0.0920 158.60)",
+          "oklch(88% 0.0920 158.60)",
+          "oklch(95% 0.0920 158.60)"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "White",
+        "tonalRamp": [
+          "oklch(15% 0.0000 0.00)",
+          "oklch(28% 0.0000 0.00)",
+          "oklch(40% 0.0000 0.00)",
+          "oklch(52% 0.0000 0.00)",
+          "oklch(64% 0.0000 0.00)",
+          "oklch(76% 0.0000 0.00)",
+          "oklch(88% 0.0000 0.00)",
+          "oklch(95% 0.0000 0.00)"
+        ]
+      },
+      "nav-active": {
+        "role": "primary",
+        "displayName": "Young Leaf",
+        "tonalRamp": [
+          "oklch(15% 0.0559 125.26)",
+          "oklch(28% 0.0559 125.26)",
+          "oklch(40% 0.0559 125.26)",
+          "oklch(52% 0.0559 125.26)",
+          "oklch(64% 0.0559 125.26)",
+          "oklch(76% 0.0559 125.26)",
+          "oklch(88% 0.0559 125.26)",
+          "oklch(95% 0.0559 125.26)"
+        ]
+      },
+      "nav-text": {
+        "role": "neutral",
+        "displayName": "Rail Mist",
+        "tonalRamp": [
+          "oklch(15% 0.0250 147.26)",
+          "oklch(28% 0.0250 147.26)",
+          "oklch(40% 0.0250 147.26)",
+          "oklch(52% 0.0250 147.26)",
+          "oklch(64% 0.0250 147.26)",
+          "oklch(76% 0.0250 147.26)",
+          "oklch(88% 0.0250 147.26)",
+          "oklch(95% 0.0250 147.26)"
+        ]
+      },
+      "nav-hover": {
+        "role": "primary",
+        "displayName": "Rail Hover",
+        "tonalRamp": [
+          "oklch(15% 0.0574 165.91)",
+          "oklch(28% 0.0574 165.91)",
+          "oklch(40% 0.0574 165.91)",
+          "oklch(52% 0.0574 165.91)",
+          "oklch(64% 0.0574 165.91)",
+          "oklch(76% 0.0574 165.91)",
+          "oklch(88% 0.0574 165.91)",
+          "oklch(95% 0.0574 165.91)"
+        ]
+      },
+      "field-border": {
+        "role": "neutral",
+        "displayName": "Field Edge",
+        "tonalRamp": [
+          "oklch(15% 0.0211 138.44)",
+          "oklch(28% 0.0211 138.44)",
+          "oklch(40% 0.0211 138.44)",
+          "oklch(52% 0.0211 138.44)",
+          "oklch(64% 0.0211 138.44)",
+          "oklch(76% 0.0211 138.44)",
+          "oklch(88% 0.0211 138.44)",
+          "oklch(95% 0.0211 138.44)"
+        ]
+      },
+      "field-focus": {
+        "role": "neutral",
+        "displayName": "Field Halo",
+        "tonalRamp": [
+          "oklch(15% 0.0360 133.57)",
+          "oklch(28% 0.0360 133.57)",
+          "oklch(40% 0.0360 133.57)",
+          "oklch(52% 0.0360 133.57)",
+          "oklch(64% 0.0360 133.57)",
+          "oklch(76% 0.0360 133.57)",
+          "oklch(88% 0.0360 133.57)",
+          "oklch(95% 0.0360 133.57)"
+        ]
+      },
+      "continuation": {
+        "role": "primary",
+        "displayName": "Continuation Leaf",
+        "tonalRamp": [
+          "oklch(15% 0.0432 124.50)",
+          "oklch(28% 0.0432 124.50)",
+          "oklch(40% 0.0432 124.50)",
+          "oklch(52% 0.0432 124.50)",
+          "oklch(64% 0.0432 124.50)",
+          "oklch(76% 0.0432 124.50)",
+          "oklch(88% 0.0432 124.50)",
+          "oklch(95% 0.0432 124.50)"
+        ]
+      },
+      "sheet-header": {
+        "role": "neutral",
+        "displayName": "Sheet Header",
+        "tonalRamp": [
+          "oklch(15% 0.0136 120.28)",
+          "oklch(28% 0.0136 120.28)",
+          "oklch(40% 0.0136 120.28)",
+          "oklch(52% 0.0136 120.28)",
+          "oklch(64% 0.0136 120.28)",
+          "oklch(76% 0.0136 120.28)",
+          "oklch(88% 0.0136 120.28)",
+          "oklch(95% 0.0136 120.28)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Login Display",
+        "purpose": "The expansive introductory login statement."
+      },
+      "headline": {
+        "displayName": "Page Heading",
+        "purpose": "Identifies the current working surface; fixed at 32px on mobile."
+      },
+      "title": {
+        "displayName": "Section Title",
+        "purpose": "Sections and modal headings."
+      },
+      "section-title": {
+        "displayName": "Nested Title",
+        "purpose": "Nested operational sections such as a mesocycle."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose and everyday values."
+      },
+      "label": {
+        "displayName": "Field Label",
+        "purpose": "Persistent form labels; set labels use a compact 10px variant."
+      },
+      "button": {
+        "displayName": "Action Label",
+        "purpose": "Primary and secondary actions; compact variant uses 12px."
+      },
+      "navigation": {
+        "displayName": "Navigation Label",
+        "purpose": "Destinations in the pine rail."
+      }
+    },
+    "shadows": [
+      {
+        "name": "dialog-lift",
+        "value": "0 18px 65px #13281e30",
+        "purpose": "Modal content only; cards and buttons stay flat."
+      }
+    ],
+    "motion": [
+      {
+        "name": "button-state",
+        "value": "background .16s ease, color .16s ease",
+        "purpose": "Short hover and active color transitions on buttons."
+      },
+      {
+        "name": "mobile-drawer",
+        "value": "transform .22s cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "Slide the pine rail into view on a phone."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "@media (prefers-reduced-motion: reduce) { transition: none !important; animation: none !important; scroll-behavior: auto !important; }",
+        "purpose": "Honor the user preference throughout the interface."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "desktop-compression",
+        "value": "1200px"
+      },
+      {
+        "name": "workspace-stack",
+        "value": "1020px"
+      },
+      {
+        "name": "phone",
+        "value": "767px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main create or add action.",
+      "html": "<button type=\"button\" class=\"ds-btn-primary\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\" /></svg>New program</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:7px;padding:11px 17px;min-height:44px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;line-height:1.4;cursor:pointer;transition:background .16s ease,color .16s ease;box-shadow:none;background:var(--green,#28724e);color:#fff;}.ds-btn-primary:hover,.ds-btn-primary:active{background:var(--green-hover,#205d40);border-color:var(--green-hover,#205d40);}.ds-btn-primary:focus-visible{outline:3px solid var(--focus,#327955);outline-offset:3px;}.ds-btn-primary:disabled{opacity:.55;cursor:default;}@media(prefers-reduced-motion:reduce){.ds-btn-primary{transition:none;}}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "A secondary action alongside the primary action.",
+      "html": "<button type=\"button\" class=\"ds-btn-outline\">Copy workout</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:7px;padding:11px 17px;min-height:44px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;line-height:1.4;cursor:pointer;transition:background .16s ease,color .16s ease;box-shadow:none;background:transparent;color:var(--ink,#23352d);border-color:#bbc5b6;}.ds-btn-outline:hover,.ds-btn-outline:active{background:var(--sage,#e6ece1);color:var(--pine,#183e31);border-color:#aab7a1;}.ds-btn-outline:focus-visible{outline:3px solid var(--focus,#327955);outline-offset:3px;}.ds-btn-outline:disabled{opacity:.55;cursor:default;}@media(prefers-reduced-motion:reduce){.ds-btn-outline{transition:none;}}"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "A destructive action with an explicit label.",
+      "html": "<button type=\"button\" class=\"ds-btn-danger\">Delete program</button>",
+      "css": ".ds-btn-danger{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:7px;padding:11px 17px;min-height:44px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;line-height:1.4;cursor:pointer;transition:background .16s ease,color .16s ease;box-shadow:none;background:var(--danger,#a33c30);color:#fff;}.ds-btn-danger:hover,.ds-btn-danger:active{background:#87352c;border-color:#87352c;}.ds-btn-danger:focus-visible{outline:3px solid var(--focus,#327955);outline-offset:3px;}.ds-btn-danger:disabled{opacity:.55;cursor:default;}@media(prefers-reduced-motion:reduce){.ds-btn-danger{transition:none;}}"
+    },
+    {
+      "name": "Paper Button",
+      "kind": "button",
+      "refersTo": "button-paper",
+      "description": "A continuation action on the pale green program panel.",
+      "html": "<button type=\"button\" class=\"ds-btn-paper\">Continue programming<svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\" /></svg></button>",
+      "css": ".ds-btn-paper{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid transparent;border-radius:7px;padding:11px 17px;min-height:44px;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;line-height:1.4;cursor:pointer;transition:background .16s ease,color .16s ease;box-shadow:none;background:#e9f0dc;color:var(--pine,#183e31);}.ds-btn-paper:hover,.ds-btn-paper:active{background:#fff;color:var(--pine,#183e31);}.ds-btn-paper:focus-visible{outline:3px solid var(--focus,#327955);outline-offset:3px;}.ds-btn-paper:disabled{opacity:.55;cursor:default;}@media(prefers-reduced-motion:reduce){.ds-btn-paper{transition:none;}}"
+    },
+    {
+      "name": "Labeled Text Field",
+      "kind": "input",
+      "refersTo": "text-field",
+      "description": "Persistent labels, paper fill, and a visible focus treatment.",
+      "html": "<label class=\"ds-field\"><span>Program name</span><input class=\"ds-field-input\" type=\"text\" placeholder=\"e.g. Strength foundation\" /></label>",
+      "css": ".ds-field{display:flex;flex-direction:column;gap:7px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500;color:var(--ink,#23352d);}.ds-field-input{box-sizing:border-box;color:var(--ink,#23352d);background:var(--surface,#fffefa);border:1px solid #b9c3b6;border-radius:7px;padding:10px 12px;min-height:44px;max-width:100%;font-family:'DM Sans',sans-serif;font-size:15px;line-height:1.55;caret-color:var(--green,#28724e);}.ds-field-input::placeholder{color:#6c766d;opacity:1;}.ds-field-input:focus{border-color:var(--green,#28724e);outline:2px solid #d3e2ca;outline-offset:1px;box-shadow:none;}.ds-field-input:disabled{opacity:1;color:#727b70;background:#efefe7;border-color:var(--line,#dce0d5);}"
+    },
+    {
+      "name": "Pine Navigation",
+      "kind": "nav",
+      "refersTo": "navigation-link",
+      "description": "Compact destinations with a pale active row in the pine rail.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Training workspace\"><a class=\"ds-nav-link ds-nav-link-active\" href=\"#programs\" aria-current=\"page\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 3h8l2 3h2v15H4V6h2l2-3ZM8 3v5h8V3M8 12h8M8 16h5\" /></svg>Programs</a><a class=\"ds-nav-link\" href=\"#library\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M6 5v14M3 8v8M18 5v14M21 8v8M6 12h12\" /></svg>Exercise Library</a></nav>",
+      "css": ".ds-nav{display:flex;flex-direction:column;gap:7px;background:var(--pine,#183e31);padding:20px;width:232px;font-family:'DM Sans',sans-serif;}.ds-nav-link{display:flex;align-items:center;gap:13px;padding:13px 15px;color:#c9d8ca;border-radius:8px;font-size:14px;font-weight:500;line-height:1.55;text-decoration:none;}.ds-nav-link:hover{background:#234f3e;color:white;}.ds-nav-link.ds-nav-link-active{background:#d5e5bd;color:var(--pine-deep,#153428);}.ds-nav-link:focus-visible{outline:3px solid #d5e5bd;outline-offset:3px;}"
+    },
+    {
+      "name": "Library Filter Chip",
+      "kind": "chip",
+      "refersTo": "filter-chip",
+      "description": "Compact selection chips for workspace exercise groups.",
+      "html": "<div class=\"ds-chip-group\" aria-label=\"Exercise group\"><button type=\"button\" class=\"ds-chip ds-chip-active\" aria-pressed=\"true\">All movements</button><button type=\"button\" class=\"ds-chip\" aria-pressed=\"false\">Cardio</button></div>",
+      "css": ".ds-chip-group{display:flex;gap:8px;flex-wrap:wrap;}.ds-chip{padding:8px 13px;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.55;background:transparent;color:var(--muted,#657168);border:1px solid var(--line,#dce0d5);border-radius:6px;cursor:pointer;}.ds-chip.ds-chip-active{background:var(--sage,#e6ece1);color:var(--pine,#183e31);border-color:#a8baa0;}.ds-chip:hover{cursor:pointer;}.ds-chip:focus-visible{outline:3px solid var(--focus,#327955);outline-offset:3px;}"
+    },
+    {
+      "name": "Mesocycle Sheet",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "A flat paper container with a heading and internally ruled workout rows.",
+      "html": "<section class=\"ds-card\"><h3>Foundation</h3><p>Oct 1, 2026 · 28 days · 2 workouts</p><a class=\"ds-workout-row\" href=\"#workout-a\"><span>Lower body</span><span>Day 1 <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\" /></svg></span></a><a class=\"ds-workout-row\" href=\"#workout-b\"><span>Upper body</span><span>Day 3 <svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\" /></svg></span></a></section>",
+      "css": ".ds-card{border:1px solid var(--line,#dce0d5);border-radius:var(--radius,14px);background:var(--surface,#fffefa);color:var(--ink,#23352d);padding:26px;box-shadow:none;font-family:'DM Sans',sans-serif;}.ds-card h3{font-family:'Manrope',sans-serif;font-weight:700;letter-spacing:-.025em;line-height:1.25;font-size:19px;margin:0 0 8px;}.ds-card p{font-size:13px;line-height:1.55;color:var(--muted,#657168);margin:0 0 20px;}.ds-workout-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:17px 3px;border-bottom:1px solid var(--line,#dce0d5);color:var(--ink,#23352d);font-size:15px;font-weight:500;text-decoration:none;}.ds-workout-row:last-child{border:0;}.ds-workout-row>span:last-child{display:flex;align-items:center;gap:20px;font-size:12px;font-weight:400;}.ds-workout-row:hover{color:var(--green,#28724e);background:#f3f5ec;}.ds-workout-row:focus-visible{outline:3px solid var(--focus,#327955);outline-offset:3px;}@media(max-width:767px){.ds-card{padding:20px;}.ds-workout-row{font-size:13px;padding:16px 0;}}"
+    },
+    {
+      "name": "Ruled Program Row",
+      "kind": "custom",
+      "refersTo": "program-row",
+      "description": "A compact program identity and real metadata with trailing open action.",
+      "html": "<article class=\"ds-program-row\"><span class=\"ds-program-symbol\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M8 3h8l2 3h2v15H4V6h2l2-3ZM8 3v5h8V3M8 12h8M8 16h5\" /></svg></span><div class=\"ds-program-body\"><h2><a href=\"#foundation\">Strength foundation</a></h2><p>Local Admin · 1 mesocycle · 3 workouts</p></div><a class=\"ds-program-open\" href=\"#foundation\" aria-label=\"Open Strength foundation\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M5 12h14M13 6l6 6-6 6\" /></svg></a></article>",
+      "css": ".ds-program-row{display:flex;align-items:center;gap:18px;padding:24px 0;border-bottom:1px solid var(--line,#dce0d5);font-family:'DM Sans',sans-serif;color:var(--ink,#23352d);}.ds-program-symbol{width:44px;height:52px;display:flex;align-items:center;justify-content:center;border:1px solid #c5d2bd;color:#5b7850;border-radius:8px;background:#edf0e5;flex-shrink:0;}.ds-program-body{min-width:0;}.ds-program-body h2{font-family:'Manrope',sans-serif;font-size:17px;font-weight:700;line-height:1.25;letter-spacing:-.025em;margin:0 0 8px;overflow-wrap:anywhere;}.ds-program-body h2 a{color:var(--ink,#23352d);text-decoration:none;}.ds-program-body h2 a:hover{color:var(--green,#28724e);text-decoration:underline;}.ds-program-body p{font-size:12px;line-height:1.55;color:var(--muted,#657168);margin:0;}.ds-program-open{display:inline-flex;width:42px;height:42px;align-items:center;justify-content:center;margin-left:auto;flex-shrink:0;background:transparent;color:var(--ink,#23352d);border:0;border-radius:6px;text-decoration:none;}.ds-program-open:hover{background:var(--sage,#e6ece1);}.ds-program-open:focus-visible,.ds-program-body a:focus-visible{outline:3px solid var(--focus,#327955);outline-offset:3px;}@media(max-width:767px){.ds-program-row{gap:12px;padding:22px 0;align-items:flex-start;}.ds-program-symbol{width:36px;height:43px;}.ds-program-body h2{font-size:16px;}.ds-program-body p{font-size:11px;}.ds-program-open{width:30px;height:30px;}}"
+    },
+    {
+      "name": "Planned and Executed Set Sheet",
+      "kind": "custom",
+      "refersTo": "set-sheet",
+      "description": "One ruled set with visible numeric labels, notes, separate saves, and inline feedback.",
+      "html": "<section class=\"ds-set-sheet\" aria-label=\"Barbell Squat\"><h2>01 Barbell Squat</h2><div class=\"ds-set-head\"><span>Set</span><span>Planned</span><span>Executed</span></div><div class=\"ds-set-row\"><span class=\"ds-set-number\">1</span><div class=\"ds-set-inputs\"><strong class=\"ds-set-mobile-label\">Planned</strong><div class=\"ds-set-values\"><label class=\"ds-set-field\"><span>Reps</span><input type=\"number\" value=\"8\" placeholder=\"—\" aria-label=\"Planned Reps\" /></label><label class=\"ds-set-field\"><span>Weight</span><input type=\"number\" value=\"45\" placeholder=\"—\" aria-label=\"Planned Weight\" /></label><label class=\"ds-set-field\"><span>RIR</span><input type=\"number\" value=\"4\" placeholder=\"—\" aria-label=\"Planned RIR\" /></label></div><label class=\"ds-set-field ds-set-note\"><span>Coach notes</span><input type=\"text\" placeholder=\"A cue for this set\" /></label><div class=\"ds-set-save\"><button type=\"button\" class=\"ds-set-button\">Save plan</button><span class=\"ds-set-status\" role=\"status\">Saved</span></div></div><div class=\"ds-set-inputs ds-set-executed\"><strong class=\"ds-set-mobile-label\">Executed</strong><div class=\"ds-set-values\"><label class=\"ds-set-field\"><span>Reps</span><input type=\"number\" value=\"\" placeholder=\"—\" aria-label=\"Executed Reps\" /></label><label class=\"ds-set-field\"><span>Weight</span><input type=\"number\" value=\"\" placeholder=\"—\" aria-label=\"Executed Weight\" /></label><label class=\"ds-set-field\"><span>RIR</span><input type=\"number\" value=\"\" placeholder=\"—\" aria-label=\"Executed RIR\" /></label></div><label class=\"ds-set-field ds-set-note\"><span>Athlete notes</span><input type=\"text\" placeholder=\"How did it feel?\" /></label><div class=\"ds-set-save\"><button type=\"button\" class=\"ds-set-button\">Save results</button></div></div></div></section>",
+      "css": ".ds-set-sheet{font-family:'DM Sans',sans-serif;color:var(--ink,#23352d);background:var(--surface,#fffefa);border:1px solid var(--line,#dce0d5);border-radius:var(--radius,14px);overflow:hidden;padding:26px 0 0;}.ds-set-sheet h2{font-family:'Manrope',sans-serif;font-size:22px;font-weight:700;letter-spacing:-.025em;line-height:1.25;padding:0 26px;margin:0 0 20px;}.ds-set-head,.ds-set-row{display:grid;grid-template-columns:62px minmax(0,1fr) minmax(0,1fr);}.ds-set-head{background:#eff2e8;color:#52654b;font-size:11px;letter-spacing:.035em;text-transform:uppercase;padding:13px 20px;}.ds-set-head>span{padding-left:6px;}.ds-set-row{padding:22px 20px;border-top:1px solid var(--line,#dce0d5);gap:12px;}.ds-set-number{padding-top:23px;font-variant-numeric:tabular-nums;color:var(--muted,#657168);font-size:15px;}.ds-set-inputs{min-width:0;padding:0 6px;}.ds-set-values{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;}.ds-set-field{display:flex;flex-direction:column;gap:5px;min-width:0;font-size:10px;line-height:1.55;color:var(--muted,#657168);}.ds-set-field input{box-sizing:border-box;width:100%;min-width:0;max-width:100%;color:var(--ink,#23352d);background:var(--surface,#fffefa);border:1px solid #b9c3b6;border-radius:7px;padding:9px;min-height:44px;font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.55;font-variant-numeric:tabular-nums;caret-color:var(--green,#28724e);}.ds-set-field input::placeholder{color:#6c766d;opacity:1;}.ds-set-field input:focus{border-color:var(--green,#28724e);outline:2px solid #d3e2ca;outline-offset:1px;box-shadow:none;}.ds-set-note{margin-top:10px;}.ds-set-note input{font-size:12px;}.ds-set-save{display:flex;gap:12px;align-items:center;margin-top:12px;}.ds-set-button{display:inline-flex;align-items:center;justify-content:center;border:1px solid #bbc5b6;border-radius:7px;background:transparent;color:var(--ink,#23352d);padding:8px 12px;min-height:36px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;line-height:1.4;cursor:pointer;transition:background .16s ease,color .16s ease;}.ds-set-button:hover,.ds-set-button:active{background:var(--sage,#e6ece1);color:var(--pine,#183e31);border-color:#aab7a1;}.ds-set-button:focus-visible{outline:3px solid var(--focus,#327955);outline-offset:3px;}.ds-set-status{font-size:11px;color:var(--green,#28724e);}.ds-set-mobile-label{display:none;}@media(max-width:1020px){.ds-set-head,.ds-set-row{grid-template-columns:36px minmax(0,1fr) minmax(0,1fr);}.ds-set-row{padding:18px 12px;gap:5px;}.ds-set-values{gap:6px;}.ds-set-field input{padding:9px 5px;}}@media(max-width:767px){.ds-set-sheet{padding-top:22px;}.ds-set-sheet h2{padding:0 20px;font-size:19px;}.ds-set-head{display:none;}.ds-set-row{grid-template-columns:25px minmax(0,1fr);padding:20px 16px;gap:14px 8px;}.ds-set-number{grid-row:span 2;padding-top:30px;font-size:12px;}.ds-set-inputs{padding:0;}.ds-set-executed{grid-column:2;border-top:1px dashed var(--line,#dce0d5);padding-top:15px;}.ds-set-mobile-label{display:block;font-size:12px;font-weight:600;margin-bottom:14px;}.ds-set-values{gap:8px;}.ds-set-field input{padding:9px;font-size:16px;}.ds-set-note input{font-size:14px;}}@media(prefers-reduced-motion:reduce){.ds-set-button{transition:none;}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Training Studio Prescription Sheet",
+    "overview": "LiftLog takes its visual character from a training studio's printed prescription sheets and equipment schedule. Warm paper, a pine navigation rail, leafy green actions, and consistently ruled rows make the workspace feel calm, practical, and ready for repeated use. Manrope gives headings a clear, compact structure; DM Sans keeps the supporting text and editable values easy to read.\n\nThe system supports frequent program editing at a desktop and workout recording on a phone. Density belongs in aligned rows and labeled fields, with enough space to distinguish an exercise, its sets, and its planned and executed values. The durable signature is a ruled training sheet with feedback beside the edited set. Icons use simple strokes; the approved interface requires no raster imagery or invented metrics.",
+    "keyCharacteristics": [
+      "Warm paper with deep pine navigation and restrained green actions.",
+      "Flat surfaces, fine rules, and aligned operational rows.",
+      "Manrope hierarchy paired with readable DM Sans text.",
+      "Explicit value labels and tabular numerals for training data.",
+      "Planned and executed fields that stack comfortably on a phone."
+    ],
+    "rules": [
+      {
+        "name": "The Action Green Rule",
+        "body": "Green identifies an action, selection, or saved state. Keep primary text in Pine Ink and supporting text in Soft Ink so the action remains easy to locate.",
+        "section": "colors"
+      },
+      {
+        "name": "The Value Alignment Rule",
+        "body": "Use tabular numerals for counts, summaries, set numbers, and numeric input values. Keep each number with an explicit label and its unit where relevant.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Workbench Rule",
+        "body": "Keep everyday lists, training sheets, cards, and buttons flat. Reserve elevation for a dialog that temporarily sits above the workspace.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use warm paper as the working canvas and pine as the navigation anchor.",
+      "Do carry the same fine rules and aligned row rhythm across programs, workouts, exercises, and administration.",
+      "Do label numeric values explicitly and use tabular numerals for training data.",
+      "Do keep planned and executed values visually distinct, with save feedback beside the edited set.",
+      "Do retain visible keyboard focus, permission context, and a reachable mobile navigation drawer.",
+      "Do use the implemented short state transitions and honor reduced-motion preferences."
+    ],
+    "donts": [
+      "Don't add raster decoration or invented activity metrics to this operational interface.",
+      "Don't replace open program rows with a grid of detached shadowed cards.",
+      "Don't apply everyday shadows to cards, lists, training sheets, or buttons.",
+      "Don't force phone set entry into a wide desktop sheet that makes the page scroll horizontally.",
+      "Don't substitute placeholders for visible field labels or use color as the only feedback signal.",
+      "Don't let account switching leave the prior user's workspace, route, or role controls on screen."
+    ]
+  }
+}

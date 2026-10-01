@@ -29,6 +29,16 @@ Feature branch → pull request into **dev** → test the dev deployment → pul
 
 Both hosted environments are disposable: **every deployment, including a manual rerun, recreates that environment's database**. The initial state contains Luke's admin account and an owner workspace, with no demo workouts. Main's environment name does not imply durable production data.
 
-Cloudflare Access protects each Worker and permits only `luke.edwards20@gmail.com`, using an emailed login code. No application email service is needed. Local persona selection and test fixture endpoints are unavailable remotely.
+Cloudflare Access protects each Worker and permits only `luke.edwards20@gmail.com` through the personal Cloudflare identity provider. No application email service is needed. Local login and fixture endpoints are unavailable remotely.
+
+## Training studio rewrite
+
+The new interface keeps programs → mesocycles → workouts → exercise blocks → strength/cardio sets. It adds a searchable program list, editable exercise variations, clear per-set save feedback, and a mobile navigation drawer. Fonts are served with the app.
+
+Select a local account to start, then use **Switch test user** to test another email and its actual workspace permissions. Local sample workouts are synthetic and seeded with idempotent inserts, so normal restarts preserve your edits.
+
+On hosted **dev**, the same switcher is available only after the allowed owner completes real Cloudflare Access sign-in. Dev seeds a test coach and athlete alongside the owner. New provisioned accounts can also be selected, including invited accounts without activating or linking a real provider. Expiring, opaque, HTTP-only sessions are stored as hashes in D1 and bound to the real authenticated account. Production disables the wrapper independently of configuration flags. See [test identity details](docs/test-identities.md).
+
+Screenshots are in [docs/screenshots](docs/screenshots). To refresh them with the default local sample data and a running server: `node scripts/capture-redesign.mjs`.
 
 See [development](docs/development.md), [deployment and recovery](docs/deployment.md), and [using LiftLog](docs/using-liftlog.md).

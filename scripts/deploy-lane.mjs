@@ -29,6 +29,7 @@ export async function deployLane(branch, env = process.env, operations = createO
     await writeConfig(database.uuid, false);
     await operations.wrangler(['d1', 'migrations', 'apply', 'DB', '--config', configPath, '--remote']);
     await operations.wrangler(['d1', 'execute', 'DB', '--config', configPath, '--remote', '--file', 'cloudflare/hosted-seed.sql']);
+    if (branch === 'dev') await operations.wrangler(['d1', 'execute', 'DB', '--config', configPath, '--remote', '--file', 'cloudflare/dev-personas.sql']);
     await operations.wrangler(['deploy', '--config', configPath]);
     await operations.smoke(names, database.uuid);
     console.log(JSON.stringify({ ...names, databaseId: database.uuid, sha: env.GITHUB_SHA }));

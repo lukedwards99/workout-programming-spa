@@ -1,9 +1,9 @@
 import { Hono } from 'hono';
-import { deleteCookie, setCookie } from 'hono/cookie';
+import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import type { AppEnv } from '../types';
 import { all, ApiError, audit, data, newId, now, parseJson } from '../lib';
-import { loadPrincipal, LOCAL_USER_COOKIE, requireAuth } from '../auth';
+import { authenticatedPrincipal, canSwitchIdentity, hashSessionToken, isLocalAuth, loadPrincipal, loadTestPrincipal, LOCAL_USER_COOKIE, TEST_USER_COOKIE, requireAuth } from '../auth';
 
 export const sessionRoutes = new Hono<AppEnv>();
 
@@ -82,6 +82,8 @@ sessionRoutes.post('/local-auth/session', async (c) => {
   const body = await parseJson(c, z.object({ userId: z.string().min(1) }));
   const principal = await loadPrincipal(c.env.DB, body.userId);
   if (!principal) throw new ApiError(401, 'invalid_local_user', 'That local user cannot sign in.');
+  const previousToken = getCookie(c, TEST_USER_COOKIE);
+  if (previousToken) await c.env.DB.prepare('DELETE FROM test_identity_sessions WHERE token_hash = ?').bind(await hashSessionToken(previousToken)).run();
   setCookie(c, LOCAL_USER_COOKIE, principal.userId, {
     httpOnly: true,
     sameSite: 'Lax',
@@ -89,6 +91,7 @@ sessionRoutes.post('/local-auth/session', async (c) => {
     secure: false,
     maxAge: 60 * 60 * 12,
   });
+  deleteCookie(c, TEST_USER_COOKIE, { path: '/' });
   await c.env.DB.prepare(
     `UPDATE auth_identities SET last_seen_at = ?, updated_at = ?, updated_by_user_id = ?
      WHERE user_id = ? AND provider = 'local'`,
@@ -98,9 +101,51 @@ sessionRoutes.post('/local-auth/session', async (c) => {
 });
 
 sessionRoutes.delete('/session', async (c) => {
+  const token = getCookie(c, TEST_USER_COOKIE);
+  if (token) await c.env.DB.prepare('DELETE FROM test_identity_sessions WHERE token_hash = ?').bind(await hashSessionToken(token)).run();
+  deleteCookie(c, TEST_USER_COOKIE, { path: '/' });
   deleteCookie(c, LOCAL_USER_COOKIE, { path: '/' });
   return data(c, { signedOut: true });
 });
 
 sessionRoutes.use('/session', requireAuth);
 sessionRoutes.get('/session', (c) => data(c, c.get('principal')));
+
+// Always authorize the real actor before applying the temporary identity wrapper.
+sessionRoutes.use('/test-auth/*', async (c, next) => {
+  if (!isLocalAuth(c.env) && c.env.APP_ENV !== 'dev') throw new ApiError(404, 'not_found', 'Test identity switching is unavailable.');
+  const actor = await authenticatedPrincipal(c);
+  if (!canSwitchIdentity(c.env, actor)) throw new ApiError(404, 'not_found', 'Test identity switching is unavailable.');
+  c.set('principal', actor);
+  await next();
+});
+sessionRoutes.get('/test-auth/users', async (c) => data(c, await all(c.env.DB.prepare(
+  `SELECT u.id, u.display_name, u.email_display, u.status,
+    (SELECT group_concat(DISTINCT role) FROM workspace_members wm WHERE wm.user_id = u.id AND wm.status = 'active') AS roles
+   FROM users u WHERE u.status IN ('active', 'invited') ORDER BY u.display_name`,
+))));
+sessionRoutes.post('/test-auth/session', async (c) => {
+  const actor = c.get('principal');
+  const { userId } = await parseJson(c, z.object({ userId: z.string().min(1).max(120) }));
+  const subject = await loadTestPrincipal(c.env.DB, userId);
+  if (!subject) throw new ApiError(400, 'invalid_test_user', 'Choose an active or invited test account.');
+  const previousToken = getCookie(c, TEST_USER_COOKIE);
+  if (previousToken) await c.env.DB.prepare('DELETE FROM test_identity_sessions WHERE token_hash = ?').bind(await hashSessionToken(previousToken)).run();
+  await c.env.DB.prepare('DELETE FROM test_identity_sessions WHERE expires_at <= ?').bind(now()).run();
+  const token = newId();
+  await c.env.DB.prepare('INSERT INTO test_identity_sessions (token_hash, actor_user_id, subject_user_id, expires_at) VALUES (?, ?, ?, ?)')
+    .bind(await hashSessionToken(token), actor.userId, subject.userId, new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString()).run();
+  await audit(c.env.DB, actor.userId, 'session.test.started', 'user', subject.userId,
+    { subjectUserId: subject.userId, metadata: { authenticatedEmail: actor.verifiedEmail } });
+  setCookie(c, TEST_USER_COOKIE, token, { httpOnly: true, secure: !isLocalAuth(c.env), sameSite: 'Strict', path: '/', maxAge: 6 * 60 * 60 });
+  subject.testing = { canSwitch: true, authenticatedEmail: actor.verifiedEmail, isImpersonating: subject.userId !== actor.userId };
+  return data(c, subject);
+});
+sessionRoutes.delete('/test-auth/session', async (c) => {
+  const token = getCookie(c, TEST_USER_COOKIE);
+  if (token) await c.env.DB.prepare('DELETE FROM test_identity_sessions WHERE token_hash = ? AND actor_user_id = ?')
+    .bind(await hashSessionToken(token), c.get('principal').userId).run();
+  deleteCookie(c, TEST_USER_COOKIE, { path: '/' });
+  await audit(c.env.DB, c.get('principal').userId, 'session.test.ended', 'user', c.get('principal').userId);
+  return data(c, { restored: true });
+});

@@ -69,7 +69,10 @@ programRoutes.get('/workspaces/:workspaceId/programs', async (c) => {
   if (c.req.query('ownerUserId')) { clauses.push('p.owner_user_id=?'); params.push(c.req.query('ownerUserId')); }
   if (!isPlatformAdmin(principal) && access.role === 'coach') { clauses.push(`(p.owner_user_id=? OR EXISTS(SELECT 1 FROM coach_client_relationships r WHERE r.workspace_id=p.workspace_id AND r.coach_user_id=? AND r.client_user_id=p.owner_user_id AND r.status='active'))`); params.push(principal.userId, principal.userId); }
   if (!isPlatformAdmin(principal) && access.role === 'client') { clauses.push('p.owner_user_id=?'); params.push(principal.userId); }
-  return data(c, await all(c.env.DB.prepare(`SELECT p.*,u.display_name AS owner_name FROM programs p JOIN users u ON u.id=p.owner_user_id WHERE ${clauses.join(' AND ')} ORDER BY p.updated_at DESC`).bind(...params)));
+  return data(c, await all(c.env.DB.prepare(`SELECT p.*,u.display_name AS owner_name,
+    (SELECT COUNT(*) FROM mesocycles m WHERE m.program_id=p.id AND m.workspace_id=p.workspace_id) AS mesocycle_count,
+    (SELECT COUNT(*) FROM workouts w WHERE w.program_id=p.id AND w.workspace_id=p.workspace_id) AS workout_count
+    FROM programs p JOIN users u ON u.id=p.owner_user_id WHERE ${clauses.join(' AND ')} ORDER BY p.updated_at DESC`).bind(...params)));
 });
 
 programRoutes.post('/workspaces/:workspaceId/programs', async (c) => {

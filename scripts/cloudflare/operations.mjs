@@ -75,7 +75,8 @@ export function createOperations(env = process.env) {
   }
   async function smoke(names, id) {
     const users = await query(id, 'SELECT email_normalized, status FROM users');
-    if (users.length !== 1 || users[0].email_normalized !== EMAIL || users[0].status !== 'active') throw new Error('Hosted owner seed verification failed.');
+    const expectedEmails = names.branch === 'dev' ? [EMAIL, 'coach@liftlog.test', 'athlete@liftlog.test'] : [EMAIL];
+    if (users.length !== expectedEmails.length || expectedEmails.some(email => !users.some(user => user.email_normalized === email && user.status === 'active'))) throw new Error('Hosted owner seed verification failed.');
     const memberships = await query(id, "SELECT role FROM workspace_members WHERE user_id='user-owner'");
     if (memberships.length !== 1 || memberships[0].role !== 'owner') throw new Error('Hosted workspace seed verification failed.');
     for (const path of ['/', '/api/session', '/api/local-auth/users', '/api/testing/fixtures']) {

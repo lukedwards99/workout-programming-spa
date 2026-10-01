@@ -8,3 +8,5 @@ test-results/*
 .dev.vars*
 .env*
 !.env.example
+.impeccable/review/
+.impeccable/hook.cache.json
