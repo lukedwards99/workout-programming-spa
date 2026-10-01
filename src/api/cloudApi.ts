@@ -14,7 +14,7 @@ export const programsApi = {
   list(workspaceId: string, visibility = 'current', ownerUserId?: string) { const q = new URLSearchParams({ visibility }); if (ownerUserId) q.set('ownerUserId', ownerUserId); return apiRequest<Program[]>(`${workspace(workspaceId)}/programs?${q}`); },
   get(workspaceId: string, id: string) { return apiRequest<Program>(program(workspaceId, id)); },
   create(workspaceId: string, input: { name: string; notes?: string; ownerUserId?: string }) { return apiRequest<Program>(`${workspace(workspaceId)}/programs`, { method: 'POST', ...jsonBody(input) }); },
-  copy(workspaceId: string, id: string, input: { name: string; targetOwnerUserId: string } & CopyOptions) { return apiRequest<Program>(`${program(workspaceId, id)}/copy`, { method: 'POST', ...jsonBody(input) }); },
+  copy(workspaceId: string, id: string, input: { name: string; targetOwnerUserId: string; targetWorkspaceId?: string } & CopyOptions) { return apiRequest<Program>(`${program(workspaceId, id)}/copy`, { method: 'POST', ...jsonBody(input) }); },
   update(workspaceId: string, row: Program, input: { name: string; notes?: string }) { return apiRequest<Program>(program(workspaceId, row.id), { method: 'PATCH', ...jsonBody({ ...input, revision: row.revision }) }); },
   remove(workspaceId: string, id: string) { return apiRequest<{ deleted: boolean }>(program(workspaceId, id), { method: 'DELETE' }); },
   archive(workspaceId: string, id: string) { return apiRequest<Program>(`${program(workspaceId, id)}/archive`, { method: 'POST' }); },
@@ -52,10 +52,10 @@ export const libraryApi = {
 
 export interface AdminUser { id: string; email_display: string; display_name: string; status: 'invited' | 'active' | 'disabled'; platform_roles: string | null; workspace_count: number }
 export interface WorkspaceMember { workspace_id: string; user_id: string; role: 'owner' | 'coach' | 'client'; status: 'active' | 'suspended'; display_name: string; email_display: string; user_status: string }
-export interface WorkspaceRow { id: string; name: string; status: string; history_retention_days: number; member_role: WorkspaceMember['role'] | null; member_status: WorkspaceMember['status'] | null }
+export interface WorkspaceRow { kind: 'organization' | 'personal' | 'client'; client_user_id: string | null; personal_owner_user_id: string | null; parent_workspace_id: string | null; id: string; name: string; status: string; history_retention_days: number; member_role: WorkspaceMember['role'] | null; member_status: WorkspaceMember['status'] | null }
 export const adminApi = {
   workspaces() { return apiRequest<WorkspaceRow[]>('/workspaces'); },
-  createWorkspace(name: string) { return apiRequest<WorkspaceRow>('/workspaces', { method: 'POST', ...jsonBody({ name }) }); },
+  createWorkspace(name: string, kind: 'personal' | 'organization' = 'personal') { return apiRequest<WorkspaceRow>('/workspaces', { method: 'POST', ...jsonBody({ name, kind }) }); },
   deleteWorkspace(id: string, confirmName: string) { return apiRequest<{ deleted: boolean }>(`/workspaces/${id}`, { method: 'DELETE', ...jsonBody({ confirmName }) }); },
   users() { return apiRequest<AdminUser[]>('/admin/users'); },
   createUser(input: { email: string; displayName: string; status: AdminUser['status']; workspaceId?: string; role?: WorkspaceMember['role'] }) { return apiRequest<AdminUser>('/admin/users', { method: 'POST', ...jsonBody(input) }); },
@@ -66,9 +66,14 @@ export const adminApi = {
   removeMember(workspaceId: string, userId: string) { return apiRequest(`${workspace(workspaceId)}/members/${userId}`, { method: 'DELETE' }); },
 };
 
-export interface ClientRelationship { id: string; client_user_id: string; coach_user_id: string; status: string; display_name: string; email_display: string; membership_status: string; program_count: number }
+export interface ClientAssignment {
+  client_user_id: string; display_name: string; email_display: string;
+  space_id: string; space_name: string; organization_id: string; organization_name: string;
+  relationship_id: string | null; coach_user_id: string | null; coach_name: string | null;
+  program_count: number; can_force_release: number; can_open: number;
+}
 export const clientsApi = {
-  list(workspaceId: string) { return apiRequest<ClientRelationship[]>(`${workspace(workspaceId)}/clients`); },
-  add(workspaceId: string, clientUserId: string, coachUserId?: string) { return apiRequest<ClientRelationship>(`${workspace(workspaceId)}/clients`, { method: 'POST', ...jsonBody({ clientUserId, coachUserId }) }); },
-  remove(workspaceId: string, id: string) { return apiRequest(`${workspace(workspaceId)}/clients/${id}`, { method: 'DELETE' }); },
+  list() { return apiRequest<ClientAssignment[]>('/clients'); },
+  claim(clientUserId: string, coachUserId?: string) { return apiRequest(`/clients/${clientUserId}/claim`, { method: 'POST', ...jsonBody({ coachUserId }) }); },
+  release(clientUserId: string, relationshipId: string) { return apiRequest(`/clients/${clientUserId}/release`, { method: 'POST', ...jsonBody({ relationshipId }) }); },
 };

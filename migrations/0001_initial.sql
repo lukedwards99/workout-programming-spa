@@ -42,9 +42,17 @@ CREATE TABLE workspaces (
   name TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active' CHECK(status IN ('active','suspended')),
   history_retention_days INTEGER NOT NULL DEFAULT 365 CHECK(history_retention_days > 0),
+  kind TEXT NOT NULL DEFAULT 'organization' CHECK(kind IN ('organization','personal','client')),
+  client_user_id TEXT UNIQUE,
+  personal_owner_user_id TEXT,
+  parent_workspace_id TEXT,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-  updated_by_user_id TEXT
+  updated_by_user_id TEXT,
+  FOREIGN KEY(client_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+  FOREIGN KEY(personal_owner_user_id) REFERENCES users(id) ON DELETE RESTRICT,
+  FOREIGN KEY(parent_workspace_id) REFERENCES workspaces(id) ON DELETE RESTRICT,
+  CHECK((kind='client' AND client_user_id IS NOT NULL AND parent_workspace_id IS NOT NULL AND personal_owner_user_id IS NULL) OR (kind='personal' AND personal_owner_user_id IS NOT NULL AND client_user_id IS NULL AND parent_workspace_id IS NULL) OR (kind='organization' AND client_user_id IS NULL AND personal_owner_user_id IS NULL AND parent_workspace_id IS NULL))
 );
 
 CREATE TABLE workspace_members (
@@ -356,6 +364,10 @@ SELECT
   workspaces.name,
   workspaces.status,
   workspaces.history_retention_days,
+  workspaces.kind,
+  workspaces.client_user_id,
+  workspaces.personal_owner_user_id,
+  workspaces.parent_workspace_id,
   workspaces.created_at,
   workspaces.updated_at,
   workspaces.updated_by_user_id
@@ -666,15 +678,15 @@ END;
 CREATE TRIGGER trg_workspaces_history_update
 BEFORE UPDATE ON workspaces
 BEGIN
-  INSERT INTO workspaces_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, name, status, history_retention_days, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.name, OLD.status, OLD.history_retention_days, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO workspaces_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, name, status, history_retention_days, kind, client_user_id, personal_owner_user_id, parent_workspace_id, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'UPDATE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), NEW.updated_by_user_id, OLD.id, OLD.name, OLD.status, OLD.history_retention_days, OLD.kind, OLD.client_user_id, OLD.personal_owner_user_id, OLD.parent_workspace_id, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_workspaces_history_delete
 BEFORE DELETE ON workspaces
 BEGIN
-  INSERT INTO workspaces_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, name, status, history_retention_days, created_at, updated_at, updated_by_user_id)
-  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.name, OLD.status, OLD.history_retention_days, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
+  INSERT INTO workspaces_history (history_id, history_action, history_recorded_at, history_recorded_by_user_id, id, name, status, history_retention_days, kind, client_user_id, personal_owner_user_id, parent_workspace_id, created_at, updated_at, updated_by_user_id)
+  VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.name, OLD.status, OLD.history_retention_days, OLD.kind, OLD.client_user_id, OLD.personal_owner_user_id, OLD.parent_workspace_id, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
 CREATE TRIGGER trg_workspace_members_history_update
@@ -845,3 +857,30 @@ BEGIN
   VALUES (lower(hex(randomblob(16))), 'DELETE', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), OLD.updated_by_user_id, OLD.id, OLD.workspace_id, OLD.program_id, OLD.actor_user_id, OLD.action, OLD.resource_type, OLD.resource_id, OLD.subject_user_id, OLD.metadata_json, OLD.created_at, OLD.updated_at, OLD.updated_by_user_id);
 END;
 
+
+CREATE UNIQUE INDEX idx_client_single_active_coach ON coach_client_relationships(client_user_id) WHERE status='active';
+-- Provision exactly one space when a client joins the roster, including role changes.
+CREATE TRIGGER provision_client_space_insert AFTER INSERT ON workspace_members
+WHEN NEW.role='client' AND (SELECT kind FROM workspaces WHERE id=NEW.workspace_id)='organization'
+BEGIN
+ INSERT OR IGNORE INTO workspaces (id,name,kind,client_user_id,parent_workspace_id,updated_by_user_id)
+ SELECT 'client-space-'||NEW.user_id,display_name||'’s space','client',NEW.user_id,NEW.workspace_id,NEW.updated_by_user_id FROM users WHERE id=NEW.user_id;
+ INSERT OR IGNORE INTO workspace_members (workspace_id,user_id,role,status,updated_by_user_id)
+ SELECT id,NEW.user_id,'client',NEW.status,NEW.updated_by_user_id FROM workspaces WHERE client_user_id=NEW.user_id;
+END;
+CREATE TRIGGER provision_client_space_update AFTER UPDATE OF role ON workspace_members
+WHEN NEW.role='client' AND (SELECT kind FROM workspaces WHERE id=NEW.workspace_id)='organization'
+BEGIN
+ INSERT OR IGNORE INTO workspaces (id,name,kind,client_user_id,parent_workspace_id,updated_by_user_id)
+ SELECT 'client-space-'||NEW.user_id,display_name||'’s space','client',NEW.user_id,NEW.workspace_id,NEW.updated_by_user_id FROM users WHERE id=NEW.user_id;
+ INSERT OR IGNORE INTO workspace_members (workspace_id,user_id,role,status,updated_by_user_id)
+ SELECT id,NEW.user_id,'client',NEW.status,NEW.updated_by_user_id FROM workspaces WHERE client_user_id=NEW.user_id;
+END;
+CREATE TRIGGER client_program_space_insert BEFORE INSERT ON programs
+WHEN EXISTS(SELECT 1 FROM workspaces WHERE client_user_id=NEW.owner_user_id AND id<>NEW.workspace_id)
+OR EXISTS(SELECT 1 FROM workspaces WHERE id=NEW.workspace_id AND kind='client' AND client_user_id<>NEW.owner_user_id)
+BEGIN SELECT RAISE(ABORT,'client_space_required'); END;
+CREATE TRIGGER client_program_space_update BEFORE UPDATE OF workspace_id,owner_user_id ON programs
+WHEN EXISTS(SELECT 1 FROM workspaces WHERE client_user_id=NEW.owner_user_id AND id<>NEW.workspace_id)
+OR EXISTS(SELECT 1 FROM workspaces WHERE id=NEW.workspace_id AND kind='client' AND client_user_id<>NEW.owner_user_id)
+BEGIN SELECT RAISE(ABORT,'client_space_required'); END;

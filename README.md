@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Startup applies migrations and idempotent local seeds. Select a local owner, coach, or client persona. Local databases are isolated from hosted environments and survive ordinary restarts.
+Startup applies migrations and idempotent local seeds. Select a local admin, one of two coaches, or a client persona. Client assignments connect coaches to dedicated client spaces; coaches can also create multiple personal spaces. Exercise libraries are specific to each space. Local databases are isolated from hosted environments and survive ordinary restarts. Schema changes currently assume a full reset; after updating this checkout, run `npm run db:reset:local` to recreate local state.
 
 ```sh
 npm run check             # types, Worker/deployment/browser tests, hosted build and dry run

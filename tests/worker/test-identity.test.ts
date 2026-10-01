@@ -53,15 +53,15 @@ describe('temporary test identity wrapper', () => {
     expect(audit).toMatchObject({ actor_user_id: 'user-owner', subject_user_id: 'user-dev-athlete' });
   });
   it('isolates program visibility and plan/execution permissions across test emails', async () => {
-    const p = await dataOf<{ id: string }>(await call('/workspaces/workspace-owner/programs', body({ name: 'Athlete program', ownerUserId: 'user-dev-athlete' })));
+    const p = await dataOf<{ id: string }>(await call('/workspaces/client-space-user-dev-athlete/programs', body({ name: 'Athlete program', ownerUserId: 'user-dev-athlete' })));
     const own = await dataOf<{ id: string }>(await call('/workspaces/workspace-owner/programs', body({ name: 'Private owner program' })));
     const cookie = cookieOf(await call('/test-auth/session', body({ userId: 'user-dev-athlete' })));
-    const programs = await dataOf<Array<{ id: string }>>(await call('/workspaces/workspace-owner/programs', { headers: { Cookie: cookie } }));
+    const programs = await dataOf<Array<{ id: string }>>(await call('/workspaces/client-space-user-dev-athlete/programs', { headers: { Cookie: cookie } }));
     expect(programs.map((x) => x.id)).toContain(p.id);
     expect(programs.map((x) => x.id)).not.toContain(own.id);
     expect((await call(`/workspaces/workspace-owner/programs/${own.id}`, { headers: { Cookie: cookie } })).status).toBe(403);
     const coach = cookieOf(await call('/test-auth/session', body({ userId: 'user-dev-coach' }, cookie)));
-    expect((await call(`/workspaces/workspace-owner/programs/${p.id}`, { headers: { Cookie: coach } })).status).toBe(200);
+    expect((await call(`/workspaces/client-space-user-dev-athlete/programs/${p.id}`, { headers: { Cookie: coach } })).status).toBe(200);
     expect((await call(`/workspaces/workspace-owner/programs/${own.id}`, { headers: { Cookie: coach } })).status).toBe(403);
   });
   it('rejects forged, expired and disabled subjects without reverting writes to the admin', async () => {

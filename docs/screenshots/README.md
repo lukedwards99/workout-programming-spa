@@ -10,3 +10,6 @@ Synthetic local sample data, captured at 1440px desktop and 390px mobile. Regene
 | Exercise library | [Screenshot](library-desktop.png) | — |
 | Test account switcher | [Screenshot](test-accounts-desktop.png) | — |
 | Local login | [Screenshot](login-desktop.png) | — |
+| Client assignments | [Screenshot](client-assignments-desktop.jpg) | [Screenshot](client-assignments-mobile.jpg) |
+
+The client assignment captures came from computer-use testing at `http://127.0.0.1:5175/clients`, using disposable local personas on September 30, 2026. Desktop is 1440 × 900; the 390px mobile image captures the full stacked directory. These JPEGs are browser captures, with no generated imagery.

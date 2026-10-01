@@ -1,6 +1,10 @@
 export type EntityId = string;
 
 export interface WorkspaceMembership {
+  kind: 'organization' | 'personal' | 'client';
+  clientUserId: string | null;
+  personalOwnerUserId: string | null;
+  parentWorkspaceId: string | null;
   workspaceId: string;
   workspaceName: string;
   role: 'owner' | 'coach' | 'client';
@@ -19,6 +23,10 @@ export interface AuthPrincipal {
   availableWorkspaces: Array<{
     workspaceId: string;
     workspaceName: string;
+    kind: WorkspaceMembership['kind'];
+    clientUserId: string | null;
+    personalOwnerUserId: string | null;
+    parentWorkspaceId: string | null;
     role: 'admin' | 'owner' | 'coach' | 'client';
     status: 'active' | 'suspended';
     isMember: boolean;

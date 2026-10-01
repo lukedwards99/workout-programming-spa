@@ -32,8 +32,8 @@ test('copies an independent program with executed values off by default', async 
 
 test('creates, switches to, and deletes a workspace', async ({ page }) => {
   const name = `E2E Workspace ${Date.now()}`;
-  await page.getByRole('link', { name: 'Workspaces' }).click();
-  await page.getByPlaceholder('Workspace name').fill(name);
+  await page.getByRole('link', { name: 'Spaces' }).click();
+  await page.getByPlaceholder('Space name').fill(name);
   await page.getByRole('button', { name: 'Create' }).click();
   const card = page.locator('article').filter({ hasText: name });
   await expect(card.getByText(/selected/)).toBeVisible();
@@ -49,7 +49,60 @@ test('provisions a beta user only inside isolated E2E state', async ({ page }) =
   const fields = page.getByRole('dialog').locator('input');
   await fields.nth(0).fill(displayName); await fields.nth(1).fill(`athlete-${suffix}@example.test`);
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByText(displayName)).toBeVisible();
+  await expect(page.getByText(displayName, { exact: true })).toBeVisible();
+});
+
+test('coach releases and reclaims a client, opens their space, and sees an isolated library', async ({ page, personas }) => {
+  await page.request.post('/api/local-auth/session',{data:{userId:personas.coachId}});
+  await page.reload();
+  await page.getByRole('link',{name:'Client assignments'}).click();
+  const client=page.getByRole('row').filter({hasText:'Assigned to you'});
+  await expect(client.getByRole('button',{name:/Release client/})).toBeVisible();
+  await client.getByRole('button',{name:/Release client/}).click();
+  await page.getByRole('dialog').getByRole('button',{name:'Release',exact:true}).click();
+  await expect(page.getByRole('button',{name:/Claim client/})).toBeVisible();
+  await page.getByRole('button',{name:/Claim client/}).click();
+  await page.getByRole('button',{name:/Open space/}).click();
+  await expect(page.getByText(/Programs belong to this client/)).toBeVisible();
+  await page.getByRole('button',{name:'New program'}).click();
+  await page.getByRole('dialog').locator('input').fill('Client space plan');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.getByRole('link',{name:'Client space plan',exact:true})).toBeVisible();
+  await page.getByRole('link',{name:'Exercise Library',exact:true}).click();
+  await expect(page.getByText('Back Squat',{exact:true})).toHaveCount(0);
+  await page.getByRole('button',{name:'New group'}).click();
+  await page.getByRole('dialog').locator('input').fill('Client strength');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await page.getByRole('button',{name:'New exercise'}).click();
+  await page.getByRole('dialog').locator('input').first().fill('Client-only squat');
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.getByText('Client-only squat',{exact:true})).toBeVisible();
+  await page.getByRole('combobox',{name:'Space',exact:true}).selectOption(personas.workspaceId);
+  await page.getByRole('link',{name:'Exercise Library',exact:true}).click();
+  await expect(page.getByText('Client-only squat',{exact:true})).toHaveCount(0);
+  await expect(page.getByText('Back Squat',{exact:true})).toBeVisible();
+});
+
+test('client sees exactly one space and cannot enter the staff assignment page', async ({ page, personas }) => {
+  await page.request.post('/api/local-auth/session',{data:{userId:personas.clientId}});
+  await page.reload();
+  await expect(page.getByRole('link',{name:'Client assignments'})).toHaveCount(0);
+  await expect(page.getByRole('link',{name:'Spaces',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('combobox',{name:'Space',exact:true})).toHaveCount(0);
+  await expect(page.getByRole('button',{name:'New program'})).toHaveCount(0);
+  await page.goto('/clients');
+  await expect(page.getByRole('alert')).toHaveText(/available to coaches, owners, and administrators/);
+});
+
+test('copies a program into a client space and navigates to the independent copy', async ({ page, personas }) => {
+  await page.goto(`/programs/${personas.programId}`);
+  await page.getByRole('button',{name:'Copy program'}).click();
+  const dialog=page.getByRole('dialog');
+  await dialog.locator('input').first().fill('Client copy');
+  await dialog.getByLabel('Destination space').selectOption(`client-space-${personas.clientId}`);
+  await page.getByRole('button',{name:'Save',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Client copy',exact:true})).toBeVisible();
+  await expect(page.getByRole('combobox',{name:'Space',exact:true})).toHaveValue(`client-space-${personas.clientId}`);
 });
 
 test('switches email identities and clears the previous account’s programs', async ({ page, personas }) => {
@@ -135,4 +188,22 @@ test('records a cardio result with the planned unit and preserves it on reload',
   await expect(page.getByRole('spinbutton', { name: 'Actual distance' })).toHaveValue('3.2');
   await expect(page.getByRole('combobox', { name: 'Distance unit' })).toHaveValue('km');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+
+test('shows a competing assignment error inside the coach dialog', async ({ page, personas }) => {
+  await page.getByRole('link', { name: 'Client assignments', exact: true }).click();
+  const assignments = (await (await page.request.get('/api/clients')).json()).data;
+  const client = assignments.find((row: { client_user_id: string }) => row.client_user_id === personas.clientId);
+  await page.getByRole('textbox', { name: 'Search clients or coaches' }).fill(client.email_display);
+  await page.getByRole('button', { name: /^Force release/ }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Release', exact: true }).click();
+  await page.getByRole('button', { name: /^Assign coach for/ }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByLabel('Coach', { exact: true }).selectOption(personas.coachId);
+  const competing = await page.request.post(`/api/clients/${personas.clientId}/claim`, { data: {} });
+  expect(competing.status()).toBe(201);
+  await dialog.getByRole('button', { name: 'Assign coach', exact: true }).click();
+  await expect(dialog.getByRole('alert')).toHaveText(/already been claimed/);
+  await expect(dialog.getByLabel('Coach', { exact: true })).toHaveValue(personas.coachId);
 });
