@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { libraryApi } from '../api/cloudApi';
 import FormModal from '../components/FormModal';
 import ConfirmModal from '../components/ConfirmModal';
@@ -10,15 +10,20 @@ export default function WorkspaceLibraryPage() {
   const { workspaceId, principal } = useSession();
   const access = principal?.availableWorkspaces.find((item) => item.workspaceId === workspaceId);
   const canEdit = ['admin', 'owner', 'coach'].includes(access?.role ?? '');
+  const activeWorkspace = useRef(workspaceId);
+  activeWorkspace.current = workspaceId;
+  const [testEnabled, setTestEnabled] = useState(false), [seedBusy, setSeedBusy] = useState(false), [seedMessage, setSeedMessage] = useState(''), [seedError, setSeedError] = useState('');
+  useEffect(() => { libraryApi.testConfig().then((config) => setTestEnabled(config.testExercisesEnabled)).catch(() => setTestEnabled(false)); }, []);
+  useEffect(() => { setSeedMessage(''); setSeedError(''); }, [workspaceId, principal?.userId]);
   const [groups, setGroups] = useState<ExerciseGroup[]>([]), [exercises, setExercises] = useState<Exercise[]>([]);
   const [search, setSearch] = useState(''), [filter, setFilter] = useState(''), [showGroup, setShowGroup] = useState(false), [showExercise, setShowExercise] = useState(false);
   const [groupId, setGroupId] = useState(''), [name, setName] = useState(''), [notes, setNotes] = useState(''), [type, setType] = useState<'strength' | 'cardio'>('strength');
   const [editing, setEditing] = useState<Exercise | null>(null), [deleting, setDeleting] = useState<Exercise | null>(null), [selected, setSelected] = useState<Exercise | null>(null);
   const [variations, setVariations] = useState<ExerciseVariation[]>([]), [variationName, setVariationName] = useState(''), [variationBusy, setVariationBusy] = useState(false);
   const [error, setError] = useState(''), [loading, setLoading] = useState(true);
-  const load = useCallback(async () => {
+  const load = useCallback(async (query = search) => {
     if (!workspaceId) return;
-    try { const [g, e] = await Promise.all([libraryApi.groups(workspaceId), libraryApi.exercises(workspaceId, search)]); setGroups(g); setExercises(e); setError(''); }
+    try { const [g, e] = await Promise.all([libraryApi.groups(workspaceId), libraryApi.exercises(workspaceId, query)]); if (activeWorkspace.current !== workspaceId) return; setGroups(g); setExercises(e); setError(''); }
     catch (e) { setError((e as Error).message); } finally { setLoading(false); }
   }, [workspaceId, search]);
   useEffect(() => { const timeout = setTimeout(() => void load(), 180); return () => clearTimeout(timeout); }, [load]);
@@ -34,9 +39,28 @@ export default function WorkspaceLibraryPage() {
     if (editing) await libraryApi.updateExercise(workspaceId, editing, input); else await libraryApi.createExercise(workspaceId, input);
     setShowExercise(false); setEditing(null); await load();
   }
+  async function addTestExercises() {
+    if (!workspaceId || seedBusy) return;
+    setSeedBusy(true); setSeedMessage(''); setSeedError('');
+    try {
+      const result = await libraryApi.addTestExercises(workspaceId);
+      if (activeWorkspace.current !== workspaceId) return;
+      setSeedMessage(result.exercisesAdded ? `Added ${result.exercisesAdded} test exercises.` : 'Test exercises are already in this library.');
+      setSearch(''); setFilter('');
+      await load('');
+    } catch (e) {
+      if (activeWorkspace.current === workspaceId) setSeedError((e as Error).message);
+    } finally { setSeedBusy(false); }
+  }
   const filtered = exercises.filter((e) => !filter || e.exercise_group_id === filter);
   return <>
     <div className="page-header"><div><h1>Exercise Library</h1><p className="page-subtitle">{access?.workspaceName} · Exercises belong to this space and are shared by its programs.</p></div>{canEdit && <div className="actions"><button className="btn btn-outline" onClick={() => { setName(''); setShowGroup(true); }}>New group</button><button className="btn btn-primary" onClick={() => { setEditing(null); setName(''); setNotes(''); setType('strength'); setGroupId(groups[0]?.id ?? ''); setShowExercise(true); }}><Icon name="plus" />New exercise</button></div>}</div>
+    {canEdit && testEnabled && <div className="toolbar">
+      <p className="muted">Need a starting list? Add sample strength and cardio exercises to this space.</p>
+      <button className="btn btn-outline" disabled={seedBusy || loading} onClick={() => void addTestExercises()}>{seedBusy ? 'Adding test exercises…' : 'Add test exercises'}</button>
+    </div>}
+    {seedMessage && <p role="status">{seedMessage}</p>}
+    {seedError && <div className="alert alert-danger" role="alert">{seedError} Try adding test exercises again.</div>}
     <div className="toolbar"><label className="search-box library-search"><Icon name="search" /><input aria-label="Search exercises" placeholder="Find an exercise" value={search} onChange={(e) => setSearch(e.target.value)} /></label><span className="muted">{filtered.length} exercises</span></div>
     <div className="library-group-tabs" aria-label="Exercise group"><button className={!filter ? 'active' : ''} aria-pressed={!filter} onClick={() => setFilter('')}>All movements</button>{groups.map((g) => <button key={g.id} className={filter === g.id ? 'active' : ''} aria-pressed={filter === g.id} onClick={() => setFilter(g.id)}>{g.name}</button>)}</div>
     {error && <div className="alert alert-danger" role="alert">{error} <button className="inline-link" onClick={() => void load()}>Retry</button></div>}

@@ -39,6 +39,8 @@ Select a local account to start, then use **Switch test user** to test another e
 
 On hosted **dev**, the same switcher is available only after the allowed owner completes real Cloudflare Access sign-in. Dev seeds a test coach and athlete alongside the owner. New provisioned accounts can also be selected, including invited accounts without activating or linking a real provider. Expiring, opaque, HTTP-only sessions are stored as hashes in D1 and bound to the real authenticated account. Production disables the wrapper independently of configuration flags. See [test identity details](docs/test-identities.md).
 
+For a prefilled exercise list, open **Exercise Library → Add test exercises** in the space you want to test. Available locally and on hosted dev to users who can edit that library, this adds up to 12 strength/cardio exercises with variations. Repeating it skips existing samples (including renamed samples) and matching exercise names without overwriting edits. Use it again after a database reset or in a new space. Production does not expose this action.
+
 Screenshots are in [docs/screenshots](docs/screenshots). To refresh them with the default local sample data and a running server: `node scripts/capture-redesign.mjs`.
 
 See [development](docs/development.md), [deployment and recovery](docs/deployment.md), and [using LiftLog](docs/using-liftlog.md).

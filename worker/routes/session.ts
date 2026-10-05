@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { deleteCookie, getCookie, setCookie } from 'hono/cookie';
 import { z } from 'zod';
 import type { AppEnv } from '../types';
+import { testExercisesEnabled } from '../test-exercises';
 import { all, ApiError, audit, data, newId, now, parseJson } from '../lib';
 import { authenticatedPrincipal, canSwitchIdentity, hashSessionToken, isLocalAuth, loadPrincipal, loadTestPrincipal, LOCAL_USER_COOKIE, TEST_USER_COOKIE, requireAuth } from '../auth';
 
@@ -11,6 +12,7 @@ sessionRoutes.get('/health', (c) => data(c, { status: 'ok', environment: c.env.A
 sessionRoutes.get('/session/config', (c) => data(c, {
   authMode: ['local', 'test'].includes(c.env.APP_ENV) && c.env.LOCAL_AUTH_ENABLED === 'true' ? 'local' : 'access',
   environment: c.env.APP_ENV,
+  testExercisesEnabled: testExercisesEnabled(c.env),
   disposableData: !['local', 'test'].includes(c.env.APP_ENV),
 }));
 

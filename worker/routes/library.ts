@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { z } from 'zod';
 import type { AppEnv } from '../types';
+import { seedTestExercises, testExercisesEnabled } from '../test-exercises';
 import {
   all, ApiError, audit, data, deleteStatement, first, newId, now, parseJson,
   requireWorkspaceRole, stampStatement,
@@ -15,6 +16,14 @@ function requireLibraryRead(c: Parameters<typeof requireWorkspaceRole>[0], works
 function requireLibraryEdit(c: Parameters<typeof requireWorkspaceRole>[0], workspaceId: string) {
   return requireWorkspaceRole(c, workspaceId, ['owner', 'coach']);
 }
+
+libraryRoutes.post('/workspaces/:workspaceId/test-exercises', async (c) => {
+  if (!testExercisesEnabled(c.env)) throw new ApiError(404, 'not_found', 'Test exercises are unavailable.');
+  const principal = c.get('principal');
+  const workspaceId = c.req.param('workspaceId');
+  requireLibraryEdit(principal, workspaceId);
+  return data(c, await seedTestExercises(c.env.DB, workspaceId, principal.userId));
+});
 
 libraryRoutes.get('/workspaces/:workspaceId/exercise-groups', async (c) => {
   const workspaceId = c.req.param('workspaceId');
