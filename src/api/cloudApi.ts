@@ -40,6 +40,8 @@ export const programsApi = {
 };
 
 export const libraryApi = {
+  testConfig() { return apiRequest<{ testExercisesEnabled: boolean }>('/session/config'); },
+  addTestExercises(workspaceId: string) { return apiRequest<{ exercisesAdded: number }>(`${workspace(workspaceId)}/test-exercises`, { method: 'POST' }); },
   groups(workspaceId: string) { return apiRequest<ExerciseGroup[]>(`${workspace(workspaceId)}/exercise-groups`); },
   createGroup(workspaceId: string, input: { name: string; notes?: string }) { return apiRequest<ExerciseGroup>(`${workspace(workspaceId)}/exercise-groups`, { method: 'POST', ...jsonBody(input) }); },
   exercises(workspaceId: string, search = '') { return apiRequest<Exercise[]>(`${workspace(workspaceId)}/exercises${search ? `?search=${encodeURIComponent(search)}` : ''}`); },

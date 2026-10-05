@@ -207,3 +207,28 @@ test('shows a competing assignment error inside the coach dialog', async ({ page
   await expect(dialog.getByRole('alert')).toHaveText(/already been claimed/);
   await expect(dialog.getByLabel('Coach', { exact: true })).toHaveValue(personas.coachId);
 });
+
+for (const mobile of [false, true]) {
+  test(`adds test exercises to an empty library${mobile ? ' on mobile' : ''}`, async ({ page, personas }, testInfo) => {
+    const space = `client-space-${personas.clientId}`;
+    await page.goto('/library');
+    await page.getByRole('combobox', { name: 'Space', exact: true }).selectOption(space);
+    await page.getByRole('link', { name: 'Exercise Library', exact: true }).click();
+    if (mobile) await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.getByText('No movements in this view')).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('test-library-empty.png'), fullPage: true });
+    await page.getByRole('button', { name: 'Add test exercises', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText('Added 12 test exercises.');
+    await expect(page.getByText('Barbell Squat', { exact: true })).toBeVisible();
+    await expect(page.getByText('Rowing', { exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Add test exercises', exact: true }).click();
+    await expect(page.getByRole('status')).toHaveText('Test exercises are already in this library.');
+    await expect(page.locator('tbody tr')).toHaveCount(12);
+    await page.screenshot({ path: testInfo.outputPath('test-library-filled.png'), fullPage: true });
+    await page.request.post('/api/local-auth/session', { data: { userId: personas.clientId } });
+    await page.reload();
+    await expect(page.locator('tbody tr')).toHaveCount(12);
+    await expect(page.getByRole('button', { name: 'Add test exercises', exact: true })).toHaveCount(0);
+    await expect(page.locator('tbody tr')).toHaveCount(12);
+  });
+}
