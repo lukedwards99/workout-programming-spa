@@ -11,7 +11,7 @@ MODE: Operate. Extend the incumbent training-studio interface. Product behavior 
 
 ## Direction contract
 
-THESIS: Make the client, assigned coach, and unique client space visible together, with authorized assignment actions beside each row.
+THESIS: Make the client, assigned coach, and unique client space visible together, with authorized assignment actions beside each row. Separate a coach's personal work, assigned client spaces, and team roster in both Spaces and the native space picker.
 
 OWN-WORLD: Inherit warm paper surfaces, the pine navigation rail, green actions, Manrope headings, DM Sans body, flat ruled tables, and existing Bootstrap controls. This surface introduces no raster assets or visual identity.
 
@@ -28,6 +28,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 Show explicit assigned/unassigned state and only permitted actions. Release confirmation explains retained client data and immediate loss of coach access. An assign-coach conflict stays visible as an alert inside the open modal, with the selected coach retained. Loading, empty, success, and failure feedback use the existing operational patterns. Filters expose their selection through `aria-pressed`; row actions include the client's name in their accessible label.
 
 ## Finish evidence
+
+The October 6 Spaces clarity update was inspected in one desktop/mobile capture round, followed by one confirmation round after fixing capture timing during modal transitions. The six final JPEGs in `docs/screenshots/space-navigation.md` show settled views of grouped Spaces, assignment context, assignment confirmation, and the client-only training route. The parent review confirmed consistent paper/pine surfaces, ruled space rows, labeled forms, clear access roles, and mobile reflow. No external reviewer or live detector verdict is claimed for this update; the Impeccable engine was unavailable, and existing project context supplied the design guidance.
 
 The finished implementation was compared with `DESIGN.md`, `.impeccable/design.json`, the target pages and navigation, `src/App.css`, and the shared form modal. Paper/pine/green tokens, the Manrope/DM Sans hierarchy, flat ruled containers, compact controls, and modal feedback remain consistent with the incumbent system. The assignment-specific CSS reuses its palette and component rules.
 
