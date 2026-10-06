@@ -20,12 +20,11 @@ Create environments `dev` (branch `dev` only) and `production` (branch `main` on
 - `CLOUDFLARE_ACCOUNT_ID`: `ddb45a91c623b716978d580d88298be1`
 - `CLOUDFLARE_WORKERS_SUBDOMAIN`: `luke-edwards20`
 - `CLOUDFLARE_ACCESS_ALLOWED_EMAIL`: `luke.edwards20@gmail.com`
-- `CLOUDFLARE_ACCESS_OTP_IDP_ID`: UUID of the approved One-time PIN identity provider in this account
 - `LANE_RESET_APPROVED`: `<account ID>:dev` or `<account ID>:main`
 
 The deployment credential uses Workers Editor, D1 Write, Access Apps Write, Access Policies Write, and Account Settings Read in this account. Do not grant billing, email, R2, queue, or other-account permissions. The account-owned `LiftLog GitHub Actions` token expires October 1, 2027; rotate it in both environment secrets before expiration. Keep credentials in GitHub environment secrets; never commit or log them.
 
-Hosted login uses only the personal organization's approved One-time PIN identity provider, selected by `CLOUDFLARE_ACCESS_OTP_IDP_ID`, with six-hour application sessions. Deployment validates the provider UUID before any remote operation. CI only attaches the configured provider to the selected LiftLog application; it never creates or changes identity providers. The bootstrap policy permits only `luke.edwards20@gmail.com`, and subsequent deployments preserve the existing explicit beta email allowlist, which must retain the owner. Domain-wide, wildcard, Everyone, and non-email rules are rejected.
+Hosted login uses only the personal organization's approved One-time PIN identity provider, pinned by `ACCESS_IDP_ID` in `scripts/cloudflare/config.mjs`, with six-hour application sessions. CI only attaches this provider to the selected LiftLog application; it never creates or changes identity providers. The bootstrap policy permits only `luke.edwards20@gmail.com`, and subsequent deployments preserve the existing explicit beta email allowlist, which must retain the owner. Domain-wide, wildcard, Everyone, and non-email rules are rejected.
 
 Workers Editor can deploy existing Workers but cannot create or delete them. Initial setup creates both Workers in maintenance mode using the operator's personal Cloudflare login and `laneConfig(branch, undefined, { maintenance: true })`. These stable Workers carry the repository/lane ownership variables before CI takes over. Recreating a deleted Worker requires this same operator bootstrap; do not broaden the CI credential to Workers Admin just for routine deployments.
 
@@ -35,12 +34,11 @@ Bootstrap dev first. The initial dev → main PR installs the trusted promotion 
 
 ## One-time PIN setup
 
-An operator completes this one-time setup before merging the OTP PR into dev:
+The personal organization's One-time PIN provider was added with owner approval on October 6, 2026. Its UUID is `209d7ca8-b50a-4989-a4c6-4d87fe237334` and is pinned in the deployment configuration. No new GitHub secrets or environment variables are required.
 
-1. In the personal account above, go to **Zero Trust → Integrations → Identity providers** and confirm whether **One-time PIN** already exists. If it does not, prepare to add it and request approval before saving this authentication change. Keep the existing Cloudflare provider.
-2. After approval, add the One-time PIN provider and copy its UUID from its detail/edit URL. Confirm its type is **One-time PIN**. Creating it through the API requires `Access: Organizations, Identity Providers, and Groups Write`; use an operator credential or the dashboard rather than expanding the CI token.
-3. Set the GitHub **dev** environment variable `CLOUDFLARE_ACCESS_OTP_IDP_ID` to that UUID. Set the same variable in **production** before promoting dev into main.
-4. Merge the PR into dev. Its normal deployment updates only **LiftLog: dev** to use OTP. Test a fresh login and logout before promoting into main; production's current login stays in place until its own deployment.
+Merge the OTP PR into dev when ready. Its normal deployment updates only **LiftLog: dev** to use OTP. Test a fresh login and logout before promoting into main; production's current login stays in place until its own deployment.
+
+If the provider must be recreated, use **Zero Trust → Integrations → Identity providers** in this personal account, request approval before adding the replacement, and update `ACCESS_IDP_ID` through a PR after verifying the new provider's type and UUID. Keep the existing Cloudflare provider. API creation requires `Access: Organizations, Identity Providers, and Groups Write`; use an operator credential or the dashboard rather than expanding the CI token.
 
 See [Cloudflare's One-time PIN instructions](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/). PINs expire after ten minutes and are single-use; requesting a new PIN invalidates the previous one. Cloudflare sends codes only to emails allowed by the application's policy, even though its login page presents the same confirmation to everyone.
 

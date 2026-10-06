@@ -1,11 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ACCOUNT_ID, EMAIL, SUBDOMAIN, REPOSITORY, validateInputs, laneConfig } from '../../scripts/cloudflare/config.mjs';
+import { ACCOUNT_ID, ACCESS_IDP_ID, EMAIL, SUBDOMAIN, REPOSITORY, validateInputs, laneConfig } from '../../scripts/cloudflare/config.mjs';
 import { assertPolicy, createOperations } from '../../scripts/cloudflare/operations.mjs';
 import { assertPromotionSource, deploymentState, checkPromotion } from '../../scripts/check-promotion.mjs';
 const inputs = { CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID, CLOUDFLARE_WORKERS_SUBDOMAIN: SUBDOMAIN,
   CLOUDFLARE_ACCESS_ALLOWED_EMAIL: EMAIL, CLOUDFLARE_API_TOKEN: 'test-token', GITHUB_REPOSITORY: REPOSITORY,
-  CLOUDFLARE_ACCESS_OTP_IDP_ID: '11111111-1111-4111-8111-111111111111',
   GITHUB_REF_NAME: 'dev', GITHUB_REF_TYPE: 'branch', LANE_RESET_APPROVED: `${ACCOUNT_ID}:dev` };
 
 test('rejects wrong accounts, branches, repository, allowlist, token and reset approval', () => {
@@ -13,12 +12,6 @@ test('rejects wrong accounts, branches, repository, allowlist, token and reset a
   for (const key of Object.keys(inputs).filter(key => key !== 'CLOUDFLARE_API_TOKEN')) assert.throws(() => validateInputs('dev', { ...inputs, [key]: 'wrong' }), key);
   assert.throws(() => validateInputs('feature', inputs));
   assert.throws(() => validateInputs('dev', { ...inputs, CLOUDFLARE_API_TOKEN: '' }));
-});
-test('OTP setup is required before deployment can reach Cloudflare', () => {
-  assert.equal(validateInputs('dev', inputs).accessIdpId, inputs.CLOUDFLARE_ACCESS_OTP_IDP_ID);
-  for (const value of [undefined, '', 'onetimepin', 'not-a-provider-id']) {
-    assert.throws(() => validateInputs('dev', { ...inputs, CLOUDFLARE_ACCESS_OTP_IDP_ID: value }), /One-time PIN provider UUID/);
-  }
 });
 test('hosted environments are separate and cannot enable local auth or asset routing', () => {
   const dev = laneConfig('dev', 'dev-database'), main = laneConfig('main', 'main-database');
@@ -97,7 +90,7 @@ test('Access updates pin OTP and preserve existing beta policies and app identit
       const write = writes.at(-1);
       assert.equal(write.method, 'PUT');
       assert.ok(write.url.endsWith(`/accounts/${ACCOUNT_ID}/access/apps/${branch}-app`));
-      assert.deepEqual(write.body.allowed_idps, [inputs.CLOUDFLARE_ACCESS_OTP_IDP_ID]);
+      assert.deepEqual(write.body.allowed_idps, [ACCESS_IDP_ID]);
       assert.equal(write.body.allow_authenticate_via_warp, false);
       assert.equal(write.body.session_duration, '6h');
       assert.deepEqual(write.body.destinations, [{ type: 'worker', worker_id: `${branch}-worker` }]);
@@ -121,7 +114,7 @@ test('a new OTP application starts with only the owner and never creates an iden
     const writes = calls.filter(call => call.method !== 'GET');
     assert.equal(writes.length, 2);
     assert.deepEqual(writes[0].body.include, [{ email: { email: EMAIL } }]);
-    assert.deepEqual(writes[1].body.allowed_idps, [inputs.CLOUDFLARE_ACCESS_OTP_IDP_ID]);
+    assert.deepEqual(writes[1].body.allowed_idps, [ACCESS_IDP_ID]);
     assert.ok(calls.every(call => !call.url.includes('/identity_providers')));
   } finally { globalThis.fetch = original; }
 });

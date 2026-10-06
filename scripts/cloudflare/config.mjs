@@ -3,6 +3,8 @@ export const ACCOUNT_ID = 'ddb45a91c623b716978d580d88298be1';
 export const SUBDOMAIN = 'luke-edwards20';
 export const REPOSITORY = 'lukedwards99/workout-programming-spa';
 export const EMAIL = 'luke.edwards20@gmail.com';
+// Approved One-time PIN provider in the personal Zero Trust organization.
+export const ACCESS_IDP_ID = '209d7ca8-b50a-4989-a4c6-4d87fe237334';
 
 export function laneNames(branch) {
   if (!['dev', 'main'].includes(branch)) throw new Error('Only dev and main may deploy.');
@@ -16,10 +18,8 @@ export function validateInputs(branch, env) {
   if (env.GITHUB_REPOSITORY !== REPOSITORY || env.GITHUB_REF_NAME !== branch || env.GITHUB_REF_TYPE !== 'branch') throw new Error('Deployment must run from its matching repository and branch.');
   if (env.LANE_RESET_APPROVED !== `${ACCOUNT_ID}:${branch}`) throw new Error('Explicit lane reset authorization is required.');
   if (env.CLOUDFLARE_ACCESS_ALLOWED_EMAIL !== EMAIL) throw new Error('The bootstrap Access email must remain the configured owner.');
-  const accessIdpId = env.CLOUDFLARE_ACCESS_OTP_IDP_ID;
-  if (typeof accessIdpId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(accessIdpId)) throw new Error('Configure CLOUDFLARE_ACCESS_OTP_IDP_ID with the approved One-time PIN provider UUID before deployment.');
   if (!env.CLOUDFLARE_API_TOKEN?.trim()) throw new Error('A personal-account API token is required.');
-  return { ...names, accessIdpId };
+  return names;
 }
 
 export function laneConfig(branch, databaseId, { maintenance = false, sha = 'verification' } = {}) {
