@@ -294,6 +294,12 @@ A persistent anchor to the training workspace.
 - **Context:** the topbar shows the selected workspace and account; a separate test-session band makes simulated identity visible. Controls and destinations reflect the account's actual permissions.
 - **Mobile:** a menu button opens the pine drawer. Provide a labeled close control, keep keyboard focus inside the open drawer, and close it after navigation. Preserve a keyboard skip link to the main content.
 
+### Spaces and assignment context
+
+The Spaces page groups My spaces, Client spaces, and Team under separate section headings. Personal space creation has a persistent name label and a specific action; team creation remains an administrator action under Team. Flat ruled rows show each space's name, the account's access, and an open action. Delete controls stay inside a disclosure until needed. The native space picker uses the same groups; personal spaces accessed by an administrator appear separately from their own work.
+
+Assignment dialogs show the client and their existing space alongside the coach choice. A completed assignment confirms all three and offers Open client space. Client-space access labels distinguish Assigned coach access, Organization owner access, and Administrator access from the client's own training space. At phone widths, space rows and forms stack in reading order with full-width labeled inputs and reachable actions.
+
 ### Ruled Program Row
 
 An open row with a document symbol, a compact program name, real owner and cycle/workout counts, and trailing actions. A Paper Rule divider separates adjacent rows. Long names wrap within the body; they must not displace the action column off screen. On a phone, actions condense while the name and metadata remain readable.

@@ -4,6 +4,7 @@ import Offcanvas from 'react-bootstrap/Offcanvas';
 import { useSession } from '../contexts/SessionContext';
 import Icon, { type IconName } from './Icon';
 import TestUserSwitcher from './TestUserSwitcher';
+import { groupSpaces, spaceAccessLabel } from '../utils/spacePresentation';
 
 export default function Navigation() {
   const { principal, workspaceId, setWorkspaceId, logout } = useSession();
@@ -13,7 +14,8 @@ export default function Navigation() {
   const [error, setError] = useState('');
   const access = principal?.availableWorkspaces.find((item) => item.workspaceId === workspaceId);
   const canManage = principal?.platformRoles.includes('admin') || principal?.memberships.some(m => m.kind === 'organization' && ['owner', 'coach'].includes(m.role));
-  const roleLabel = access?.kind === 'personal' ? 'Personal space' : access?.kind === 'client' && access.role === 'coach' ? 'Assigned coach' : access?.kind === 'organization' && access.role === 'owner' ? 'Organization owner' : access?.role ?? 'No space role';
+  const roleLabel = access ? spaceAccessLabel(access.kind, access.role, access.personalOwnerUserId === principal?.userId) : 'No space role';
+  const spaceGroups = principal ? groupSpaces(principal.availableWorkspaces.filter(space => space.status === 'active'), principal.userId) : [];
   const isAdmin = principal?.platformRoles.includes('admin');
   const sections: { label: string; path: string; icon: IconName; show: boolean }[] = [
     { label: 'Programs', path: '/', icon: 'programs', show: true },
@@ -49,7 +51,7 @@ export default function Navigation() {
     </Offcanvas>
     <header className="topbar">
       <button className="mobile-menu icon-button" aria-label="Open navigation" aria-controls="main-navigation-drawer" aria-expanded={open} onClick={() => setOpen(true)}><Icon name="menu" /></button>
-      <div className="workspace-select"><span>{current}</span>{principal && principal.availableWorkspaces.length > 1 ? <select aria-label="Space" value={workspaceId ?? ''} onChange={(e) => { setWorkspaceId(e.target.value); navigate('/'); }}>{principal.availableWorkspaces.filter((w) => w.status === 'active').map((w) => <option key={w.workspaceId} value={w.workspaceId}>{w.workspaceName} · {w.kind === 'client' ? 'Client' : w.kind === 'personal' ? 'Personal' : 'Organization'}</option>)}</select> : <strong>{access?.workspaceName ?? 'Choose a space'}</strong>}</div>
+      <div className="workspace-select"><span>{current}</span>{principal && principal.availableWorkspaces.length > 1 ? <select aria-label="Space" value={workspaceId ?? ''} onChange={(e) => { setWorkspaceId(e.target.value); navigate('/'); }}>{spaceGroups.filter(group => group.spaces.length).map(group => <optgroup label={group.label} key={group.key}>{group.spaces.map(space => <option key={space.workspaceId} value={space.workspaceId}>{space.workspaceName}</option>)}</optgroup>)}</select> : <strong>{access?.workspaceName ?? 'Choose a space'}</strong>}</div>
       <div className="account-strip"><span className="avatar">{principal?.displayName.split(' ').map((n) => n[0]).slice(0, 2).join('')}</span><div><strong>{principal?.displayName}</strong><span>{roleLabel}</span></div></div>
     </header>
     {principal?.testing?.canSwitch && <div className="test-session-bar"><div><span className="test-tag">Test mode</span><span>{principal.verifiedEmail}</span><small>{principal.testing.isImpersonating ? 'Simulated identity' : 'Account preview'}</small></div><TestUserSwitcher /></div>}

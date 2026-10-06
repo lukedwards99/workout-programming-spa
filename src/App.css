@@ -365,6 +365,35 @@ td strong { font-weight: 600; }
 .assignment-toolbar input::placeholder { color: var(--muted); opacity: 1; }
 .assignment-toolbar input:focus { background: var(--surface); color: var(--ink); border-color: var(--green); box-shadow: none; }
 .assignment-toolbar :focus-visible, .assignment-table button:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
-.space-create { flex-wrap: wrap; }
-.space-create input { flex: 1 1 200px; }
-.space-create select { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px; }
+.space-section { margin-top: 38px; }
+.space-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 20px; }
+.space-section-heading h2 { margin-bottom: 8px; }
+.space-section-heading p { color: var(--muted); max-width: 70ch; margin: 0; }
+.space-section-heading > a { flex-shrink: 0; }
+.space-create { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 24px; }
+.space-create .form-group { flex: 1; margin: 0; }
+.space-create input { width: 100%; }
+.space-empty { color: var(--muted); padding: 16px 0; margin: 0; }
+.space-row { padding: 24px 0; border-top: 1px solid var(--line); }
+.space-row-main { display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.space-row-main > div:first-child { min-width: 0; }
+.space-row h3 { overflow-wrap: anywhere; }
+.space-row p { color: var(--muted); margin: 0; font-size: 13px; }
+.space-row .actions { flex-shrink: 0; }
+.space-delete, .team-create { margin-top: 16px; }
+.space-delete summary, .team-create summary { color: var(--muted); cursor: pointer; width: fit-content; }
+.space-delete label { display: block; margin: 16px 0 8px; }
+.space-delete-controls { display: flex; gap: 12px; max-width: 520px; }
+.space-delete-controls input { min-width: 0; flex: 1; }
+.team-create .space-create { margin-top: 16px; }
+.assignment-preview { margin: 0 0 20px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.assignment-preview > div { display: grid; grid-template-columns: 100px 1fr; gap: 16px; margin-bottom: 8px; }
+.assignment-preview dt { color: var(--muted); font-weight: 400; }
+.assignment-preview dd { margin: 0; overflow-wrap: anywhere; }
+.assignment-success { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.assignment-success button { flex-shrink: 0; }
+@media (max-width: 767px) {
+  .space-section-heading, .space-row-main, .space-create, .assignment-success { flex-direction: column; align-items: stretch; gap: 16px; }
+  .space-row .actions { align-self: flex-start; }
+  .space-create .btn { align-self: flex-start; }
+}

@@ -8,7 +8,7 @@ Hosted beta testers sign in using a Cloudflare email one-time PIN. The administr
 
 An **organization roster** contains owners, coaches, and clients. Adding a client to the roster automatically creates their **one client space**. All of their programs, results, and exercise library belong to that space. Clients can enter only their own space.
 
-Coaches can have many assigned client spaces and create multiple **personal spaces** for training, templates, or other coaching work. Personal spaces are private to their creator and platform admins. Use **Spaces** or the **Space** picker to switch contexts. Owners can enter client spaces belonging to their organization; platform admins can enter all spaces. Only platform admins can create organization rosters.
+Coaches can have many assigned client spaces and create multiple **personal spaces** for training, templates, or other coaching work. Personal spaces are private to their creator and platform admins. **Spaces** and the **Space** picker separate **My spaces**, **Client spaces**, and **Team**. Use **Create personal space** for work without a client attached. Administrators see other users' personal spaces in a separate group. Owners can enter client spaces belonging to their organization; platform admins can enter all spaces. Only platform admins can create teams (organization rosters); their roster tools and existing shared programming stay under **Team**. Clients land directly in their single training space.
 
 Client spaces cannot be deleted or have members added manually. Organizations containing client spaces cannot be deleted. A personal space can be deleted by its owner or an admin after typing its exact name.
 
@@ -16,7 +16,7 @@ Client spaces cannot be deleted or have members added manually. Organizations co
 
 **Client assignments** is available to coaches, organization owners, and admins. It lists each active client, assigned coach, organization, and client space. Search by client or coach, or filter to **My clients** and **Unassigned**.
 
-A coach can **Claim client** when no coach is assigned. Each client has at most one active coach. The assigned coach can **Open space** to view programs, plan training, and maintain that space’s library.
+A coach can **Assign to me** when no coach is assigned. Each client has at most one active coach. The **Assign coach** dialog shows the client and their existing space alongside the coach choice. Assignment confirmation identifies the client, coach, and space and offers **Open client space**. Assigning a coach grants access to the existing client space; it never replaces that space. The assigned coach can open it to view programs, plan training, and maintain its library.
 
 **Release client** returns the client to the unassigned list and removes the coach’s access immediately. It preserves the client’s space, programs, results, and exercises. Only an organization owner or platform admin can **Force release** another coach’s client or use **Assign coach** to select a coach from the organization. Coaches cannot claim someone who is already assigned.
 

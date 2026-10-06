@@ -33,10 +33,11 @@ test('copies an independent program with executed values off by default', async 
 test('creates, switches to, and deletes a workspace', async ({ page }) => {
   const name = `E2E Workspace ${Date.now()}`;
   await page.getByRole('link', { name: 'Spaces' }).click();
-  await page.getByPlaceholder('Space name').fill(name);
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByLabel('Personal space name').fill(name);
+  await page.getByRole('button', { name: 'Create personal space' }).click();
   const card = page.locator('article').filter({ hasText: name });
-  await expect(card.getByText(/selected/)).toBeVisible();
+  await expect(card.getByText(/Current space/)).toBeVisible();
+  await card.getByText('Delete personal space', { exact: true }).click();
   await card.locator('input').fill(name);
   await card.getByRole('button', { name: 'Delete' }).click();
   await expect(card).toHaveCount(0);
@@ -60,8 +61,8 @@ test('coach releases and reclaims a client, opens their space, and sees an isola
   await expect(client.getByRole('button',{name:/Release client/})).toBeVisible();
   await client.getByRole('button',{name:/Release client/}).click();
   await page.getByRole('dialog').getByRole('button',{name:'Release',exact:true}).click();
-  await expect(page.getByRole('button',{name:/Claim client/})).toBeVisible();
-  await page.getByRole('button',{name:/Claim client/}).click();
+  await expect(page.getByRole('button',{name:/Assign to me/})).toBeVisible();
+  await page.getByRole('button',{name:/Assign to me/}).click();
   await page.getByRole('button',{name:/Open space/}).click();
   await expect(page.getByText(/Programs belong to this client/)).toBeVisible();
   await page.getByRole('button',{name:'New program'}).click();
@@ -90,6 +91,9 @@ test('client sees exactly one space and cannot enter the staff assignment page',
   await expect(page.getByRole('link',{name:'Spaces',exact:true})).toHaveCount(0);
   await expect(page.getByRole('combobox',{name:'Space',exact:true})).toHaveCount(0);
   await expect(page.getByRole('button',{name:'New program'})).toHaveCount(0);
+  await page.goto('/workspaces');
+  await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole('heading',{name:'Programs',exact:true})).toBeVisible();
   await page.goto('/clients');
   await expect(page.getByRole('alert')).toHaveText(/available to coaches, owners, and administrators/);
 });
