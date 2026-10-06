@@ -28,10 +28,19 @@ test('hosted environments are separate and cannot enable local auth or asset rou
   const maintenance = laneConfig('dev', undefined, { maintenance: true });
   assert.equal(maintenance.d1_databases, undefined); assert.deepEqual(maintenance.triggers.crons, []);
 });
-test('refuses to broaden or replace unrelated Access policies', () => {
+test('accepts approved beta email allowlists but rejects broad or unrelated Access rules', () => {
   assert.doesNotThrow(() => assertPolicy({ decision: 'allow', include: [{ email: { email: EMAIL } }] }));
+  const beta = { decision: 'allow', include: [{ email: { email: EMAIL } }, { email: { email: 'friend@example.com' } }] };
+  assert.doesNotThrow(() => assertPolicy(beta));
   for (const policy of [{ decision: 'bypass' }, { decision: 'allow', include: [{ everyone: {} }] },
-    { decision: 'allow', include: [{ email: { email: EMAIL } }], require: [{ email_domain: { domain: 'example.com' } }] }]) assert.throws(() => assertPolicy(policy));
+    { ...beta, require: [{ email_domain: { domain: 'example.com' } }] },
+    { ...beta, exclude: [{ email: { email: 'friend@example.com' } }] },
+    { decision: 'allow', include: [{ email: { email: 'friend@example.com' } }] },
+    { ...beta, include: [...beta.include, { email_domain: { domain: 'example.com' } }] },
+    { ...beta, include: [...beta.include, { email: { email: '*@example.com' } }] },
+    { ...beta, include: [...beta.include, { email: { email: 'invalid' } }] },
+    { ...beta, include: [...beta.include, { email: { email: 'friend@example.com' }, everyone: {} }] },
+    { ...beta, include: [...beta.include, null] }, { decision: 'allow', include: [] }]) assert.throws(() => assertPolicy(policy));
 });
 test('promotion requires same-repository dev and latest successful exact-commit deployment', async () => {
   const pr = { base: { ref: 'main' }, head: { ref: 'dev', sha: 'head-sha', repo: { full_name: REPOSITORY } } };
@@ -63,22 +72,49 @@ test('resource collisions stop preflight before any mutation', async () => {
   } finally { globalThis.fetch = original; }
 });
 
-test('Access updates preserve app identity and pin only the approved Cloudflare login provider', async () => {
+test('Access updates pin OTP and preserve existing beta policies and app identity in each lane', async () => {
   const original = globalThis.fetch;
   const writes = [];
   globalThis.fetch = async (url, init) => {
     if (init.method !== 'GET') writes.push({ url, ...init, body: JSON.parse(init.body) });
     return { ok: true, json: async () => ({ success: true,
-      result: init.method === 'GET' ? [{ name: 'liftlog-dev', id: 'worker-id' }] : { id: 'app-id' } }) };
+      result: init.method === 'GET' ? [{ name: 'liftlog-dev', id: 'dev-worker' }, { name: 'liftlog-production', id: 'main-worker' }] : { id: 'app-id' } }) };
   };
   try {
-    await createOperations(inputs).ensureAccess(validateInputs('dev', inputs), { app: { id: 'app-id' }, policy: { id: 'policy-id' } });
-    assert.equal(writes.length, 1);
-    assert.equal(writes[0].method, 'PUT');
-    assert.ok(writes[0].url.endsWith(`/accounts/${ACCOUNT_ID}/access/apps/app-id`));
-    assert.deepEqual(writes[0].body.allowed_idps, [ACCESS_IDP_ID]);
-    assert.equal(writes[0].body.allow_authenticate_via_warp, false);
-    assert.equal(writes[0].body.session_duration, '6h');
-    assert.deepEqual(writes[0].body.destinations, [{ type: 'worker', worker_id: 'worker-id' }]);
+    for (const branch of ['dev', 'main']) {
+      const policy = { id: `${branch}-policy`, decision: 'allow', include: [{ email: { email: EMAIL } }, { email: { email: 'friend@example.com' } }] };
+      const originalPolicy = structuredClone(policy);
+      const names = validateInputs(branch, { ...inputs, GITHUB_REF_NAME: branch, LANE_RESET_APPROVED: `${ACCOUNT_ID}:${branch}` });
+      await createOperations(inputs).ensureAccess(names, { app: { id: `${branch}-app` }, policy });
+      assert.deepEqual(policy, originalPolicy);
+      const write = writes.at(-1);
+      assert.equal(write.method, 'PUT');
+      assert.ok(write.url.endsWith(`/accounts/${ACCOUNT_ID}/access/apps/${branch}-app`));
+      assert.deepEqual(write.body.allowed_idps, [ACCESS_IDP_ID]);
+      assert.equal(write.body.allow_authenticate_via_warp, false);
+      assert.equal(write.body.session_duration, '6h');
+      assert.deepEqual(write.body.destinations, [{ type: 'worker', worker_id: `${branch}-worker` }]);
+      assert.deepEqual(write.body.policies, [{ id: `${branch}-policy`, account_id: ACCOUNT_ID, precedence: 1 }]);
+    }
+    assert.equal(writes.length, 2);
+  } finally { globalThis.fetch = original; }
+});
+
+test('a new OTP application starts with only the owner and never creates an identity provider', async () => {
+  const original = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url, method: init.method, body: init.body ? JSON.parse(init.body) : undefined });
+    const result = init.method === 'GET' ? [{ name: 'liftlog-dev', id: 'worker-id' }]
+      : url.endsWith('/access/policies') ? { id: 'policy-id' } : { id: 'app-id' };
+    return { ok: true, json: async () => ({ success: true, result }) };
+  };
+  try {
+    await createOperations(inputs).ensureAccess(validateInputs('dev', inputs), {});
+    const writes = calls.filter(call => call.method !== 'GET');
+    assert.equal(writes.length, 2);
+    assert.deepEqual(writes[0].body.include, [{ email: { email: EMAIL } }]);
+    assert.deepEqual(writes[1].body.allowed_idps, [ACCESS_IDP_ID]);
+    assert.ok(calls.every(call => !call.url.includes('/identity_providers')));
   } finally { globalThis.fetch = original; }
 });

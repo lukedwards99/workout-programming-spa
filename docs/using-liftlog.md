@@ -4,6 +4,8 @@
 
 Accounts are manually provisioned during beta. There is no public signup. Locally, choose an administrator, either coach, or a client to test role-specific access.
 
+Hosted beta testers sign in using a Cloudflare email one-time PIN. The administrator must create their account in **Admin Users** and add the same email to that environment's Cloudflare Access allowlist before they can test. See [invitation instructions](deployment.md#invite-beta-testers). Hosted deployments reset app accounts and training data, so manually provisioned accounts must be re-created after each deployment.
+
 An **organization roster** contains owners, coaches, and clients. Adding a client to the roster automatically creates their **one client space**. All of their programs, results, and exercise library belong to that space. Clients can enter only their own space.
 
 Coaches can have many assigned client spaces and create multiple **personal spaces** for training, templates, or other coaching work. Personal spaces are private to their creator and platform admins. Use **Spaces** or the **Space** picker to switch contexts. Owners can enter client spaces belonging to their organization; platform admins can enter all spaces. Only platform admins can create organization rosters.

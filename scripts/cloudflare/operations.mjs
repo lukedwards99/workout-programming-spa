@@ -59,6 +59,7 @@ export function createOperations(env = process.env) {
     return { worker, db, app, policy };
   }
   async function ensureAccess(names, inventory) {
+    assertPolicy(inventory.policy);
     const workers = await list('/workers/workers');
     const worker = workers.find(x => x.name === names.worker);
     if (!worker?.id) throw new Error('Cannot resolve the Worker identity for Access.');
@@ -90,6 +91,11 @@ export function createOperations(env = process.env) {
 
 export function assertPolicy(policy) {
   if (!policy) return;
-  if (policy.decision !== 'allow' || policy.exclude?.length || policy.require?.length || policy.include?.length !== 1
-    || Object.keys(policy.include[0]).join() !== 'email' || policy.include[0].email?.email !== EMAIL) throw new Error('Access policy collision: refusing to overwrite unrelated rules.');
+  const emailRule = rule => rule && Object.keys(rule).join() === 'email'
+    && rule.email && Object.keys(rule.email).join() === 'email'
+    && typeof rule.email.email === 'string' && rule.email.email.length <= 320
+    && /^[^\s@*]+@[^\s@*]+\.[^\s@*]+$/.test(rule.email.email);
+  if (policy.decision !== 'allow' || policy.exclude?.length || policy.require?.length
+    || !Array.isArray(policy.include) || !policy.include.length || !policy.include.every(emailRule)
+    || !policy.include.some(rule => rule.email.email.toLowerCase() === EMAIL)) throw new Error('Access policy collision: only explicit approved emails including the owner are supported.');
 }

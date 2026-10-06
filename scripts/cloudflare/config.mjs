@@ -3,8 +3,8 @@ export const ACCOUNT_ID = 'ddb45a91c623b716978d580d88298be1';
 export const SUBDOMAIN = 'luke-edwards20';
 export const REPOSITORY = 'lukedwards99/workout-programming-spa';
 export const EMAIL = 'luke.edwards20@gmail.com';
-// Existing Cloudflare account sign-in in the personal Zero Trust organization.
-export const ACCESS_IDP_ID = '36a7605a-c3e1-4317-a69a-5822337b048f';
+// Approved One-time PIN provider in the personal Zero Trust organization.
+export const ACCESS_IDP_ID = '209d7ca8-b50a-4989-a4c6-4d87fe237334';
 
 export function laneNames(branch) {
   if (!['dev', 'main'].includes(branch)) throw new Error('Only dev and main may deploy.');
@@ -17,7 +17,7 @@ export function validateInputs(branch, env) {
   if (env.CLOUDFLARE_ACCOUNT_ID !== ACCOUNT_ID || env.CLOUDFLARE_WORKERS_SUBDOMAIN !== SUBDOMAIN) throw new Error('Refusing any account or subdomain other than the personal LiftLog account.');
   if (env.GITHUB_REPOSITORY !== REPOSITORY || env.GITHUB_REF_NAME !== branch || env.GITHUB_REF_TYPE !== 'branch') throw new Error('Deployment must run from its matching repository and branch.');
   if (env.LANE_RESET_APPROVED !== `${ACCOUNT_ID}:${branch}`) throw new Error('Explicit lane reset authorization is required.');
-  if (env.CLOUDFLARE_ACCESS_ALLOWED_EMAIL !== EMAIL) throw new Error('The initial Access allowlist must contain only the configured owner.');
+  if (env.CLOUDFLARE_ACCESS_ALLOWED_EMAIL !== EMAIL) throw new Error('The bootstrap Access email must remain the configured owner.');
   if (!env.CLOUDFLARE_API_TOKEN?.trim()) throw new Error('A personal-account API token is required.');
   return names;
 }

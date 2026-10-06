@@ -24,13 +24,31 @@ Create environments `dev` (branch `dev` only) and `production` (branch `main` on
 
 The deployment credential uses Workers Editor, D1 Write, Access Apps Write, Access Policies Write, and Account Settings Read in this account. Do not grant billing, email, R2, queue, or other-account permissions. The account-owned `LiftLog GitHub Actions` token expires October 1, 2027; rotate it in both environment secrets before expiration. Keep credentials in GitHub environment secrets; never commit or log them.
 
-Hosted login uses the personal organization's existing Cloudflare account identity provider, pinned by ID in `scripts/cloudflare/config.mjs`, with six-hour application sessions. Only `luke.edwards20@gmail.com` is allowed. No email-code provider is added, and other applications' identity settings remain unchanged.
+Hosted login uses only the personal organization's approved One-time PIN identity provider, pinned by `ACCESS_IDP_ID` in `scripts/cloudflare/config.mjs`, with six-hour application sessions. CI only attaches this provider to the selected LiftLog application; it never creates or changes identity providers. The bootstrap policy permits only `luke.edwards20@gmail.com`, and subsequent deployments preserve the existing explicit beta email allowlist, which must retain the owner. Domain-wide, wildcard, Everyone, and non-email rules are rejected.
 
 Workers Editor can deploy existing Workers but cannot create or delete them. Initial setup creates both Workers in maintenance mode using the operator's personal Cloudflare login and `laneConfig(branch, undefined, { maintenance: true })`. These stable Workers carry the repository/lane ownership variables before CI takes over. Recreating a deleted Worker requires this same operator bootstrap; do not broaden the CI credential to Workers Admin just for routine deployments.
 
 The `verify` check runs `npm run check` on PRs. `promotion policy` runs trusted base-branch code, allows feature PRs into dev, and accepts main PRs only from the same repository's dev branch after its latest deployment for the exact head commit succeeds. PR policy requires merge commits, no mandatory second reviewer, and blocks branch deletion/force-push. Keep main as the default branch.
 
 Bootstrap dev first. The initial dev → main PR installs the trusted promotion workflow on main, so inspect its dev deployment and verification checks before merging under the existing rules. Then require both `verify` and `promotion policy` checks on dev and main. Do not require a check before the workflow exists on its trusted base.
+
+## One-time PIN setup
+
+The personal organization's One-time PIN provider was added with owner approval on October 6, 2026. Its UUID is `209d7ca8-b50a-4989-a4c6-4d87fe237334` and is pinned in the deployment configuration. No new GitHub secrets or environment variables are required.
+
+Merge the OTP PR into dev when ready. Its normal deployment updates only **LiftLog: dev** to use OTP. Test a fresh login and logout before promoting into main; production's current login stays in place until its own deployment.
+
+If the provider must be recreated, use **Zero Trust → Integrations → Identity providers** in this personal account, request approval before adding the replacement, and update `ACCESS_IDP_ID` through a PR after verifying the new provider's type and UUID. Keep the existing Cloudflare provider. API creation requires `Access: Organizations, Identity Providers, and Groups Write`; use an operator credential or the dashboard rather than expanding the CI token.
+
+See [Cloudflare's One-time PIN instructions](https://developers.cloudflare.com/cloudflare-one/integrations/identity-providers/one-time-pin/). PINs expire after ten minutes and are single-use; requesting a new PIN invalidates the previous one. Cloudflare sends codes only to emails allowed by the application's policy, even though its login page presents the same confirmation to everyone.
+
+## Invite beta testers
+
+1. Sign in as the owner and create each friend's exact email in **Admin Users**, with invited or active status and the intended organization role. The app's existing provisioning flow supplies their space access.
+2. In Cloudflare Zero Trust, edit **LiftLog: dev allowlist** under **Access controls → Policies**. Add each approved friend as an **Include → Emails** entry alongside the owner. Keep the policy action **Allow**. Request approval before saving new access if an agent performs this step.
+3. Share the dev URL yourself. Friends enter the same email, receive a Cloudflare code, and sign in. Their first real login links the verified email to their pre-created app account and activates an invited account. Unknown or disabled app users cannot use the API even if Cloudflare admits their email.
+
+Manage each lane's allowlist separately; deployment preserves its approved email entries. Every deployment still resets that lane's D1 database, including manually provisioned beta accounts and training data. Re-create those app accounts after a deployment before friends test again. To revoke access, remove the email from the lane's Access allowlist and disable the app account; revoke existing Access sessions if immediate sign-out is required.
 
 ## Reset and recovery
 
