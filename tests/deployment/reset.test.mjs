@@ -8,6 +8,7 @@ import { ACCOUNT_ID, EMAIL, REPOSITORY, SUBDOMAIN } from '../../scripts/cloudfla
 
 const inputs = branch => ({ CLOUDFLARE_ACCOUNT_ID: ACCOUNT_ID, CLOUDFLARE_WORKERS_SUBDOMAIN: SUBDOMAIN,
   CLOUDFLARE_ACCESS_ALLOWED_EMAIL: EMAIL, CLOUDFLARE_API_TOKEN: 'test-token', GITHUB_REPOSITORY: REPOSITORY,
+  CLOUDFLARE_ACCESS_OTP_IDP_ID: '11111111-1111-4111-8111-111111111111',
   GITHUB_REF_NAME: branch, GITHUB_REF_TYPE: 'branch', LANE_RESET_APPROVED: `${ACCOUNT_ID}:${branch}`, GITHUB_SHA: 'test-sha' });
 
 test('reset isolates environments, protects Access before deleting data, and closes on failure', async () => {

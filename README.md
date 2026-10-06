@@ -29,7 +29,7 @@ Feature branch → pull request into **dev** → test the dev deployment → pul
 
 Both hosted environments are disposable: **every deployment, including a manual rerun, recreates that environment's database**. The initial state contains Luke's admin account and an owner workspace, with no demo workouts. Main's environment name does not imply durable production data.
 
-Cloudflare Access protects each Worker and permits only `luke.edwards20@gmail.com` through the personal Cloudflare identity provider. No application email service is needed. Local login and fixture endpoints are unavailable remotely.
+Cloudflare Access protects each Worker with emailed one-time PINs for explicitly approved beta email addresses. The initial allowlist contains `luke.edwards20@gmail.com`; follow the [beta invitation steps](docs/deployment.md#invite-beta-testers) to add friends. Cloudflare sends the codes, so no application email service is needed. Local login and fixture endpoints are unavailable remotely.
 
 ## Training studio rewrite
 
